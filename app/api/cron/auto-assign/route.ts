@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 
 // Cron: Called every 15 min via Vercel Cron or external scheduler
-// Auto-assign staff to bookings that are 3 hours away with no staff
+// Auto-assign staff to bookings that are 2 hours away with no staff
 export async function GET(req: NextRequest) {
     // Verify cron secret
     const auth = req.headers.get('authorization')
@@ -12,9 +12,9 @@ export async function GET(req: NextRequest) {
 
     const supabase = createServiceClient()
     const now = new Date()
-    const cutoff = new Date(now.getTime() + 3 * 60 * 60 * 1000) // 3 hours from now
+    const cutoff = new Date(now.getTime() + 2 * 60 * 60 * 1000) // 2 hours from now
 
-    // Get pending bookings happening within 3 hours
+    // Get pending bookings happening within 2 hours
     const { data: pendingBookings } = await supabase
         .from('bookings')
         .select('id, zone_id, scheduled_date, scheduled_time, customers(full_name, line_user_id)')
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     let assigned = 0
     for (const booking of pendingBookings || []) {
         const bookingDt = new Date(`${booking.scheduled_date}T${booking.scheduled_time}`)
-        if (bookingDt > cutoff) continue // More than 3 hours away, skip
+        if (bookingDt > cutoff) continue // More than 2 hours away, skip
 
         // Find available staff for this zone/date/time
         const { data: schedules } = await supabase
