@@ -1,0 +1,214 @@
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-5);
+}
+
+.section {
+    margin-bottom: var(--space-4);
+}
+
+.sectionTitle {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--space-4);
+}
+
+.infoGrid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.infoRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-4);
+    font-size: 0.9rem;
+}
+
+.infoRow span:first-child {
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.actionBar {
+    position: fixed;
+    bottom: 84px; /* Increased from 72px to ensure no overlap */
+    bottom: calc(84px + env(safe-area-inset-bottom));
+    left: 0;
+    right: 0;
+    padding: var(--space-4) var(--space-5);
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    z-index: 110; /* Higher than bottom-nav's 100 */
+    box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.12); /* Stronger shadow for depth */
+}
+
+/* Additional Costs Refinement */
+.costCard {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
+    box-shadow: var(--shadow-card);
+}
+
+.costInputGroup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+}
+
+.fieldLabel {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-1);
+}
+
+.priceInputWrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.priceInputWrapper input {
+    padding-left: 2.5rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.currencySymbol {
+    position: absolute;
+    left: 1rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.slipUploadArea {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-8);
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    background: var(--bg);
+}
+
+.slipUploadArea:hover {
+    border-color: var(--primary);
+    background: var(--primary-ghost);
+    transform: scale(0.99);
+}
+
+.slipPreview {
+    position: relative;
+    width: 140px;
+    height: 140px;
+    margin: 0 auto;
+    border-radius: var(--radius-lg);
+    overflow: visible;
+    box-shadow: var(--shadow);
+}
+
+.slipPreview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: var(--radius-lg);
+}
+
+.removeSlip {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    background: var(--danger);
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: var(--shadow-sm);
+    z-index: 10;
+}
+
+.uploadPlaceholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-muted);
+}
+
+.uploadPlaceholder span:first-child {
+    font-size: 2.5rem;
+}
+
+.mandatoryLabel {
+    color: var(--danger);
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-left: var(--space-1);
+}
+
+/* Modal Styles - Shared with Dashboard */
+.modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: var(--space-4);
+}
+
+.modalContent {
+    background: var(--surface);
+    width: 100%;
+    max-width: 320px;
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.modalTitle {
+    font-size: 1.1rem;
+    font-weight: 800;
+    margin-bottom: var(--space-2);
+}
+
+.modalDesc {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    margin-bottom: var(--space-6);
+}
+
+.modalActions {
+    display: flex;
+    gap: var(--space-3);
+}

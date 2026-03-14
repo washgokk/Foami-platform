@@ -1,0 +1,1079 @@
+'use client'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
+import styles from './crm.module.css'
+import { getRFMScore, segmentCustomer, DEFAULT_CRM_CONFIG } from '@/lib/crm-utils'
+import { generateScalableId } from '@/lib/id-utils'
+import { VEHICLE_SIZE_LABEL } from '@/lib/types'
+
+/* 
+This CRM Page groups customer data into 4 tabs:
+1. Profiles (All customer info & dynamic flags)
+2. Transactions (All booking history)
+3. Analytics (RFM scoring algorithms & behaviors)
+4. Segments (Custom segment builder for discounts)
+*/
+
+export default function CRMPage() {
+    const [activeTab, setActiveTab] = useState<'profiles' | 'transactions' | 'analytics' | 'segments'>('profiles')
+
+    // Data State
+    const [customers, setCustomers] = useState<any[]>([])
+    const [bookings, setBookings] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
+    const [searchTerm, setSearchTerm] = useState('')
+
+    // Segment Builder State
+    const [segmentName, setSegmentName] = useState('')
+    const [conditions, setConditions] = useState<any[]>([
+        { id: Date.now(), metric: 'totalVisits', operator: '>=', value: '5' }
+    ])
+    const [showLegend, setShowLegend] = useState(false)
+    const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
+    const [crmConfig, setCrmConfig] = useState(DEFAULT_CRM_CONFIG)
+    const [savedSegments, setSavedSegments] = useState<any[]>([])
+    const [editingSegmentId, setEditingSegmentId] = useState<string | null>(null)
+
+    // Load Data
+    useEffect(() => {
+        const loadSavedConfig = localStorage.getItem('foami_crm_config')
+        if (loadSavedConfig) {
+            try { setCrmConfig(JSON.parse(loadSavedConfig)) } catch(e) {}
+        }
+        const loadSegments = localStorage.getItem('crm_custom_segments')
+        if (loadSegments) {
+            try { setSavedSegments(JSON.parse(loadSegments)) } catch(e) {}
+        }
+    }, [])
+
+    const saveConfig = (newConfig: any) => {
+        setCrmConfig(newConfig)
+        localStorage.setItem('foami_crm_config', JSON.stringify(newConfig))
+    }
+
+    // Load Data
+    useEffect(() => {
+        const loadData = async () => {
+            setLoading(true)
+            const [custRes, bookRes, svcRes, stfRes, znRes, brRes] = await Promise.all([
+                supabase.from('customers').select('*').order('created_at', { ascending: false }),
+                supabase.from('bookings').select(`
+                    *, 
+                    customers(*), 
+                    staff(full_name),
+                    services(name),
+                    zones(name, branches(name))
+                `).order('created_at', { ascending: false }),
+                supabase.from('services').select('*'),
+                supabase.from('staff').select('*'),
+                supabase.from('zones').select('*'),
+                supabase.from('branches').select('*')
+            ])
+
+            const customersData = custRes.data || []
+            const rawBookings = bookRes.data || []
+            const servicesData = svcRes.data || []
+            const staffData = stfRes.data || []
+            const zonesData = znRes.data || []
+            const branchesData = brRes.data || []
+
+            // Manual Client-Side Join (Fallback for Mock DB or loose relations)
+            const enrichedBookings = rawBookings.map(b => {
+                const enriched = { ...b }
+                if (!enriched.customers && enriched.customer_id) {
+                    enriched.customers = customersData.find(c => c.id === enriched.customer_id)
+                }
+                if (!enriched.services && enriched.service_id) {
+                    enriched.services = servicesData.find(s => s.id === enriched.service_id)
+                }
+                if (!enriched.staff && enriched.staff_id) {
+                    enriched.staff = staffData.find(s => s.id === enriched.staff_id)
+                }
+                if (!enriched.zones && enriched.zone_id) {
+                    const zone = zonesData.find(z => z.id === enriched.zone_id)
+                    if (zone) {
+                        const branch = branchesData.find(br => br.id === zone.branch_id)
+                        enriched.zones = { ...zone, branches: branch }
+                    }
+                }
+                return enriched
+            })
+
+            setCustomers(customersData)
+            setBookings(enrichedBookings)
+            setLoading(false)
+        }
+        loadData()
+    }, [])
+
+    // Process Analytics
+    const customerStats = customers.map(c => {
+        const cBookings = bookings.filter(b => b.customer_id === c.id && ['completed', 'paid', 'delivering'].includes(b.status))
+        const totalSpent = cBookings.reduce((sum, b) => sum + (b.total_price || 0), 0)
+        const totalVisits = cBookings.length
+        
+        // Extract all unique addons used by this customer
+        const allAddons = new Set<string>()
+        cBookings.forEach(b => {
+            if (Array.isArray(b.addon_ids)) {
+                b.addon_ids.forEach((a: any) => {
+                    if (typeof a === 'string') allAddons.add(a)
+                    else if (a && a.name) allAddons.add(a.name)
+                })
+            }
+        })
+
+        const lastVisitDate = cBookings.length > 0
+            ? [...cBookings].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0].created_at
+            : null
+
+        let daysSinceLast = 999
+        if (lastVisitDate) {
+            daysSinceLast = Math.floor((new Date().getTime() - new Date(lastVisitDate).getTime()) / (1000 * 3600 * 24))
+        }
+
+        const rfmParams = getRFMScore(daysSinceLast, totalVisits, totalSpent, crmConfig)
+        const segment = segmentCustomer(rfmParams, crmConfig)
+
+        const vehicleCount = (Array.isArray(c.saved_vehicles) && c.saved_vehicles.length > 0) 
+            ? c.saved_vehicles.length 
+            : (c.vehicle_brand ? 1 : 0)
+
+        return { 
+            ...c, 
+            totalSpent, 
+            totalVisits, 
+            lastVisitDate, 
+            daysSinceLast, 
+            rfm: rfmParams, 
+            segment, 
+            vehicleCount,
+            addons: Array.from(allAddons) 
+        }
+    })
+
+    const filteredStats = customerStats.filter(c =>
+        c.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.phone?.includes(searchTerm) ||
+        c.license_plate?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.occupation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (Array.isArray(c.interests) && c.interests.some((i: string) => i.toLowerCase().includes(searchTerm.toLowerCase())))
+    )
+
+    // Calculate how many users fit the segment builder condition
+    const evaluateSegmentMatch = (c: any) => {
+        if (conditions.length === 0) return true 
+
+        return conditions.every(cond => {
+            const val = cond.value
+            const target = c[cond.metric]
+            
+            // Special Handle: Profile Completion (Boolean)
+            if (cond.metric === 'is_profile_complete') {
+                const targetBool = !!target
+                const valBool = val === 'true'
+                return cond.operator === '===' ? targetBool === valBool : targetBool !== valBool
+            }
+
+            if (target === undefined) return false
+
+            // Handle Array match (Interests / Addons)
+            if (['interests', 'addons'].includes(cond.metric) && Array.isArray(target)) {
+                if (cond.operator === 'contains') return target.some(a => String(a).toLowerCase().includes(String(val).toLowerCase()))
+                if (cond.operator === 'not_contains') return !target.some(a => String(a).toLowerCase().includes(String(val).toLowerCase()))
+                return false
+            }
+
+            // Handle string comparisons
+            if (['gender', 'vehicle_brand', 'vehicle_size', 'segment', 'occupation'].includes(cond.metric)) {
+                if (cond.operator === '===') return String(target).toLowerCase() === String(val).toLowerCase()
+                return String(target).toLowerCase().includes(String(val).toLowerCase())
+            }
+
+            // Handle numeric comparisons
+            const numVal = Number(val)
+            const numTarget = Number(target)
+            if (cond.operator === '>=') return numTarget >= numVal
+            if (cond.operator === '<=') return numTarget <= numVal
+            if (cond.operator === '===') return numTarget === numVal
+            if (cond.operator === '!=') return numTarget !== numVal
+            return false
+        })
+    }
+    const matchedUsersCount = customerStats.filter(evaluateSegmentMatch).length
+
+    // ─── ID Migration Logic ─────────────────────────────────────
+    const runIdMigration = async () => {
+        if (!confirm('ยืนยันระบบอัปเกรด Booking ID และ Customer ID ให้เป็นรูปแบบ Professional? \n(ระบบจะเปลี่ยน UUID เดิมทั้งหมด และเชื่อมความสัมพันธ์ให้ถูกต้อง)')) return
+        
+        setLoading(true)
+        const idMap: Record<string, string> = {}
+        
+        // 1. Migrate Customers
+        const { data: rawCustomers } = await supabase.from('customers').select('*')
+        const migratedCustomers = (rawCustomers || []).map(c => {
+            if (c.id.startsWith('CU-')) return c
+            const newId = generateScalableId('CU')
+            idMap[c.id] = newId
+            return { ...c, id: newId }
+        })
+
+        // 2. Migrate Bookings
+        const { data: rawBookings } = await supabase.from('bookings').select('*')
+        const migratedBookings = (rawBookings || []).map(b => {
+            const oldBookingId = b.id
+            // Update Customer Reference
+            if (idMap[b.customer_id]) {
+                b.customer_id = idMap[b.customer_id]
+            }
+
+            // Update Booking ID itself if it's a UUID
+            if (!b.id.startsWith('BK-')) {
+                const now = new Date(b.created_at)
+                const yy = now.getFullYear().toString().slice(-2)
+                const mm = (now.getMonth() + 1).toString().padStart(2, '0')
+                const dd = now.getDate().toString().padStart(2, '0')
+                const random = Math.random().toString(36).substring(2, 8).toUpperCase()
+                const newBookingId = `BK-${yy}${mm}${dd}-${random}`
+                idMap[oldBookingId] = newBookingId
+                b.id = newBookingId
+            }
+            return b
+        })
+
+        // 3. Migrate Job Photos
+        const { data: rawPhotos } = await supabase.from('job_photos').select('*')
+        const migratedPhotos = (rawPhotos || []).map(p => {
+            if (idMap[p.booking_id]) {
+                p.booking_id = idMap[p.booking_id]
+            }
+            return p
+        })
+
+        // Save back to Mock DB
+        localStorage.setItem('foami_mock_db_customers', JSON.stringify(migratedCustomers))
+        localStorage.setItem('foami_mock_db_bookings', JSON.stringify(migratedBookings))
+        localStorage.setItem('foami_mock_db_job_photos', JSON.stringify(migratedPhotos))
+        
+        alert('อัปเกรด ID เสร็จสิ้น! ระบบทำการจดจำความสัมพันธ์ลูกค้าและการจองเดิมได้ครบถ้วน')
+        window.location.reload()
+    }
+
+    if (loading) return <div className="p-8 text-center text-gray-500">กำลังโหลดข้อมูล CRM... <span className="spinner" /></div>
+
+    return (
+        <>
+        <div className={`animate-fade ${styles.page}`}>
+            <div className={styles.header}>
+                <h1 className={styles.title}>👥 CRM & ฐานลูกค้า</h1>
+                <button className="btn btn-sm btn-ghost" onClick={runIdMigration} style={{ opacity: 0.6, fontSize: '0.7rem' }}>⚙️ อัปเกรด ID ระบบ</button>
+            </div>
+
+            <div className={styles.tabs}>
+                <button className={`${styles.tabBtn} ${activeTab === 'profiles' ? styles.tabActive : ''}`} onClick={() => setActiveTab('profiles')}>
+                    โปรไฟล์ลูกค้า
+                </button>
+                <button className={`${styles.tabBtn} ${activeTab === 'transactions' ? styles.tabActive : ''}`} onClick={() => setActiveTab('transactions')}>
+                    ประวัติธุรกรรม (Transactions)
+                </button>
+                <button className={`${styles.tabBtn} ${activeTab === 'analytics' ? styles.tabActive : ''}`} onClick={() => setActiveTab('analytics')}>
+                    วิเคราะห์พฤติกรรม (RFM)
+                </button>
+                <button className={`${styles.tabBtn} ${activeTab === 'segments' ? styles.tabActive : ''}`} onClick={() => setActiveTab('segments')}>
+                    เครื่องมือสร้าง Segments
+                </button>
+            </div>
+
+            {/* TAB 1: PROFILES */}
+            {activeTab === 'profiles' && (
+                <div className={styles.card}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+                        <h2 className={styles.tableTitle}>ฐานข้อมูลลูกค้า (Profiles)</h2>
+                        <input className="form-input" style={{ width: 250 }} placeholder="ค้นหาชื่อ, เบอร์, ทะเบียน..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                    </div>
+
+                    <div className={styles.tableContainer}>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>รหัสลูกค้า</th>
+                                    <th>ชื่อลูกค้า</th>
+                                    <th>เบอร์โทร</th>
+                                    <th>วันเกิด</th>
+                                    <th>เพศ</th>
+                                    <th>อาชีพ</th>
+                                    <th>วันที่สมัคร</th>
+                                    <th>รถ/ที่อยู่</th>
+                                    <th>ความสนใจ</th>
+                                    <th>ล้าง</th>
+                                    <th>สะสม</th>
+                                    <th>จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredStats.map(c => (
+                                    <tr key={c.id}>
+                                        <td style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{c.id}</td>
+                                        <td style={{ fontWeight: 600 }}>{c.full_name}</td>
+                                        <td>{c.phone}</td>
+                                        <td>{c.birthdate ? new Date(c.birthdate).toLocaleDateString('th-TH') : '-'}</td>
+                                        <td>{c.gender === 'male' ? 'ชาย' : c.gender === 'female' ? 'หญิง' : c.gender || '-'}</td>
+                                        <td style={{ fontSize: '0.85rem' }}>{c.occupation || '-'}</td>
+                                        <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                            {c.created_at ? new Date(c.created_at).toLocaleDateString('th-TH') : '-'}
+                                        </td>
+                                        <td style={{ fontSize: '0.85rem' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                                <span style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                                                    🚗 {c.vehicleCount} คัน
+                                                </span>
+                                                <span style={{ color: 'var(--text-secondary)' }}>
+                                                    📍 {Array.isArray(c.saved_locations) ? c.saved_locations.length : 0} แห่ง
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxWidth: 150 }}>
+                                                {Array.isArray(c.interests) && c.interests.map((i: string) => (
+                                                    <span key={i} style={{ fontSize: '0.6rem', padding: '2px 4px', background: 'var(--primary-ghost)', color: 'var(--primary)', borderRadius: 4 }}>{i.split(' ')[1] || i}</span>
+                                                ))}
+                                                {(!c.interests || c.interests.length === 0) && '-'}
+                                            </div>
+                                        </td>
+                                        <td>{c.totalVisits}</td>
+                                        <td>{c.totalSpent.toLocaleString()}</td>
+                                        <td>
+                                            <button 
+                                                className="btn btn-sm btn-ghost" 
+                                                title="ดูรายละเอียดแบบเต็ม"
+                                                onClick={() => setSelectedCustomer(c)}
+                                            >🖊️</button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {filteredStats.length === 0 && (
+                                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>ไม่พบข้อมูลลูกค้า</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* TAB 2: TRANSACTIONS */}
+            {activeTab === 'transactions' && (
+                <div className={styles.card}>
+                    <h2 className={styles.tableTitle}>ประวัติธุรกรรมทั้งหมด (All Transactions)</h2>
+                    <div className={styles.tableContainer}>
+                        <table>
+                                    <thead>
+                                        <tr>
+                                            <th> Timestamp </th>
+                                            <th> Booking ID </th>
+                                            <th> Customer ID </th>
+                                            <th> ชื่อลูกค้า </th>
+                                            <th> เบอร์โทร </th>
+                                            <th> ยี่ห้อ / รุ่นรถ </th>
+                                            <th> ทะเบียน </th>
+                                            <th> สีรถ </th>
+                                            <th> ว/ด/ป รับบริการ </th>
+                                            <th> เวลารับบริการ </th>
+                                            <th> สาขาที่รับผิดชอบ </th>
+                                            <th> โซน </th>
+                                            <th> ชื่อแพ็กเกจ </th>
+                                            <th> บริการเสริม </th>
+                                            <th> ราคาหลัก </th>
+                                            <th> ค่าพื้นที่ </th>
+                                            <th> เพิ่มเติม </th>
+                                            <th> ส่วนลด </th>
+                                            <th> ยอดรวม </th>
+                                            <th> ผู้รับผิดชอบ </th>
+                                            <th> คะแนนรีวิว </th>
+                                            <th> คอมเม้น </th>
+                                            <th> ชำระเงิน </th>
+                                            <th> สถานะจ่าย </th>
+                                            <th> สถานะงาน </th>
+                                            <th> ข้อมูลโปรไฟล์ </th>
+                                            <th> รับ/ส่งรถ </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {bookings.map(b => {
+                                            const vData = b.vehicle_data || b.customers || {}
+                                            const zonesData = b.zones as any
+                                            const branchName = zonesData?.branches?.name || '-'
+                                            const zoneName = b.extra_fee > 0 ? 'นอกโซน' : (zonesData?.name || '-')
+                                            
+                                            // Parse Addons
+                                            let addonListStr = 'ไม่มี'
+                                            if (Array.isArray(b.addon_ids) && b.addon_ids.length > 0) {
+                                                addonListStr = b.addon_ids.map((a: any) => typeof a === 'string' ? a : a.name).join(', ')
+                                            }
+
+                                            // Helper to extract building/detail name from full address
+                                            const formatLocation = (addr: string) => {
+                                                if (!addr) return '-'
+                                                const parts = addr.split('(')
+                                                let detail = parts[0].trim()
+                                                if (!detail && addr.includes(')')) detail = addr.split(')')[1].trim().split(' ')[0]
+                                                return detail || '-'
+                                            }
+
+                                            return (
+                                                <tr key={b.id}>
+                                                    <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{new Date(b.created_at).toLocaleString('th-TH')}</td>
+                                                    <td style={{ fontWeight: 600, fontSize: '0.72rem', fontFamily: 'monospace' }}>{b.id}</td>
+                                                    <td style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{b.customer_id || '-'}</td>
+                                                    <td style={{ fontWeight: 600 }}>{b.customers?.full_name || 'ไม่ทราบชื่อ'}</td>
+                                                    <td style={{ whiteSpace: 'nowrap' }}>{b.customers?.phone || '-'}</td>
+                                                    <td style={{ fontWeight: 600 }}>{vData.vehicle_brand || '-'} {vData.vehicle_model || ''}</td>
+                                                    <td style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{vData.license_plate || '-'}</td>
+                                                    <td style={{ fontSize: '0.85rem' }}>{vData.vehicle_color || '-'}</td>
+                                                    <td>{b.scheduled_date ? new Date(b.scheduled_date).toLocaleDateString('th-TH') : '-'}</td>
+                                                    <td>{b.scheduled_time?.substring(0, 5) || '-'}</td>
+                                                    <td style={{ fontWeight: 600, color: 'var(--primary)' }}>{branchName}</td>
+                                                    <td style={{ color: b.extra_fee > 0 ? 'var(--danger)' : 'inherit', fontWeight: b.extra_fee > 0 ? 600 : 400 }}>{zoneName}</td>
+                                                    <td style={{ color: 'var(--primary)', fontWeight: 600 }}>{b.services?.name || '-'}</td>
+                                                    <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={addonListStr}>
+                                                        {addonListStr}
+                                                    </td>
+                                                    <td>฿{b.base_price?.toLocaleString() || 0}</td>
+                                                    <td style={{ color: 'var(--primary)' }}>฿{b.extra_fee?.toLocaleString() || 0}</td>
+                                                    <td style={{ color: 'var(--warning)' }}>
+                                                        {b.slip_url ? (
+                                                            <a href={b.slip_url} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline', color: 'var(--warning)', fontWeight: 600 }} title="กดเพื่อดูสลิป">
+                                                                ฿{b.additional_price?.toLocaleString() || 0}
+                                                            </a>
+                                                        ) : (
+                                                            <>฿{b.additional_price?.toLocaleString() || 0}</>
+                                                        )}
+                                                    </td>
+
+                                                    <td style={{ color: 'var(--danger)' }}>
+                                                        {b.discount_amount ? `-฿${b.discount_amount.toLocaleString()}` : '฿0'}
+                                                    </td>
+
+                                                    <td style={{ fontWeight: 700, color: 'var(--primary)' }}>฿{b.total_price?.toLocaleString() || 0}</td>
+                                                    
+                                                    <td style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>
+                                                        {b.staff?.full_name || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>ยังไม่ได้รับ</span>}
+                                                    </td>
+
+                                                    <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--warning)' }}>
+                                                        {b.rating ? `⭐ ${b.rating}` : '-'}
+                                                    </td>
+
+                                                    <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {b.review_comment || '-'}
+                                                    </td>
+
+                                                    <td>{b.payment_method === 'stripe' ? 'บัตร/Stripe' : b.payment_method === 'transfer' ? 'โอนเงิน' : '-'}</td>
+                                                    <td>
+                                                        <span style={{ color: b.payment_status === 'paid' ? 'var(--success)' : 'var(--warning)', fontWeight: 600 }}>
+                                                            {b.payment_status === 'paid' ? 'จ่ายแล้ว' : b.payment_status === 'pending' ? 'รอชำระ' : b.payment_status || '-'}
+                                                        </span>
+                                                    </td>
+                                                    <td><span className={styles.tag}>{b.status}</span></td>
+
+                                                    <td style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                                                        <div style={{ fontWeight: 600 }}>{b.customers?.gender === 'male' ? 'ชาย' : b.customers?.gender === 'female' ? 'หญิง' : b.customers?.gender || '-'}</div>
+                                                        <div style={{ color: 'var(--text-muted)' }}>{b.customers?.occupation || '-'}</div>
+                                                        <div style={{ fontSize: '0.7rem', color: 'var(--primary)' }}>
+                                                            {Array.isArray(b.customers?.interests) ? b.customers.interests.slice(0, 2).join(', ') : '-'}
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ fontSize: '0.8rem', fontWeight: 600 }}>
+                                                        <div title={`จาก: ${b.pickup_address}`}>📍 {formatLocation(b.pickup_address)}</div>
+                                                        <div title={`ถึง: ${b.delivery_address}`}>🏁 {formatLocation(b.delivery_address)}</div>
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })}
+                                {bookings.length === 0 && (
+                                    <tr><td colSpan={21} style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>ไม่พบข้อมูลธุรกรรม</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* TAB 3: ANALYTICS (RFM) */}
+            {activeTab === 'analytics' && (
+                <div className={styles.card}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                        <div>
+                            <h2 className={styles.tableTitle}>วิเคราะห์พฤติกรรม (Behavior & RFM)</h2>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                ระบบคำนวณจาก: ช่วงเวลาที่หายไป (Recency), ความถี่เข้าล้าง (Frequency), และมูลค่ารวมที่จ่าย (Monetary)
+                            </p>
+                        </div>
+                        <button className="btn btn-sm btn-outline" onClick={() => setShowLegend(true)}>ℹ️ ดูความหมายแท็ก</button>
+                    </div>
+
+
+                    <div className={styles.tableContainer}>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ชื่อลูกค้า</th>
+                                    <th>เวลาที่ผ่านไป (R)</th>
+                                    <th>ความถี่ (F)</th>
+                                    <th>ยอดรวม (M)</th>
+                                    <th>Auto-Segment แท็ก</th>
+                                </tr>
+                            </thead>
+                                <tbody>
+                                    {customerStats.sort((a, b) => b.totalSpent - a.totalSpent).map(c => (
+                                        <tr key={c.id}>
+                                            <td style={{ fontWeight: 600 }}>{c.full_name}</td>
+                                            <td>
+                                                {c.lastVisitDate ? (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                        <span style={{ color: c.daysSinceLast > 30 ? 'var(--danger)' : 'var(--success)' }}>
+                                                            {c.daysSinceLast} วัน
+                                                        </span>
+                                                        {c.daysSinceLast > 30 && <small style={{ color: 'var(--text-muted)' }}>(ควรติดตาม)</small>}
+                                                    </div>
+                                                ) : '-'}
+                                            </td>
+                                            <td>{c.totalVisits} ครั้ง</td>
+                                            <td style={{ color: 'var(--primary)', fontWeight: 700 }}>฿{c.totalSpent.toLocaleString()}</td>
+                                            <td><span className={`${styles.tag} ${styles['tag-' + c.segment?.replace(/\s+/g, '-').replace(/[()]/g, '').toLowerCase()]}`}>{c.segment}</span></td>
+                                        </tr>
+                                    ))}
+                                {customerStats.length === 0 && (
+                                    <tr><td colSpan={5} style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>ไม่พบข้อมูลลูกค้าสำหรับวิเคราะห์</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* TAB 4: SEGMENT BUILDER */}
+            {activeTab === 'segments' && (
+                <div className={styles.card}>
+                    <h2 className={styles.tableTitle}>เครื่องมือสร้างกลุ่มเป้าหมาย (Segment Builder) 🎯</h2>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 24 }}>
+                        กำหนดเงื่อนไขเพื่อดึงรายชื่อลูกค้าเป้าหมาย แล้วบันทึกเป็น Segment นำไปใช้ผูกกับคูปองส่วนลด
+                    </p>
+
+                    <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                        {/* Builder Form */}
+                        <div style={{ flex: '1 1 350px', background: 'var(--surface-2)', padding: 24, borderRadius: 12, border: '1px solid var(--border)' }}>
+                            <div className="form-group">
+                                <label style={{ fontWeight: 700, marginBottom: 8, display: 'block' }}>ตั้งชื่อ Segment นี้</label>
+                                <input className="form-input" placeholder="เช่น ลูกค้าสาวก Honda, แคมเปญวันพ่อ..." value={segmentName} onChange={e => setSegmentName(e.target.value)} />
+                            </div>
+
+                            <div style={{ marginTop: 24 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                    <label style={{ fontWeight: 700 }}>เงื่อนไข (Conditions)</label>
+                                    <button 
+                                        className="btn btn-sm btn-outline" 
+                                        style={{ height: 28, fontSize: '0.75rem' }}
+                                        onClick={() => setConditions([...conditions, { id: Date.now(), metric: 'totalVisits', operator: '>=', value: '1' }])}
+                                    >
+                                        + เพิ่มเงื่อนไข
+                                    </button>
+                                </div>
+                                
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                    {conditions.map((cond, idx) => (
+                                        <div key={cond.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 32px', gap: 6, alignItems: 'center' }}>
+                                            <select 
+                                                className="form-input" 
+                                                style={{ fontSize: '0.8rem', padding: '6px 8px' }}
+                                                value={cond.metric} 
+                                                onChange={e => {
+                                                    const newConds = [...conditions]
+                                                    newConds[idx].metric = e.target.value
+                                                    // Reset operator and value on metric change
+                                                    if (e.target.value === 'is_profile_complete') {
+                                                        newConds[idx].operator = '==='
+                                                        newConds[idx].value = 'true'
+                                                    } else if (['interests', 'addons'].includes(e.target.value)) {
+                                                        newConds[idx].operator = 'contains'
+                                                        newConds[idx].value = ''
+                                                    } else {
+                                                        newConds[idx].operator = '>='
+                                                        newConds[idx].value = '0'
+                                                    }
+                                                    setConditions(newConds)
+                                                }}
+                                            >
+                                                <option value="is_profile_complete">กรอกข้อมูลครบ (Boolean)</option>
+                                                <option value="totalVisits">จำนวนครั้งที่ล้าง</option>
+                                                <option value="totalSpent">ยอดรวมที่จ่าย</option>
+                                                <option value="daysSinceLast">หายไป (วัน)</option>
+                                                <option value="vehicle_size">ขนาดรถ (SML)</option>
+                                                <option value="segment">กลุ่ม RFM</option>
+                                                <option value="vehicle_brand">ยี่ห้อรถ</option>
+                                                <option value="gender">เพศ</option>
+                                                <option value="occupation">อาชีพ</option>
+                                                <option value="interests">สิ่งที่สนใจ (Array)</option>
+                                                <option value="addons">บริการเสริมที่เคยใช้ (Array)</option>
+                                            </select>
+
+                                            {cond.metric === 'is_profile_complete' ? (
+                                                <select 
+                                                    className="form-input"
+                                                    style={{ fontSize: '0.8rem', padding: '6px 8px' }}
+                                                    value={cond.operator}
+                                                    onChange={e => {
+                                                        const newConds = [...conditions]
+                                                        newConds[idx].operator = e.target.value
+                                                        setConditions(newConds)
+                                                    }}
+                                                >
+                                                    <option value="===">ใช่</option>
+                                                    <option value="!=">ไม่ใช่</option>
+                                                </select>
+                                            ) : ['interests', 'addons'].includes(cond.metric) ? (
+                                                <select 
+                                                    className="form-input"
+                                                    style={{ fontSize: '0.8rem', padding: '6px 8px' }}
+                                                    value={cond.operator}
+                                                    onChange={e => {
+                                                        const newConds = [...conditions]
+                                                        newConds[idx].operator = e.target.value
+                                                        setConditions(newConds)
+                                                    }}
+                                                >
+                                                    <option value="contains">มี</option>
+                                                    <option value="not_contains">ไม่มี</option>
+                                                </select>
+                                            ) : (
+                                                <select 
+                                                    className="form-input"
+                                                    style={{ fontSize: '0.8rem', padding: '6px 8px' }}
+                                                    value={cond.operator} 
+                                                    onChange={e => {
+                                                        const newConds = [...conditions]
+                                                        newConds[idx].operator = e.target.value
+                                                        setConditions(newConds)
+                                                    }}
+                                                >
+                                                    <option value=">=">&ge;</option>
+                                                    <option value="<=">&le;</option>
+                                                    <option value="===">=</option>
+                                                    <option value="!=">!=</option>
+                                                </select>
+                                            )}
+
+                                            {cond.metric === 'is_profile_complete' ? (
+                                                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{cond.operator === '===' ? 'ครบ' : 'ไม่ครบ'}</div>
+                                            ) : cond.metric === 'vehicle_size' ? (
+                                                <select 
+                                                    className="form-input"
+                                                    style={{ fontSize: '0.8rem', padding: '6px 8px' }}
+                                                    value={cond.value}
+                                                    onChange={e => {
+                                                        const newConds = [...conditions]
+                                                        newConds[idx].value = e.target.value
+                                                        setConditions(newConds)
+                                                    }}
+                                                >
+                                                    {['S', 'M', 'L'].map(v => (
+                                                        <option key={v} value={v}>{v} ({VEHICLE_SIZE_LABEL[v]})</option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <input 
+                                                    className="form-input"
+                                                    style={{ fontSize: '0.8rem', padding: '6px 8px' }}
+                                                    placeholder="ค่า..."
+                                                    value={cond.value} 
+                                                    onChange={e => {
+                                                        const newConds = [...conditions]
+                                                        newConds[idx].value = e.target.value
+                                                        setConditions(newConds)
+                                                    }} 
+                                                />
+                                            )}
+                                            
+                                            <button 
+                                                className="btn btn-sm btn-ghost" 
+                                                style={{ color: 'var(--danger)', padding: 0 }}
+                                                onClick={() => setConditions(conditions.filter(c => c.id !== cond.id))}
+                                            >
+                                                🗑️
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {conditions.length === 0 && (
+                                        <div style={{ textAlign: 'center', padding: '12px', border: '1px dashed var(--border)', borderRadius: 8, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                            ยังไม่มีเงื่อนไข (คลิกปุ่มเพื่อเพิ่ม)
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <button
+                                    className="btn btn-primary"
+                                    style={{ flex: 1, marginTop: 24, opacity: segmentName && conditions.length > 0 ? 1 : 0.5 }}
+                                    onClick={() => {
+                                        if (!segmentName || conditions.length === 0) return;
+                                        
+                                        const newSegment = {
+                                            id: editingSegmentId || 'seg_' + Date.now(),
+                                            name: segmentName,
+                                            conditions: conditions
+                                        };
+
+                                        let updated: any[] = [];
+                                        if (editingSegmentId) {
+                                            updated = savedSegments.map(s => s.id === editingSegmentId ? newSegment : s);
+                                        } else {
+                                            updated = [...savedSegments, newSegment];
+                                        }
+                                        
+                                        localStorage.setItem('crm_custom_segments', JSON.stringify(updated));
+                                        setSavedSegments(updated);
+                                        alert(`บันทึก Segment "${segmentName}" สำเร็จแล้ว!`);
+                                        setSegmentName('');
+                                        setConditions([{ id: Date.now(), metric: 'totalVisits', operator: '>=', value: '5' }]);
+                                        setEditingSegmentId(null);
+                                    }}
+                                >
+                                    {editingSegmentId ? '💾 บันทึกการแก้ไข' : '➕ สร้าง Segment ใหม่'}
+                                </button>
+                                {editingSegmentId && (
+                                    <button 
+                                        className="btn btn-outline" 
+                                        style={{ marginTop: 24 }}
+                                        onClick={() => {
+                                            setEditingSegmentId(null);
+                                            setSegmentName('');
+                                            setConditions([{ id: Date.now(), metric: 'totalVisits', operator: '>=', value: '5' }]);
+                                        }}
+                                    >ยกเลิก</button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* List & Live Preview */}
+                        <div style={{ flex: '2 1 400px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+                            {/* List of Saved Segments */}
+                            <div>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12 }}>รายการที่บันทึกไว้ ({savedSegments.length})</h3>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                                    {savedSegments.map(seg => (
+                                        <div key={seg.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '10px 16px', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12, boxShadow: 'var(--shadow-sm)' }}>
+                                            <div>
+                                                <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{seg.name}</div>
+                                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{seg.conditions.length} เงื่อนไข · {customerStats.filter(c => {
+                                                    // Quick match for list count
+                                                    return seg.conditions.every((cond: any) => {
+                                                        const target = c[cond.metric]
+                                                        if (target === undefined) return false
+                                                        if (cond.metric === 'is_profile_complete') return !!target === (cond.value === 'true')
+                                                        if (['interests', 'addons'].includes(cond.metric)) return Array.isArray(target) && target.some(a => String(a).toLowerCase().includes(String(cond.value).toLowerCase()))
+                                                        if (cond.operator === '>=') return Number(target) >= Number(cond.value)
+                                                        if (cond.operator === '<=') return Number(target) <= Number(cond.value)
+                                                        return String(target).toLowerCase().includes(String(cond.value).toLowerCase())
+                                                    })
+                                                }).length} คน</div>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: 4 }}>
+                                                <button className="btn btn-xs btn-ghost" onClick={() => {
+                                                    setEditingSegmentId(seg.id);
+                                                    setSegmentName(seg.name);
+                                                    setConditions(seg.conditions);
+                                                }}>🖊️</button>
+                                                <button className="btn btn-xs btn-ghost" style={{ color: 'var(--danger)' }} onClick={() => {
+                                                    if (confirm(`ยืนยันลบ Segment "${seg.name}"?`)) {
+                                                        const updated = savedSegments.filter(s => s.id !== seg.id);
+                                                        localStorage.setItem('crm_custom_segments', JSON.stringify(updated));
+                                                        setSavedSegments(updated);
+                                                    }
+                                                }}>🗑️</button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {savedSegments.length === 0 && (
+                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>ยังไม่มี Segment ที่บันทึกไว้</div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12 }}>ตัวอย่างลูกค้าที่เข้าเงื่อนไขปัจจุบัน ({matchedUsersCount} คน)</h3>
+                                <div className={styles.tableContainer} style={{ maxHeight: 300, overflowY: 'auto' }}>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>ชื่อ</th>
+                                                <th>ข้อมูล (เงื่อนไขแรก)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {customerStats.filter(evaluateSegmentMatch).slice(0, 10).map(c => (
+                                                <tr key={c.id}>
+                                                    <td>{c.full_name}</td>
+                                                    <td style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.85rem' }}>
+                                                        {conditions[0]?.metric === 'totalSpent' ? '฿' : ''}
+                                                        {conditions[0]?.metric === 'is_profile_complete' ? (c.is_profile_complete ? '✅ ครบ' : '❌ ไม่ครบ') : 
+                                                         conditions[0]?.metric === 'vehicle_size' ? (VEHICLE_SIZE_LABEL[c.vehicle_size] || c.vehicle_size) :
+                                                         String(c[conditions[0]?.metric || 'totalVisits'])}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {matchedUsersCount > 10 && (
+                                                <tr><td colSpan={2} style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>และอีก {matchedUsersCount - 10} คน...</td></tr>
+                                            )}
+                                            {matchedUsersCount === 0 && (
+                                                <tr><td colSpan={2} style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่มีลูกค้าตรงตามเงื่อนไขนี้</td></tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+
+        {showLegend && (
+            <div className={styles.fullscreenOverlay} onClick={() => setShowLegend(false)}>
+                <div className={styles.fullscreenModal} onClick={e => e.stopPropagation()}>
+                    <div className={styles.modalHeader}>
+                        <div>
+                            <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--primary)' }}>⚙️ ตั้งค่าเกณฑ์แบ่งกลุ่ม (CRM Config)</h2>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>ปรับจูนเกณฑ์การให้คะแนนและตรรกะการจัดกลุ่มลูกค้าให้เหมาะสมกับธุรกิจคุณ</p>
+                        </div>
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            <button className="btn btn-outline" onClick={() => {
+                                if (confirm('ยืนยันการรีเซ็ตเป็นค่าเริ่มต้น?')) {
+                                    saveConfig(DEFAULT_CRM_CONFIG);
+                                }
+                            }}>🔄 รีเซ็ตเป็นค่าเริ่มต้น</button>
+                            <button className="btn btn-primary" style={{ padding: '12px 32px' }} onClick={() => setShowLegend(false)}>บันทึกและปิดหน้าต่างนี้</button>
+                        </div>
+                    </div>
+
+                    <div className={styles.modalBody}>
+                        {/* Column 1: RFM Scoring */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-primary)' }}>
+                                <span style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--primary-ghost)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem' }}>1</span>
+                                เกณฑ์คะแนน (RFM Thresholds)
+                            </h3>
+                            
+                            <div className={styles.configGroup}>
+                                <p style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 16 }}>Recency (R) - วันที่หายไปไม่เกิน...</p>
+                                <div className={styles.configGrid}>
+                                    {['r5', 'r4', 'r3', 'r2'].map((key, i) => (
+                                        <div key={key} className={styles.thresholdCard}>
+                                            <span className={styles.thresholdLabel}>คะแนน {5-i} {5-i === 5 ? '🎯' : ''}</span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                <input type="number" className={styles.thresholdInput} value={(crmConfig.recency as any)[key]} onChange={e => {
+                                                    const newCfg = { ...crmConfig };
+                                                    (newCfg.recency as any)[key] = Number(e.target.value);
+                                                    saveConfig(newCfg);
+                                                }} />
+                                                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>วัน</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className={styles.configGroup}>
+                                <p style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 16 }}>Frequency (F) - จำนวนครั้งขึ้นไป...</p>
+                                <div className={styles.configGrid}>
+                                    {['f5', 'f4', 'f3', 'f2'].map((key, i) => (
+                                        <div key={key} className={styles.thresholdCard}>
+                                            <span className={styles.thresholdLabel}>คะแนน {5-i}</span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                <input type="number" className={styles.thresholdInput} value={(crmConfig.frequency as any)[key]} onChange={e => {
+                                                    const newCfg = { ...crmConfig };
+                                                    (newCfg.frequency as any)[key] = Number(e.target.value);
+                                                    saveConfig(newCfg);
+                                                }} />
+                                                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>ครั้ง</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className={styles.configGroup}>
+                                <p style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 16 }}>Monetary (M) - ยอดรวมสะสมขึ้นไป...</p>
+                                <div className={styles.configGrid}>
+                                    {['m5', 'm4', 'm3', 'm2'].map((key, i) => (
+                                        <div key={key} className={styles.thresholdCard}>
+                                            <span className={styles.thresholdLabel}>คะแนน {5-i}</span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                <span style={{ fontSize: '1rem', color: 'var(--primary)', fontWeight: 700 }}>฿</span>
+                                                <input type="number" className={styles.thresholdInput} value={(crmConfig.monetary as any)[key]} onChange={e => {
+                                                    const newCfg = { ...crmConfig };
+                                                    (newCfg.monetary as any)[key] = Number(e.target.value);
+                                                    saveConfig(newCfg);
+                                                }} />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Column 2: Segment Logic */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-primary)' }}>
+                                <span style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--primary-ghost)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem' }}>2</span>
+                                ตรรกะการแบ่งกลุ่ม (Segment Logic)
+                            </h3>
+                            
+                            <div className={styles.segmentConfigCard}>
+                                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 8 }}>ระบุคะแนนคะแนนเฉลี่ยหรือคะแนนขั้นต่ำ (1-5) เพื่อจัดกลุ่มลูกค้า</p>
+                                
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                    {[
+                                        { id: 'vip', label: 'VIP', keys: ['f', 'm', 'r'], desc: 'คะแนน F, M, R ต้องมากกว่าหรือเท่ากับค่าที่ตั้ง' },
+                                        { id: 'loyal', label: 'Loyal', keys: ['f', 'r'], desc: 'เน้นความถี่และความสม่ำเสมอ' },
+                                        { id: 'churnRisk', label: 'Churn Risk', keys: ['f', 'r'], desc: 'มาบ่อย (F) แต่ล่าสุด (R) คะแนนต่ำกว่า/เท่ากับที่ตั้ง' },
+                                        { id: 'lost', label: 'Lost', keys: ['f', 'r'], desc: 'เคยบ่อย (F) แต่ล่าสุด (R) คะแนนต่ำสุด' },
+                                        { id: 'new', label: 'New', keys: ['r', 'f'], desc: 'มาล่าสุด (R) แต่ความถี่ (F) ยังน้อย' },
+                                        { id: 'bigSpender', label: 'Big Ticket', keys: ['m', 'f'], desc: 'ยอดจ่าย (M) สูง แต่ความถี่ (F) น้อย' },
+                                    ].map(seg => (
+                                        <div key={seg.id} className={styles.configGroup} style={{ marginBottom: 0, padding: 20 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                                                <span className={`${styles.tag} ${styles['tag-' + (seg.id === 'bigSpender' ? 'big-ticket-rare' : seg.id.toLowerCase())]}`} style={{ margin: 0, fontSize: '0.8rem', padding: '6px 12px' }}>{seg.label}</span>
+                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>{seg.desc}</span>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: 12 }}>
+                                                {seg.keys.map(k => (
+                                                    <div key={k} className={styles.thresholdCard} style={{ flex: 1, padding: 10 }}>
+                                                        <span className={styles.thresholdLabel}>{k.toUpperCase()} {k === 'r' && seg.id === 'churnRisk' ? 'Max' : 'Min'}</span>
+                                                        <input type="number" className={styles.thresholdInput} style={{ fontSize: '1.1rem' }} value={(crmConfig.segments as any)[seg.id][k]} onChange={e => {
+                                                            const newCfg = { ...crmConfig };
+                                                            (newCfg.segments as any)[seg.id][k] = Number(e.target.value);
+                                                            saveConfig(newCfg);
+                                                        }} />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    <div className={styles.configGroup} style={{ marginBottom: 0, padding: 20 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                                            <span className={`${styles.tag} ${styles['tag-promising']}`} style={{ margin: 0, fontSize: '0.8rem', padding: '6px 12px' }}>Promising / Inactive</span>
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>ใช้คะแนนเฉลี่ย (R+F+M)/3</span>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: 12 }}>
+                                            <div className={styles.thresholdCard} style={{ flex: 1, padding: 10 }}>
+                                                <span className={styles.thresholdLabel}>Promising Avg Min</span>
+                                                <input type="number" step="0.1" className={styles.thresholdInput} style={{ fontSize: '1.1rem' }} value={crmConfig.segments.promising} onChange={e => {
+                                                    const newCfg = { ...crmConfig };
+                                                    newCfg.segments.promising = Number(e.target.value);
+                                                    saveConfig(newCfg);
+                                                }} />
+                                            </div>
+                                            <div className={styles.thresholdCard} style={{ flex: 1, padding: 10 }}>
+                                                <span className={styles.thresholdLabel}>Inactive Avg Max</span>
+                                                <input type="number" step="0.1" className={styles.thresholdInput} style={{ fontSize: '1.1rem' }} value={crmConfig.segments.inactive} onChange={e => {
+                                                    const newCfg = { ...crmConfig };
+                                                    newCfg.segments.inactive = Number(e.target.value);
+                                                    saveConfig(newCfg);
+                                                }} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+        {selectedCustomer && (
+            <div className={styles.fullscreenOverlay} onClick={() => setSelectedCustomer(null)}>
+                <div className={styles.fullscreenModal} style={{ maxWidth: 800 }} onClick={e => e.stopPropagation()}>
+                    <div className={styles.modalHeader}>
+                        <div>
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary)' }}>👤 รายละเอียดลูกค้าแบบเต็ม</h2>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>ข้อมูล Demo/Demographic และทรัพย์สินระบุชื่อ</p>
+                        </div>
+                        <button className="btn btn-outline" onClick={() => setSelectedCustomer(null)}>ปิด</button>
+                    </div>
+                    
+                    <div className={styles.modalBody} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+                        {/* Column 1: Personal Info & Interests */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                            <section>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12, borderBottom: '2px solid var(--primary-ghost)', paddingBottom: 4 }}>📌 ข้อมูลส่วนตัว</h3>
+                                <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 8, fontSize: '0.9rem' }}>
+                                    <span style={{ color: 'var(--text-muted)' }}>ชื่อ-นามสกุล:</span> <span style={{ fontWeight: 600 }}>{selectedCustomer.full_name}</span>
+                                    <span style={{ color: 'var(--text-muted)' }}>เบอร์โทรศัพท์:</span> <span>{selectedCustomer.phone}</span>
+                                    <span style={{ color: 'var(--text-muted)' }}>วันเกิด:</span> <span>{selectedCustomer.birthdate ? new Date(selectedCustomer.birthdate).toLocaleDateString('th-TH') : '-'}</span>
+                                    <span style={{ color: 'var(--text-muted)' }}>เพศ:</span> <span>{selectedCustomer.gender === 'male' ? 'ชาย' : selectedCustomer.gender === 'female' ? 'หญิง' : selectedCustomer.gender || '-'}</span>
+                                    <span style={{ color: 'var(--text-muted)' }}>อาชีพ:</span> <span style={{ color: 'var(--primary)', fontWeight: 600 }}>{selectedCustomer.occupation || '-'}</span>
+                                </div>
+                            </section>
+
+                            <section>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12, borderBottom: '2px solid var(--primary-ghost)', paddingBottom: 4 }}>✨ สิ่งที่สนใจ</h3>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                    {Array.isArray(selectedCustomer.interests) && selectedCustomer.interests.map((i: string) => (
+                                        <span key={i} style={{ fontSize: '0.8rem', padding: '4px 10px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 20 }}>{i}</span>
+                                    ))}
+                                    {(!selectedCustomer.interests || selectedCustomer.interests.length === 0) && <span style={{ color: 'var(--text-muted)' }}>ไม่ระบุ</span>}
+                                </div>
+                            </section>
+
+                            <section>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12, borderBottom: '2px solid var(--primary-ghost)', paddingBottom: 4 }}>📊 สถิติล้างรถ</h3>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                    <div className={styles.thresholdCard} style={{ padding: 12 }}>
+                                        <div className={styles.thresholdLabel}>จำนวนครั้ง</div>
+                                        <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary)' }}>{selectedCustomer.totalVisits} ครั้ง</div>
+                                    </div>
+                                    <div className={styles.thresholdCard} style={{ padding: 12 }}>
+                                        <div className={styles.thresholdLabel}>ยอดสะสม</div>
+                                        <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary)' }}>฿{selectedCustomer.totalSpent.toLocaleString()}</div>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+
+                        {/* Column 2: Vehicles & Locations */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                            <section>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12, borderBottom: '2px solid var(--primary-ghost)', paddingBottom: 4 }}>🚗 ยานพาหนะที่บันทึกไว้ ({selectedCustomer.saved_vehicles?.length || 0})</h3>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    {Array.isArray(selectedCustomer.saved_vehicles) && selectedCustomer.saved_vehicles.map((v: any, idx: number) => (
+                                        <div key={idx} style={{ padding: 10, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)', fontSize: '0.85rem' }}>
+                                            <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{v.license_plate} - {v.vehicle_brand} {v.vehicle_model}</div>
+                                            <div style={{ color: 'var(--text-muted)' }}>สี: {v.vehicle_color} | ขนาด: {v.vehicle_size}</div>
+                                        </div>
+                                    ))}
+                                    {(!selectedCustomer.saved_vehicles || selectedCustomer.saved_vehicles.length === 0) && <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 12 }}>ไม่มีข้อมูลรถ</div>}
+                                </div>
+                            </section>
+
+                            <section>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12, borderBottom: '2px solid var(--primary-ghost)', paddingBottom: 4 }}>📍 ที่อยู่ที่บันทึกไว้ ({selectedCustomer.saved_locations?.length || 0})</h3>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    {Array.isArray(selectedCustomer.saved_locations) && selectedCustomer.saved_locations.map((l: any, idx: number) => (
+                                        <div key={idx} style={{ padding: 10, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)', fontSize: '0.85rem' }}>
+                                            <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{l.name}</div>
+                                            <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{l.address}</div>
+                                            {l.note && <div style={{ color: 'var(--warning)', fontSize: '0.75rem', marginTop: 4 }}>📝 {l.note}</div>}
+                                        </div>
+                                    ))}
+                                    {(!selectedCustomer.saved_locations || selectedCustomer.saved_locations.length === 0) && <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 12 }}>ไม่มีข้อมูลที่อยู่</div>}
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+        </>
+    )
+}

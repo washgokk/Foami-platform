@@ -1,0 +1,192 @@
+.shell {
+    display: flex;
+    min-height: 100vh;
+    background: var(--bg);
+}
+
+/* ─── Sidebar ─── */
+.sidebar {
+    width: 240px;
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-6) 0;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 50;
+    transition: transform 0.3s ease;
+    border-right: 2.5px solid var(--border);
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 var(--space-5) var(--space-6);
+    border-bottom: 2.5px solid var(--border);
+    margin-bottom: var(--space-4);
+}
+
+.nav {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0 var(--space-3);
+}
+
+.navItem {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: 12px 14px;
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    text-decoration: none;
+    border: 2.5px solid transparent;
+}
+
+.navItem:hover {
+    background: var(--primary-ghost);
+    color: var(--primary);
+}
+
+.navActive {
+    background: var(--primary) !important;
+    color: #fff !important;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(49, 94, 195, 0.2);
+}
+
+.navIcon {
+    opacity: 0.8;
+}
+
+.sidebarFooter {
+    padding: var(--space-4) var(--space-3);
+    border-top: 2.5px solid var(--border);
+}
+
+.logoutBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: 12px;
+    border: 2.5px solid var(--danger-light);
+    background: var(--danger-light);
+    color: var(--danger);
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    width: 100%;
+    transition: all 0.2s;
+}
+
+.logoutBtn:hover {
+    background: #fee2e2;
+    border-color: var(--danger);
+}
+
+/* ─── Main Area ─── */
+.main {
+    flex: 1;
+    margin-left: 240px;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.topbar {
+    height: 64px;
+    background: var(--surface);
+    border-bottom: 2.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: 0 var(--space-6);
+    position: sticky;
+    top: 0;
+    z-index: 40;
+}
+
+.menuBtn {
+    display: none;
+    background: var(--primary-ghost);
+    border: none;
+    color: var(--primary);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.topbarTitle {
+    font-weight: 700;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    letter-spacing: -0.02em;
+}
+
+.topbarRight {
+    margin-left: auto;
+}
+
+.adminBadge {
+    background: var(--accent-pink-ghost);
+    color: #B25E8F;
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    font-size: 0.78rem;
+    font-weight: 700;
+    border: 2.5px solid var(--accent-pink);
+}
+
+.content {
+    padding: var(--space-8);
+    flex: 1;
+}
+
+.overlay {
+    display: none;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%);
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .main {
+        margin-left: 0;
+    }
+
+    .menuBtn {
+        display: block;
+    }
+
+    .content {
+        padding: var(--space-5) var(--space-4);
+    }
+
+    .overlay {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 49;
+    }
+}

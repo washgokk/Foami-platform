@@ -1,0 +1,149 @@
+.page {
+    position: relative;
+    max-width: var(--max-w);
+    margin: 0 auto;
+}
+
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-content: center;
+    margin-bottom: var(--space-4);
+    align-items: center;
+}
+
+.title {
+    font-size: 1.5rem;
+    font-weight: 800;
+}
+
+.layout {
+    display: grid;
+    grid-template-columns: 1fr 350px;
+    gap: var(--space-5);
+    align-items: start;
+}
+
+@media (max-width: 768px) {
+    .layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.card {
+    background: #fff;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    padding: var(--space-5);
+    border: 1px solid var(--border);
+}
+
+.cardTitle {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: var(--space-4);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.formGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+}
+
+.formRow {
+    grid-column: 1 / -1;
+}
+
+.label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: var(--space-2);
+    color: var(--text-base);
+}
+
+.input {
+    width: 100%;
+    padding: var(--space-3) var(--space-3);
+    background: var(--surface-1);
+    border: 2px solid transparent;
+    border-radius: var(--radius);
+    font-size: 0.95rem;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.input:focus {
+    background: #fff;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(59, 95, 204, 0.1);
+    outline: none;
+}
+
+.codeList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.codeItem {
+    background: var(--surface-1);
+    padding: var(--space-3);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.codeItemLeft {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.codeName {
+    font-weight: 800;
+    font-size: 1.1rem;
+    color: var(--primary);
+    letter-spacing: 0.5px;
+}
+
+.codeDetails {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.codeItemRight {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-end;
+}
+
+.codeStatus {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
+.statusActive {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+}
+
+.statusInactive {
+    background: rgba(100, 116, 139, 0.1);
+    color: var(--text-muted);
+}
+
+.codeActions {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: 4px;
+}

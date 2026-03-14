@@ -1,0 +1,167 @@
+.header {
+    margin-bottom: var(--space-5);
+}
+
+.title {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--text-primary);
+}
+
+.marketList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+}
+
+.date {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.statsRow {
+    display: flex;
+    gap: var(--space-3);
+    margin-bottom: var(--space-6);
+}
+
+.statPill {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+}
+
+.statN {
+    font-size: 1.6rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.statL {
+    font-size: 0.72rem;
+    font-weight: 500;
+    opacity: 0.8;
+}
+
+.sectionTitle {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: var(--space-3);
+}
+
+.jobCard {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4) var(--space-5);
+    margin-bottom: var(--space-3);
+    text-decoration: none;
+    color: inherit;
+    transition: box-shadow 0.2s, transform 0.2s;
+    border-left: 4px solid var(--border); /* Default */
+}
+
+.jobCardRecommended {
+    border-left-color: #22c55e !important; /* Green */
+}
+
+.jobCardAvailable {
+    border-left-color: #3b82f6 !important; /* Blue */
+}
+
+.jobCard:hover {
+    box-shadow: var(--shadow);
+    transform: translateY(-1px);
+}
+
+.jobTime {
+    text-align: center;
+    min-width: 50px;
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.jobDate {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    display: block;
+}
+
+.jobBody {
+    flex: 1;
+}
+
+.jobCustomer {
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
+.jobDetail {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+/* Modal Styles */
+.modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: var(--space-4);
+}
+
+.modalContent {
+    background: var(--surface);
+    width: 100%;
+    max-width: 320px;
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.modalTitle {
+    font-size: 1.1rem;
+    font-weight: 800;
+    margin-bottom: var(--space-2);
+}
+
+.modalDesc {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    margin-bottom: var(--space-6);
+}
+
+.modalActions {
+    display: flex;
+    gap: var(--space-3);
+}
+
+.dateHeader {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: var(--primary);
+    background: var(--primary-ghost);
+    padding: 6px 12px;
+    border-radius: var(--radius-full);
+    display: inline-block;
+    margin-bottom: var(--space-3);
+    margin-top: var(--space-2);
+}

@@ -1,0 +1,171 @@
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-5);
+}
+
+.title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.filters {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    align-items: center;
+    background: var(--surface);
+    padding: var(--space-4);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--border);
+    margin-bottom: var(--space-5);
+}
+
+.filterGroup {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.filterLabel {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.weekControl {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    background: var(--surface);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--border);
+}
+
+.weekLabel {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--primary);
+    min-width: 140px;
+    text-align: center;
+}
+
+/* Grid System matches Staff Schedule but wider */
+.grid {
+    display: grid;
+    grid-template-columns: 80px repeat(7, 1fr);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    box-sizing: border-box;
+}
+
+.cornerCell {
+    background: var(--surface-2);
+    border-bottom: 2px solid var(--border);
+    border-right: 1px solid var(--border);
+}
+
+.dayHeader {
+    background: var(--surface-2);
+    border-bottom: 2px solid var(--border);
+    border-right: 1px solid var(--border);
+    padding: 12px 4px;
+    text-align: center;
+    font-weight: 700;
+    color: var(--text-secondary);
+}
+
+.dayHeader:last-child {
+    border-right: none;
+}
+
+.dayNum {
+    font-size: 1.2rem;
+    color: var(--text-primary);
+    margin-top: 2px;
+}
+
+.today {
+    color: var(--primary);
+    background: var(--primary-ghost);
+}
+
+.today .dayNum {
+    color: var(--primary);
+}
+
+.timeLabel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    padding: 8px 0;
+}
+
+.cell {
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    min-height: 70px;
+    padding: 4px;
+    background: var(--surface);
+    vertical-align: top;
+}
+
+.cell:nth-child(8n) {
+    border-right: none;
+}
+
+.staffList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: flex-start;
+}
+
+.staffPill {
+    font-size: 0.7rem;
+    line-height: 1.2;
+    padding: 3px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.status-available {
+    background-color: var(--blue-100);
+    color: var(--blue-700);
+    border: 1px solid var(--blue-200);
+}
+
+.status-booked {
+    background-color: var(--gray-200);
+    color: var(--gray-700);
+    border: 1px solid var(--gray-300);
+}
+
+.loadingEmpty {
+    text-align: center;
+    padding: var(--space-8);
+    color: var(--text-muted);
+    font-size: 0.95rem;
+}
