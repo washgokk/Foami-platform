@@ -10,12 +10,11 @@ export async function getGoogleDriveClient() {
         throw new Error('Google Drive credentials are missing')
     }
 
-    const auth = new google.auth.JWT(
-        clientEmail,
-        null as any,
-        privateKey,
-        SCOPES
-    )
+    const auth = new google.auth.JWT({
+        email: clientEmail,
+        key: privateKey,
+        scopes: SCOPES
+    })
 
     return google.drive({ version: 'v3', auth })
 }
