@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
             .eq('booking_id', booking_id)
 
         const afterPhotos = photos?.find(p => p.type === 'after')
-        if (afterPhotos?.photo_urls?.length > 0) {
+        if (afterPhotos && afterPhotos.photo_urls && afterPhotos.photo_urls.length > 0) {
             photosContent = [{
                 type: 'image',
                 url: afterPhotos.photo_urls[0],
