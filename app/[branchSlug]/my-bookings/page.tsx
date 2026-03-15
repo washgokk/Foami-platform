@@ -510,6 +510,7 @@ export default function MyBookingsPage() {
                                                 <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe' } }}>
                                                     <CheckoutForm 
                                                         amount={selectedBooking.additional_price}
+                                                        customerEmail={JSON.parse(localStorage.getItem('liff_customer') || '{}').email}
                                                         onSuccess={handleStripeSuccess}
                                                         onCancel={() => setClientSecret('')}
                                                     />

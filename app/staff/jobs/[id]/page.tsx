@@ -33,7 +33,9 @@ const InfoSection = ({ job }: { job: any }) => {
         })
     }
     
-    const derivedPkgPrice = (job.total_price || 0) - addonsTotal - (job.extra_fee || 0) + (job.discount_amount || 0) - (job.additional_price || 0)
+    const totalPkgPlusAdj = (job.total_price || 0) - addonsTotal - (job.extra_fee || 0) + (job.discount_amount || 0) - (job.additional_price || 0)
+    const rawBasePrice = job.services?.price_s || job.services?.price || 0
+    const sizeAdjustment = totalPkgPlusAdj - rawBasePrice
 
     return (
         <div className={styles.jobItem}>
@@ -42,7 +44,6 @@ const InfoSection = ({ job }: { job: any }) => {
                     <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-primary)' }}>{job.services?.name}</div>
                     <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 4 }}>ไซส์รถ (CC): <strong>{VEHICLE_SIZE_LABEL[job.customers?.vehicle_size] || job.customers?.vehicle_size || 'ไม่ระบุ'}</strong></div>
                 </div>
-                <div style={{ fontWeight: 900, fontSize: '1.2rem', color: 'var(--primary)' }}>฿{derivedPkgPrice?.toLocaleString()}</div>
             </div>
 
             {/* Addons List */}
@@ -80,8 +81,14 @@ const InfoSection = ({ job }: { job: any }) => {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                     <span>ค่าบริการพื้นฐาน</span>
-                    <span>฿{derivedPkgPrice?.toLocaleString()}</span>
+                    <span>฿{rawBasePrice?.toLocaleString()}</span>
                 </div>
+                {sizeAdjustment !== 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--danger)' }}>
+                        <span>ส่วนต่างขนาดรถ ({VEHICLE_SIZE_LABEL[job.customers?.vehicle_size] || job.customers?.vehicle_size})</span>
+                        <span>{sizeAdjustment > 0 ? '+' : ''}฿{sizeAdjustment?.toLocaleString()}</span>
+                    </div>
+                )}
                 {addonsTotal > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                         <span>ค่าบริการเสริมรวม</span>
@@ -275,15 +282,15 @@ export default function JobDetailPage() {
             })
         }
 
-        // Calculate size adjustment
-        const vSize = job.customers?.vehicle_size || 'S'
-        const currentAdj = sizeAdjustments.find(a => a.vehicle_size === vSize)
-        const adjAmount = currentAdj?.adjustment_amount || 0
-
-        const newTotal = (job.base_price || 0) + adjAmount + currentAddonsTotal + (job.extra_fee || 0) + Number(additionalPrice) - (job.discount_amount || 0)
+        // Calculate the difference in additional price to update total_price correctly
+        const oldAdditionalPrice = Number(job.additional_price) || 0
+        const newAdditionalPrice = Number(additionalPrice)
+        const priceDiff = newAdditionalPrice - oldAdditionalPrice
+        
+        const newTotal = (Number(job.total_price) || 0) + priceDiff
 
         await supabase.from('bookings').update({
-            additional_price: Number(additionalPrice),
+            additional_price: newAdditionalPrice,
             additional_price_note: additionalNote,
             additional_price_slips: slipUrls,
             total_price: newTotal
@@ -336,7 +343,10 @@ export default function JobDetailPage() {
     }
 
     const handleUpload = async () => {
-        if (selectedFiles.length === 0) return
+        if (selectedFiles.length < 4) {
+            alert('กรุณาอัปโหลดรูปภาพให้ครบ 4 รูป เพื่อความถูกต้องของงาน')
+            return
+        }
         setUploading(true)
 
         const urls: string[] = []

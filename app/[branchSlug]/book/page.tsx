@@ -12,24 +12,24 @@ import {
 } from '@/lib/types'
 import { format, addDays } from 'date-fns'
 import { th } from 'date-fns/locale'
-import { 
-    ChevronLeft, 
+import {
+    ChevronLeft,
     ChevronRight,
     ClipboardList,
-    Sparkles, 
-    Wrench, 
-    Droplets, 
-    CheckCircle, 
+    Sparkles,
+    Wrench,
+    Droplets,
+    CheckCircle,
     XCircle,
-    Star, 
-    Home, 
-    MapPin, 
-    Bike, 
-    Camera, 
-    AlertTriangle, 
-    Clock, 
-    Coins, 
-    CreditCard, 
+    Star,
+    Home,
+    MapPin,
+    Bike,
+    Camera,
+    AlertTriangle,
+    Clock,
+    Coins,
+    CreditCard,
     Smartphone,
     Info,
     Calendar,
@@ -96,7 +96,7 @@ export default function BookPage() {
     const [allSchedulesData, setAllSchedulesData] = useState<any[]>([])
     const [addons, setAddons] = useState<Record<string, boolean>>({})
     const [addonSelectedPrices, setAddonSelectedPrices] = useState<Record<string, number>>({})
-    const [addonVariableStates, setAddonVariableStates] = useState<Record<string, { mode: 'full_tank' | 'custom', customAmount: string }>>({})
+    const [addonVariableStates, setAddonVariableStates] = useState<Record<string, { mode: 'full_tank' | 'custom', customAmount: string, note?: string }>>({})
 
     // Step 2 — Vehicle & Location
     const [selectedVehicle, setSelectedVehicle] = useState<any>(null)
@@ -184,11 +184,11 @@ export default function BookPage() {
                     const parts = s.description.split('\n[Addons: ')
                     const desc = parts[0]
                     const addonsStr = parts.length > 1 ? parts[1].replace(']', '') : ''
-                    
+
                     let color = '#315EC3' // Dominant
                     if (s.name.includes('เคลือบ')) color = '#F1BFDB' // Accent Pink
                     if (s.name.includes('บำรุง')) color = '#A0D9F6' // Subordinate Light Blue
-                    
+
                     return {
                         id: s.id,
                         name: s.name,
@@ -206,22 +206,22 @@ export default function BookPage() {
                 setDbPackages(parsed)
             }
             if (ads) setDbAddons(ads)
-            
+
             if (branch) {
                 setBranches([branch])
                 supabase.from('zones').select('*').eq('branch_id', branch.id).eq('is_active', true)
                     .then(({ data: zns }) => { if (zns) setZones(zns) })
-                
+
                 // Fetch all active CC price groups and filter by branch_id in JS to be safe
                 supabase.from('cc_price_groups').select('*')
                     .eq('is_active', true)
-                    .then(({ data: groups, error }) => { 
+                    .then(({ data: groups, error }) => {
                         if (error) {
                             console.error('[CC Pricing] Fetch error:', error)
                         } else if (groups) {
                             const branchGroups = (groups || []).filter(g => (g.branch_ids || []).includes(branch.id))
                             console.log(`[CC Pricing] Total entries: ${groups.length}, Matches current branch: ${branchGroups.length}`)
-                            setCcPriceGroups(branchGroups as CCPriceGroup[]) 
+                            setCcPriceGroups(branchGroups as CCPriceGroup[])
                         }
                     })
             }
@@ -240,19 +240,24 @@ export default function BookPage() {
         const to = format(dateRange[dateRange.length - 1], 'yyyy-MM-dd')
 
         const loadAvailability = async () => {
-            // 1. Fetch Staff Schedules
+            if (!zones.length) return
+            const zoneIds = zones.map(z => z.id)
+
+            // 1. Fetch Staff Schedules only for THIS branch's zones
             const { data: allSchedules } = await supabase
                 .from('staff_schedules')
                 .select('date, time_slot, zone_id, is_booked, staff_id')
                 .gte('date', from)
                 .lte('date', to)
+                .in('zone_id', zoneIds)
 
-            // 2. Fetch Existing Bookings (to subtract from capacity)
+            // 2. Fetch Existing Bookings only for THIS branch's zones
             const { data: allBookings } = await supabase
                 .from('bookings')
                 .select('scheduled_date, scheduled_time, zone_id, staff_id')
                 .gte('scheduled_date', from)
                 .lte('scheduled_date', to)
+                .in('zone_id', zoneIds)
                 .not('status', 'eq', 'cancelled')
 
             setAllSchedulesData(allSchedules || [])
@@ -267,7 +272,7 @@ export default function BookPage() {
                 const dateKey = format(d, 'yyyy-MM-dd')
                 const daySchedules = (allSchedules || []).filter(s => s.date === dateKey)
                 const dayBookings = (allBookings || []).filter(b => b.scheduled_date === dateKey)
-                
+
                 const slotsForDay = TIME_SLOTS.map(slot => {
                     if (dateKey === todayStr && slot <= currentHourMin) return null
 
@@ -275,7 +280,7 @@ export default function BookPage() {
                     // A slot is available if:
                     // 1. There is an unbooked staff schedule for this (date, time, zone)
                     // 2. AND there are no pending unassigned bookings consuming that staff
-                    
+
                     // Filter staff who are assigned to this slot and NOT yet booked
                     const inZoneFreeStaff = daySchedules.filter(s => s.time_slot === slot && s.zone_id === zoneId && !s.is_booked)
                     const otherFreeStaff = daySchedules.filter(s => s.time_slot === slot && !s.is_booked)
@@ -287,10 +292,10 @@ export default function BookPage() {
                     // Effective Capacity in Zone
                     // For local staff, we subtract pending unassigned bookings in that same zone
                     const effectiveInZoneCount = inZoneFreeStaff.length - pendingBookingsInZone.length
-                    
+
                     if (effectiveInZoneCount > 0) {
-                        return { 
-                            time_slot: slot, type: 'local', 
+                        return {
+                            time_slot: slot, type: 'local',
                             serving_zone_id: zoneId,
                             available_staff_ids: inZoneFreeStaff.slice(0, effectiveInZoneCount).map(s => s.staff_id)
                         }
@@ -300,7 +305,7 @@ export default function BookPage() {
                         // (This is a conservative estimate to prevent overbooking across the whole branch)
                         const totalFreeStaff = otherFreeStaff.filter(s => s.zone_id !== zoneId)
                         const totalPendingOther = pendingBookingsOther.length + (effectiveInZoneCount < 0 ? Math.abs(effectiveInZoneCount) : 0)
-                        
+
                         const effectiveOtherCount = totalFreeStaff.length - totalPendingOther
 
                         if (effectiveOtherCount > 0) {
@@ -315,10 +320,10 @@ export default function BookPage() {
                                     if (d < minDist) { minDist = d; nearestZ = z }
                                 }
                             })
-                            
+
                             const staffInNearest = totalFreeStaff.filter(s => s.zone_id === nearestZ?.id)
-                            return { 
-                                time_slot: slot, type: 'overflow', 
+                            return {
+                                time_slot: slot, type: 'overflow',
                                 serving_zone_id: nearestZ?.id,
                                 available_staff_ids: staffInNearest.slice(0, effectiveOtherCount).map(s => s.staff_id)
                             }
@@ -405,7 +410,7 @@ export default function BookPage() {
 
         let baseZoneFee = 0
         const pickupMatched = zones.find(z => z.is_active && z.polygon_coords?.length >= 3 && isPointInPolygon(pickupLat, pickupLng, z.polygon_coords))
-        
+
         if (pickupMatched) {
             setZoneId(pickupMatched.id)
             baseZoneFee = Number(pickupMatched.extra_fee || 0)
@@ -425,27 +430,27 @@ export default function BookPage() {
         if (selectedDate && selectedSlot && slots[selectedDate]) {
             const daySlots = slots[selectedDate] || []
             const currentSlot = daySlots.find((s: any) => s.time_slot === selectedSlot)
-            
+
             if (currentSlot) {
                 // Base Location for distance calculation (serving branch)
                 const sZone = zones.find(z => z.id === currentSlot.serving_zone_id)
                 const sBranch = branches.find(b => b.id === sZone?.branch_id)
-                
+
                 if (sZone && sBranch) {
                     const bLat = Number(sBranch.lat)
                     const bLng = Number(sBranch.lng)
-                    
+
                     // Check if trip legs are within serving zone
                     const pickupInS = isPointInPolygon(pickupLat, pickupLng, sZone.polygon_coords)
                     const deliveryMatched = zones.find(z => z.is_active && z.polygon_coords?.length >= 3 && isPointInPolygon(deliveryLat, deliveryLng, z.polygon_coords))
                     const deliveryInS = showDelivery ? (deliveryMatched?.id === sZone.id) : pickupInS
-                    
+
                     // If either leg is outside serving zone, calculate distance fee
                     if (!pickupInS || !deliveryInS) {
                         // distance from base to pickup is 0 if pickup is in-zone
                         const d1 = pickupInS ? 0 : haversine(bLat, bLng, pickupLat, pickupLng)
                         const d2 = showDelivery ? haversine(pickupLat, pickupLng, deliveryLat, deliveryLng) : 0
-                        
+
                         // --- Intelligent Chaining Check ---
                         let skipReturn = false
                         if (showDelivery && deliveryMatched) {
@@ -454,9 +459,9 @@ export default function BookPage() {
                             if (nextSlotName) {
                                 // Check allSchedulesData for ANY staff available in current slot having a NEXT shift in delivery zone
                                 const availableStaffIds = currentSlot.available_staff_ids || []
-                                const hasChain = allSchedulesData.some(sch => 
-                                    sch.date === selectedDate && 
-                                    sch.time_slot === nextSlotName && 
+                                const hasChain = allSchedulesData.some(sch =>
+                                    sch.date === selectedDate &&
+                                    sch.time_slot === nextSlotName &&
                                     sch.zone_id === deliveryMatched.id &&
                                     availableStaffIds.includes(sch.staff_id)
                                 )
@@ -467,7 +472,7 @@ export default function BookPage() {
                         // return distance is 0 if delivery is in-zone or next shift is there
                         const d3 = (showDelivery && !skipReturn && !deliveryInS) ? haversine(deliveryLat, deliveryLng, bLat, bLng) : (skipReturn || deliveryInS ? 0 : d1)
                         const totalDist = d1 + d2 + d3
-                        
+
                         const rate = sBranch.out_of_zone_fee || OUT_OF_ZONE_RATE
                         if (sBranch.out_of_zone_type === 'flat_rate') {
                             travelSurcharge = Number(rate)
@@ -494,7 +499,7 @@ export default function BookPage() {
 
             const dbA = dbAddons.find(a => a.name === addonName)
             if (!dbA) continue
-            
+
             const pricingType = dbA.pricing_type || (dbA.description.includes('[Pricing: Free]') ? 'free' : dbA.description.includes('[Pricing: Variable]') ? 'notify_later' : 'fixed')
 
             if (pricingType === 'free') {
@@ -520,29 +525,30 @@ export default function BookPage() {
         if (!addons[addonName]) return true
         const dbA = dbAddons.find(a => a.name === addonName)
         if (!dbA) return true
-        
+
         const pricingType = dbA.pricing_type || (dbA.description.includes('[Pricing: Variable]') ? 'notify_later' : 'fixed')
 
         if (pricingType === 'notify_later') {
             const vState = addonVariableStates[addonName]
             if (!vState) return false
+            if (addonName.includes('น้ำมัน') && !vState.note?.trim()) return false
             if (vState.mode === 'full_tank') return true
             if (vState.mode === 'custom' && (Number(vState.customAmount) || 0) > 0) return true
             return false
         }
-        
+
         const hasSubOptions = dbA.sub_options && dbA.sub_options.length > 0
         if (hasSubOptions || dbA.description.includes('[Prices:')) {
             return addonSelectedPrices[addonName] !== undefined
         }
         return true
     }
-    
+
     // Calculate Package Price based on CC Price Group
     const getPkgPrice = (pkg: any) => {
         if (!pkg) return { price: 0, basePrice: 0, adjustment: 0, isCc: false, matchedGroupName: null }
         const size = (selectedVehicle?.vehicle_size || 'S').toUpperCase() as keyof CCPriceGroup['prices']
-        
+
         // Base Price is ALWAYS the starting price (Size S)
         const basePrice = pkg.price_s || pkg.price || 0
 
@@ -554,14 +560,14 @@ export default function BookPage() {
             const ids = Array.isArray(g.service_ids) ? g.service_ids : []
             return ids.includes(pkg.id)
         })
-        
+
         if (matchingGroup && matchingGroup.prices) {
             const ccValue = matchingGroup.prices[size] || matchingGroup.prices[size.toLowerCase()]
             if (ccValue !== undefined) {
-                const adjustment = Number(ccValue) 
+                const adjustment = Number(ccValue)
                 // Treat CC value as the adjustment itself (additive to base)
-                return { 
-                    price: basePrice + adjustment, 
+                return {
+                    price: basePrice + adjustment,
                     basePrice,
                     adjustment,
                     isCc: true,
@@ -571,10 +577,10 @@ export default function BookPage() {
         }
 
         // Fallback to standard absolute prices
-        return { 
-            price: standardPriceForSize, 
-            basePrice, 
-            adjustment: standardPriceForSize - basePrice, 
+        return {
+            price: standardPriceForSize,
+            basePrice,
+            adjustment: standardPriceForSize - basePrice,
             isCc: false,
             matchedGroupName: null
         }
@@ -583,7 +589,7 @@ export default function BookPage() {
     const { price: pkgPrice, basePrice: pkgBasePrice, adjustment: pkgAdjustment, isCc: isCcPrice, matchedGroupName } = getPkgPrice(selectedPkg)
     const currentAddonTotal = addonTotal()
     const total = pkgPrice + currentAddonTotal + extraFee - discountAmount
-    const basePrice = pkgPrice 
+    const basePrice = pkgPrice
 
     // ─── Discount ────────────────────────────────────────────────
     const applyDiscount = async () => {
@@ -634,9 +640,9 @@ export default function BookPage() {
             amountToDiscount = Math.min(amountToDiscount, pkgPrice)
 
             setDiscountAmount(amountToDiscount)
-            setDiscountMsg(`ลด ${amountToDiscount} บาท`)
+            setDiscountMsg(`✅ ลด ${amountToDiscount} บาท`)
         } catch (e: any) {
-            setDiscountMsg(`${e.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่'}`)
+            setDiscountMsg(`❌ ${e.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่'}`)
             setDiscountAmount(0)
         }
 
@@ -699,7 +705,11 @@ export default function BookPage() {
             const detail: any = { name, isFree: desc.includes('[Pricing: Free]') }
             if (dbA) {
                 if (desc.includes('[Pricing: Variable]')) {
-                    detail.variableState = addonVariableStates[name] || { mode: 'full_tank', customAmount: '' }
+                    const vState = addonVariableStates[name] || { mode: 'full_tank', customAmount: '' }
+                    detail.variableState = vState
+                    if (vState.note && name.includes('น้ำมัน')) {
+                        detail.name = `${name} (${vState.note.trim()})`
+                    }
                 } else if (desc.includes('[Prices:')) {
                     detail.selectedPrice = addonSelectedPrices[name]
                 } else {
@@ -720,7 +730,7 @@ export default function BookPage() {
         const body: any = {
             customer_id: customer.id,
             service_id: selectedPkg?.id,
-            addon_ids: richAddons, 
+            addon_ids: richAddons,
             pickup_lat: pickupLat, pickup_lng: pickupLng, pickup_address: finalPickupAddr,
             delivery_lat: finalDeliveryLat, delivery_lng: finalDeliveryLng, delivery_address: finalDeliveryAddr,
             scheduled_date: selectedDate, scheduled_time: selectedSlot,
@@ -731,9 +741,9 @@ export default function BookPage() {
             discount_amount: discountAmount,
             payment_method: payMethod,
             vehicle_data: selectedVehicle,
-            vehicle_photos: [] 
+            vehicle_photos: []
         }
-        
+
         // Identify active branch for the booking
         const bookingId = pendingBookingId || generateScalableId('BK')
         const activeSlot = slots[selectedDate]?.find((s: any) => s.time_slot === selectedSlot)
@@ -749,7 +759,7 @@ export default function BookPage() {
                 delivery_lat: finalDeliveryLat, delivery_lng: finalDeliveryLng, delivery_address: finalDeliveryAddr,
                 scheduled_date: selectedDate, scheduled_time: selectedSlot,
                 branch_id: activeBranchId,
-                zone_id: zoneId || null, 
+                zone_id: zoneId || null,
                 extra_fee: extraFee,
                 base_price: basePrice, total_price: total,
                 discount_code: discountCode || null, discount_amount: discountAmount,
@@ -793,7 +803,7 @@ export default function BookPage() {
                         const { data: uData, error: uError } = await supabase.storage
                             .from('job-photos')
                             .upload(path, file, { contentType: file.type })
-                        
+
                         if (!uError && uData) {
                             const { data: { publicUrl } } = supabase.storage.from('job-photos').getPublicUrl(path)
                             photoUrls.push(publicUrl)
@@ -835,7 +845,7 @@ export default function BookPage() {
     }
 
     const canNext = [
-        !!selectedPkg && 
+        !!selectedPkg &&
         Object.keys(addons).every(name => !addons[name] || isAddonComplete(name)) &&
         (selectedPkg.is_addon_required === true ? Object.values(addons).some(v => v === true) : true),
         !!selectedVehicle && !!pickupAddress && !!pickupAddressDetail.trim(),
@@ -906,7 +916,7 @@ export default function BookPage() {
                                                     <IconComp size={48} color={pkg.color} style={{ opacity: 0.2 }} />
                                                 </div>
                                             )}
-                                            
+
                                             {/* Badge for Maintenance */}
                                             {pkg.name.includes('บำรุง') && (
                                                 <div className={styles.packageBadge}>
@@ -926,13 +936,13 @@ export default function BookPage() {
                                         <div className={styles.packageInfo}>
                                             <div className={styles.packageName}>{pkg.name}</div>
                                             <div className={styles.packageDesc}>{pkg.description}</div>
-                                            
+
                                             <div className={styles.packagePriceRow}>
                                                 <div>
                                                     <div className={styles.packagePriceLabel}>เริ่มต้น</div>
                                                     <div style={{ color: pkg.color }}>
                                                         <span className={styles.packageCurrency}>฿</span>
-                                                        <span className={styles.packageAmount}>{getPkgPrice(pkg).price}</span>
+                                                        <span className={styles.packageAmount}>{(pkg.price_s || pkg.price || 0).toLocaleString()}</span>
                                                     </div>
                                                 </div>
                                                 {!isSelected && (
@@ -956,7 +966,7 @@ export default function BookPage() {
                                         const label = ADDON_LABELS[addon] || addon
                                         const dbA = dbAddons.find(a => a.name === label)
                                         const desc = dbA?.description || ''
-                                        
+
                                         const pricingType = dbA?.pricing_type || (desc.includes('[Pricing: Free]') ? 'free' : desc.includes('[Pricing: Variable]') ? 'notify_later' : 'fixed')
                                         const isFree = pricingType === 'free'
                                         const isNotifyLater = pricingType === 'notify_later'
@@ -964,7 +974,7 @@ export default function BookPage() {
 
                                         // New Sub-options parsing
                                         let dynPrices = dbA?.sub_options?.map((o: any) => ({ label: o.name, price: o.price, image_url: o.image_url })) || []
-                                        
+
                                         // Legacy fallback
                                         if (dynPrices.length === 0 && desc.includes('[Prices:')) {
                                             const match = desc.match(/\[Prices:\s*(.+?)\]/)
@@ -1045,7 +1055,7 @@ export default function BookPage() {
                                                         {dynPrices.map((opt: any) => {
                                                             const isSelected = addonSelectedPrices[addon] === opt.price
                                                             return (
-                                                                <div key={opt.label} 
+                                                                <div key={opt.label}
                                                                     onClick={() => setAddonSelectedPrices(p => ({ ...p, [addon]: opt.price }))}
                                                                     style={{
                                                                         cursor: 'pointer',
@@ -1059,8 +1069,8 @@ export default function BookPage() {
                                                                     }}
                                                                 >
                                                                     {opt.image_url && (
-                                                                        <div 
-                                                                            style={{ width: '100%', aspectRatio: '1/1', borderRadius: 8, overflow: 'hidden', cursor: 'zoom-in', transition: 'transform 0.2s' }} 
+                                                                        <div
+                                                                            style={{ width: '100%', aspectRatio: '1/1', borderRadius: 8, overflow: 'hidden', cursor: 'zoom-in', transition: 'transform 0.2s' }}
                                                                             onClick={(e) => { e.stopPropagation(); setPreviewImg(opt.image_url) }}
                                                                             onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05)'}
                                                                             onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
@@ -1081,6 +1091,21 @@ export default function BookPage() {
                                                 {/* Variable sub-options */}
                                                 {addons[addon] && isNotifyLater && (
                                                     <div style={{ marginTop: 8, paddingLeft: 32 }}>
+                                                        {addon.includes('น้ำมัน') && (
+                                                            <div style={{ marginBottom: 12 }}>
+                                                                <label style={{ fontSize: '0.8rem', fontWeight: 700, display: 'block', marginBottom: 6 }}>
+                                                                    ประเภทน้ำมันที่ต้องการ/รายละเอียด <span style={{ color: 'var(--danger)' }}>*</span>
+                                                                </label>
+                                                                <textarea
+                                                                    className="form-input"
+                                                                    placeholder="เช่น เติม 95, ดีเซล B7..."
+                                                                    rows={2}
+                                                                    value={addonVariableStates[addon]?.note || ''}
+                                                                    onChange={e => setAddonVariableStates(p => ({ ...p, [addon]: { ...p[addon], note: e.target.value } }))}
+                                                                    style={{ borderRadius: 'var(--radius)', fontSize: '0.85rem' }}
+                                                                />
+                                                            </div>
+                                                        )}
                                                         <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
                                                             <button onClick={() => setAddonVariableStates(p => ({ ...p, [addon]: { ...p[addon], mode: 'full_tank' } }))} className={`btn btn-sm ${addonVariableStates[addon]?.mode === 'full_tank' ? 'btn-primary' : 'btn-outline'}`} style={{ gap: 6 }}>
                                                                 <Droplets size={14} /> เต็มถัง
@@ -1225,29 +1250,29 @@ export default function BookPage() {
                                     <span><Camera size={16} /> แนบรูปภาพรถและจุดรับส่ง (ไม่บังคับ)</span>
                                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{vehicleFiles.length}/3 รูป</span>
                                 </label>
-                                
+
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 8 }}>
                                     {vehicleFiles.map((f, i) => (
                                         <div key={i} style={{ position: 'relative', aspectRatio: '1/1', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)' }}>
                                             <img src={URL.createObjectURL(f)} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                            <button 
+                                            <button
                                                 onClick={() => setVehicleFiles(prev => prev.filter((_, idx) => idx !== i))}
                                                 style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: '#fff', border: 'none', borderRadius: '50%', width: 18, height: 18, fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                             >✕</button>
                                         </div>
                                     ))}
                                     {vehicleFiles.length < 3 && (
-                                        <label style={{ 
-                                            aspectRatio: '1/1', borderRadius: 12, border: '2px dashed var(--border)', 
-                                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', 
-                                            cursor: 'pointer', background: 'var(--surface-2)', transition: 'all 0.2s' 
+                                        <label style={{
+                                            aspectRatio: '1/1', borderRadius: 12, border: '2px dashed var(--border)',
+                                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                            cursor: 'pointer', background: 'var(--surface-2)', transition: 'all 0.2s'
                                         }}>
-                                            <input 
-                                                type="file" accept="image/*" multiple hidden 
+                                            <input
+                                                type="file" accept="image/*" multiple hidden
                                                 onChange={e => {
                                                     const files = Array.from(e.target.files || [])
                                                     setVehicleFiles(prev => [...prev, ...files].slice(0, 3))
-                                                }} 
+                                                }}
                                             />
                                             <span style={{ fontSize: '1.2rem', color: 'var(--primary)' }}>+</span>
                                             <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center' }}>เพิ่มรูป</span>
@@ -1261,11 +1286,11 @@ export default function BookPage() {
 
                             <div className="form-group">
                                 <label className="form-label">หมายเหตุถึงพนักงาน (เช่น ระวังสีรถพิเศษ, ฝากกุญแจไว้ที่ไหน)</label>
-                                <textarea 
-                                    className="form-input" 
-                                    placeholder="ระบุข้อความถึงพนักงาน..." 
+                                <textarea
+                                    className="form-input"
+                                    placeholder="ระบุข้อความถึงพนักงาน..."
                                     rows={3}
-                                    value={customerNote} 
+                                    value={customerNote}
                                     onChange={e => setCustomerNote(e.target.value)}
                                     style={{ resize: 'none', borderRadius: 'var(--radius)' }}
                                 />
@@ -1401,7 +1426,7 @@ export default function BookPage() {
                                         if (!pickupInS || !deliveryInS) {
                                             const d1 = pickupInS ? 0 : haversine(bLat, bLng, pickupLat, pickupLng)
                                             const d2 = showDelivery ? haversine(pickupLat, pickupLng, deliveryLat, deliveryLng) : 0
-                                            
+
                                             // --- Intelligent Chaining Check ---
                                             let skipReturn = false
                                             if (showDelivery && deliveryMatched) {
@@ -1409,9 +1434,9 @@ export default function BookPage() {
                                                 const nextSlotName = TIME_SLOTS[currentIdx + 1]
                                                 if (nextSlotName) {
                                                     const availableStaffIds = sl.available_staff_ids || []
-                                                    const hasChain = allSchedulesData.some(sch => 
-                                                        sch.date === selectedDate && 
-                                                        sch.time_slot === nextSlotName && 
+                                                    const hasChain = allSchedulesData.some(sch =>
+                                                        sch.date === selectedDate &&
+                                                        sch.time_slot === nextSlotName &&
                                                         sch.zone_id === deliveryMatched.id &&
                                                         availableStaffIds.includes(sch.staff_id)
                                                     )
@@ -1421,7 +1446,7 @@ export default function BookPage() {
 
                                             const d3 = (showDelivery && !skipReturn && !deliveryInS) ? haversine(deliveryLat, deliveryLng, bLat, bLng) : (skipReturn || deliveryInS ? 0 : d1)
                                             const totalD = d1 + d2 + d3
-                                            
+
                                             if (sBranch.out_of_zone_type === 'flat_rate') {
                                                 slotSurcharge = Number(sBranch.out_of_zone_fee || OVERFLOW_FEE)
                                             } else {
@@ -1432,7 +1457,7 @@ export default function BookPage() {
                                         // Fallback for completely unknown zone but slot exists
                                         slotSurcharge = OVERFLOW_FEE
                                     }
-                                    
+
                                     const hasSurcharge = slotSurcharge > 0
 
                                     return (
@@ -1480,9 +1505,9 @@ export default function BookPage() {
                         <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-5)', border: '1px solid var(--border)', marginBottom: 'var(--space-4)' }}>
                             <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
                                 <div className={styles.iconBox} style={{ background: selectedPkg?.color + '20', color: selectedPkg?.color, width: 48, height: 48, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    {selectedPkg?.icon === 'sparkles' ? <Sparkles size={24} /> : 
-                                     selectedPkg?.icon === 'wrench' ? <Wrench size={24} /> : 
-                                     <Droplets size={24} />}
+                                    {selectedPkg?.icon === 'sparkles' ? <Sparkles size={24} /> :
+                                        selectedPkg?.icon === 'wrench' ? <Wrench size={24} /> :
+                                            <Droplets size={24} />}
                                 </div>
                                 <div>
                                     <div style={{ fontWeight: 800, fontSize: '1rem' }}>{selectedPkg?.name}</div>
@@ -1512,9 +1537,9 @@ export default function BookPage() {
                             </div>
                             {[
                                 { label: `แพ็กเกจ ${selectedPkg?.name}`, val: pkgBasePrice },
-                                ...( (pkgAdjustment !== 0 || (selectedVehicle?.vehicle_size && selectedVehicle.vehicle_size !== 'S') || isCcPrice) ? [{ 
-                                    label: isCcPrice ? `ค่าบริการตาม CC` : `ส่วนต่างตามขนาดรถ (${selectedVehicle?.vehicle_size})`, 
-                                    val: pkgAdjustment, 
+                                ...((pkgAdjustment !== 0 || (selectedVehicle?.vehicle_size && selectedVehicle.vehicle_size !== 'S') || isCcPrice) ? [{
+                                    label: isCcPrice ? `ค่าบริการตาม CC` : `ส่วนต่างตามขนาดรถ (${selectedVehicle?.vehicle_size})`,
+                                    val: pkgAdjustment,
                                     note: pkgAdjustment === 0 ? '฿0' : (pkgAdjustment > 0 ? `+฿${pkgAdjustment.toLocaleString()}` : `-฿${Math.abs(pkgAdjustment).toLocaleString()}`)
                                 }] : []),
                                 ...Object.entries(addons).map(([name, isSelected]) => {
@@ -1605,10 +1630,11 @@ export default function BookPage() {
                         ) : (
                             <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-5)', border: '1px solid var(--border)' }}>
                                 <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe' } }}>
-                                    <CheckoutForm 
-                                        amount={total} 
-                                        onSuccess={handleStripeSuccess} 
-                                        onCancel={() => setClientSecret('')} 
+                                    <CheckoutForm
+                                        amount={total}
+                                        customerEmail={customer?.email}
+                                        onSuccess={handleStripeSuccess}
+                                        onCancel={() => setClientSecret('')}
                                     />
                                 </Elements>
                             </div>
@@ -1643,9 +1669,9 @@ export default function BookPage() {
                                 disabled={submitting || !currentCanNext}
                                 onClick={payMethod === 'stripe' ? fetchPaymentIntent : () => submit()}
                             >
-                                {submitting ? <span className="spinner" /> : 
-                                 payMethod === 'stripe' ? <><CreditCard size={18} /> ชำระเงิน</> :
-                                 <><CheckCircle size={18} /> ยืนยันการจอง</>}
+                                {submitting ? <span className="spinner" /> :
+                                    payMethod === 'stripe' ? <><CreditCard size={18} /> ชำระเงิน</> :
+                                        <><CheckCircle size={18} /> ยืนยันการจอง</>}
                             </button>
                         )
                     )}
@@ -1654,12 +1680,12 @@ export default function BookPage() {
 
             {/* Image Preview Modal */}
             {previewImg && (
-                <div 
+                <div
                     style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
                     onClick={() => setPreviewImg(null)}
                 >
                     <div style={{ position: 'relative', maxWidth: '100%', maxHeight: '100%' }} onClick={e => e.stopPropagation()}>
-                        <button 
+                        <button
                             onClick={() => setPreviewImg(null)}
                             style={{ position: 'absolute', top: -40, right: 0, color: '#fff', background: 'none', border: 'none', cursor: 'pointer' }}
                         >

@@ -24,6 +24,7 @@ export default function CRMPage() {
     const [searchTerm, setSearchTerm] = useState('')
     const [branches, setBranches] = useState<any[]>([])
     const [services, setServices] = useState<any[]>([])
+    const [addons, setAddons] = useState<any[]>([])
     const [txFilters, setTxFilters] = useState({
         branchId: 'all',
         status: 'all',
@@ -64,19 +65,20 @@ export default function CRMPage() {
     useEffect(() => {
         const loadData = async () => {
             setLoading(true)
-            const [custRes, bookRes, svcRes, stfRes, znRes, brRes] = await Promise.all([
+            const [custRes, bookRes, svcRes, stfRes, znRes, brRes, addRes] = await Promise.all([
                 supabase.from('customers').select('*').order('created_at', { ascending: false }),
                 supabase.from('bookings').select(`
                     *, 
                     customers(*), 
                     staff(full_name),
-                    services(name),
+                    services(name, price_s),
                     zones(name, branches(name))
                 `).order('created_at', { ascending: false }),
                 supabase.from('services').select('*'),
                 supabase.from('staff').select('*'),
                 supabase.from('zones').select('*'),
-                supabase.from('branches').select('*')
+                supabase.from('branches').select('*'),
+                supabase.from('service_addons').select('*')
             ])
 
             const customersData = custRes.data || []
@@ -112,6 +114,7 @@ export default function CRMPage() {
             setBookings(enrichedBookings)
             setBranches(branchesData)
             setServices(servicesData)
+            setAddons(addRes.data || [])
             setLoading(false)
         }
         loadData()
@@ -119,24 +122,34 @@ export default function CRMPage() {
 
     // Process Analytics
     const customerStats = customers.map(c => {
-        const cBookings = bookings.filter(b => b.customer_id === c.id && ['completed', 'paid', 'delivering'].includes(b.status))
-        const totalSpent = cBookings.reduce((sum, b) => sum + (b.total_price || 0), 0)
+        const cBookings = bookings.filter((b: any) => b.customer_id === c.id && ['completed', 'paid', 'delivering', 'washing'].includes(b.status))
+        const totalSpent = cBookings.reduce((sum: number, b: any) => sum + (b.total_price || 0), 0)
         const totalVisits = cBookings.length
         
-        // Extract all unique addons used by this customer
         const allAddons = new Set<string>()
-        cBookings.forEach(b => {
+        const allServices = new Set<string>()
+        let totalDiscount = 0
+        let totalRating = 0
+        let ratingCount = 0
+        
+        cBookings.forEach((b: any) => {
             if (Array.isArray(b.addon_ids)) {
                 b.addon_ids.forEach((a: any) => {
                     if (typeof a === 'string') allAddons.add(a)
                     else if (a && a.name) allAddons.add(a.name)
                 })
             }
+            if (b.services?.name) allServices.add(b.services.name)
+            if (b.discount_amount) totalDiscount += b.discount_amount
+            if (b.rating) {
+                totalRating += b.rating
+                ratingCount++
+            }
         })
 
-        const lastVisitDate = cBookings.length > 0
-            ? [...cBookings].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0].created_at
-            : null
+        const sortedArrivals = [...cBookings].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        const lastVisitDate = sortedArrivals.length > 0 ? sortedArrivals[0].created_at : null
+        const lastBranchId = sortedArrivals.length > 0 ? (sortedArrivals[0].branch_id || sortedArrivals[0].zones?.branch_id) : null
 
         let daysSinceLast = 999
         if (lastVisitDate) {
@@ -146,22 +159,37 @@ export default function CRMPage() {
         const rfmParams = getRFMScore(daysSinceLast, totalVisits, totalSpent, crmConfig)
         const segment = segmentCustomer(rfmParams, crmConfig)
 
-        const vehicleCount = (Array.isArray(c.saved_vehicles) && c.saved_vehicles.length > 0) 
+        const vehicleCount = (Array.isArray(c.saved_vehicles)) 
             ? c.saved_vehicles.length 
-            : (c.vehicle_brand ? 1 : 0)
+            : 0
+
+        const birthMonth = c.birthdate ? new Date(c.birthdate).getMonth() + 1 : null
 
         return { 
             ...c, 
             totalSpent, 
-            totalVisits, 
+            totalVisits,
+            avgSpent: totalVisits > 0 ? totalSpent / totalVisits : 0,
             lastVisitDate, 
             daysSinceLast, 
+            lastBranchId,
+            hasDiscountUsage: totalDiscount > 0,
+            totalSavings: totalDiscount,
+            avgRating: ratingCount > 0 ? totalRating / ratingCount : null,
+            birthMonth,
             rfm: rfmParams, 
             segment, 
             vehicleCount,
-            addons: Array.from(allAddons) 
+            addons: Array.from(allAddons),
+            servicesUsed: Array.from(allServices)
         }
     })
+
+    // Extract unique value lists for dynamic dropdowns
+    const uniqueGenders = Array.from(new Set(customers.map(c => c.gender).filter(Boolean)))
+    const uniqueOccupations = Array.from(new Set(customers.map(c => c.occupation).filter(Boolean)))
+    const uniqueInterests = Array.from(new Set(customers.flatMap(c => c.interests || []).filter(Boolean)))
+    const uniqueVehicleBrands = Array.from(new Set(customers.map(c => c.vehicle_brand).filter(Boolean)))
 
     const filteredStats = customerStats.filter(c =>
         c.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -195,26 +223,29 @@ export default function CRMPage() {
             const val = cond.value
             const target = c[cond.metric]
             
-            // Special Handle: Profile Completion (Boolean)
-            if (cond.metric === 'is_profile_complete') {
+            // Boolean Handle
+            if (['is_profile_complete', 'hasDiscountUsage'].includes(cond.metric)) {
                 const targetBool = !!target
                 const valBool = val === 'true'
                 return cond.operator === '===' ? targetBool === valBool : targetBool !== valBool
             }
 
-            if (target === undefined) return false
-
-            // Handle Array match (Interests / Addons)
-            if (['interests', 'addons'].includes(cond.metric) && Array.isArray(target)) {
-                if (cond.operator === 'contains') return target.some(a => String(a).toLowerCase().includes(String(val).toLowerCase()))
-                if (cond.operator === 'not_contains') return !target.some(a => String(a).toLowerCase().includes(String(val).toLowerCase()))
+            if (target === undefined || target === null) {
+                // For numeric/date nulls, fail unless specifically checking for null
+                if (cond.operator === '!=' && val === '') return true
                 return false
             }
 
-            // Handle string comparisons
-            if (['gender', 'vehicle_brand', 'vehicle_size', 'segment', 'occupation'].includes(cond.metric)) {
-                if (cond.operator === '===') return String(target).toLowerCase() === String(val).toLowerCase()
-                return String(target).toLowerCase().includes(String(val).toLowerCase())
+            // Handle Array match (Interests / Addons / ServicesUsed)
+            if (['interests', 'addons', 'servicesUsed'].includes(cond.metric) && Array.isArray(target)) {
+                const isIncluded = target.some(a => String(a).toLowerCase() === String(val).toLowerCase())
+                return cond.operator === '===' ? isIncluded : !isIncluded
+            }
+
+            // Handle categorical string comparisons
+            if (['gender', 'vehicle_brand', 'vehicle_size', 'segment', 'occupation', 'lastBranchId'].includes(cond.metric)) {
+                const isMatch = String(target).toLowerCase() === String(val).toLowerCase()
+                return cond.operator === '===' ? isMatch : !isMatch
             }
 
             // Handle numeric comparisons
@@ -461,7 +492,7 @@ export default function CRMPage() {
                                             <th colSpan={3} className={styles.bgGroupCustomer} style={{ textAlign: 'center', borderBottom: 'none' }}>👤 ข้อมูลลูกค้า</th>
                                             <th colSpan={3} className={styles.bgGroupVehicle} style={{ textAlign: 'center', borderBottom: 'none' }}>🚗 ข้อมูลรถ</th>
                                             <th colSpan={4} className={styles.bgGroupDetail} style={{ textAlign: 'center', borderBottom: 'none' }}>📝 รายละเอียดงาน</th>
-                                            <th colSpan={5} className={styles.bgGroupPricing} style={{ textAlign: 'center', borderBottom: 'none' }}>💰 การเงิน & ส่วนลด</th>
+                                            <th colSpan={6} className={styles.bgGroupPricing} style={{ textAlign: 'center', borderBottom: 'none' }}>💰 การเงิน & ส่วนลด</th>
                                             <th colSpan={3} className={styles.bgGroupStatus} style={{ textAlign: 'center', borderBottom: 'none' }}>🛡️ สถานะ & รีวิว</th>
                                             <th colSpan={2} style={{ textAlign: 'center', borderBottom: 'none' }}>📍 รับ/ส่ง</th>
                                         </tr>
@@ -483,7 +514,8 @@ export default function CRMPage() {
                                             <th className={styles.bgGroupDetail}>แพ็กเกจ / เสริม</th>
 
                                             {/* Pricing */}
-                                            <th className={styles.bgGroupPricing}>ราคาหลัก</th>
+                                            <th className={styles.bgGroupPricing}>แพ็กเกจ</th>
+                                            <th className={styles.bgGroupPricing}>ส่วนต่าง CC</th>
                                             <th className={styles.bgGroupPricing}>นอกโซน</th>
                                             <th className={styles.bgGroupPricing}>เพิ่มเติม</th>
                                             <th className={styles.bgGroupPricing}>ส่วนลด</th>
@@ -503,9 +535,13 @@ export default function CRMPage() {
                                         {filteredTransactions.map(b => {
                                             const vData = b.vehicle_data || b.customers || {}
                                             const zonesData = b.zones as any
-                                            const branchName = zonesData?.branches?.name || '-'
+                                            const branchName = zonesData?.branches?.name || branches.find(br => br.id === b.branch_id)?.name || 'ไม่ระบุ'
                                             const zoneName = b.extra_fee > 0 ? 'นอกโซน' : (zonesData?.name || '-')
                                             
+                                            // Split Pricing Logic
+                                            const rawBasePrice = b.services?.price_s || 0
+                                            const ccAdj = Math.max(0, (b.base_price || 0) - rawBasePrice)
+
                                             // Parse Addons
                                             let addonListStr = 'ไม่มี'
                                             if (Array.isArray(b.addon_ids) && b.addon_ids.length > 0) {
@@ -530,12 +566,10 @@ export default function CRMPage() {
                                                         <div style={{ fontWeight: 600 }}>{b.customers?.full_name || 'ไม่ทราบชื่อ'}</div>
                                                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{b.customers?.phone || '-'}</div>
                                                     </td>
-
                                                     {/* Vehicle */}
                                                     <td style={{ fontWeight: 600 }}>{vData.vehicle_brand || '-'} {vData.vehicle_model || ''}</td>
                                                     <td style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{vData.license_plate || '-'}</td>
                                                     <td style={{ fontSize: '0.85rem' }}>{vData.vehicle_color || '-'}</td>
-
                                                     {/* Details */}
                                                     <td>{b.scheduled_date ? new Date(b.scheduled_date).toLocaleDateString('th-TH') : '-'}</td>
                                                     <td>{b.scheduled_time?.substring(0, 5) || '-'}</td>
@@ -549,24 +583,30 @@ export default function CRMPage() {
                                                             + {addonListStr}
                                                         </div>
                                                     </td>
-
                                                     {/* Pricing */}
-                                                    <td>฿{b.base_price?.toLocaleString() || 0}</td>
+                                                    <td>฿{rawBasePrice.toLocaleString()}</td>
+                                                    <td style={{ color: ccAdj > 0 ? 'var(--danger)' : 'inherit' }}>฿{ccAdj.toLocaleString()}</td>
                                                     <td style={{ color: b.extra_fee > 0 ? 'var(--primary)' : 'inherit' }}>฿{b.extra_fee?.toLocaleString() || 0}</td>
                                                     <td style={{ color: 'var(--warning)' }}>
-                                                        {b.slip_url ? (
-                                                            <a href={b.slip_url} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline', color: 'var(--warning)', fontWeight: 600 }} title="กดเพื่อดูสลิป">
-                                                                ฿{b.additional_price?.toLocaleString() || 0} 📄
-                                                            </a>
-                                                        ) : (
-                                                            <>฿{b.additional_price?.toLocaleString() || 0}</>
+                                                        <div>
+                                                            {b.slip_url ? (
+                                                                <a href={b.slip_url} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline', color: 'var(--warning)', fontWeight: 600 }} title="กดเพื่อดูสลิป">
+                                                                    ฿{b.additional_price?.toLocaleString() || 0} 📄
+                                                                </a>
+                                                            ) : (
+                                                                <span style={{ fontWeight: 700 }}>฿{b.additional_price?.toLocaleString() || 0}</span>
+                                                            )}
+                                                        </div>
+                                                        {b.additional_price_note && (
+                                                            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2, fontStyle: 'italic', maxWidth: 80 }}>
+                                                                {b.additional_price_note}
+                                                            </div>
                                                         )}
                                                     </td>
                                                     <td style={{ color: 'var(--danger)' }}>
                                                         {b.discount_amount ? `-฿${b.discount_amount.toLocaleString()}` : '฿0'}
                                                     </td>
                                                     <td style={{ fontWeight: 700, color: 'var(--primary)' }}>฿{b.total_price?.toLocaleString() || 0}</td>
-
                                                     {/* Status */}
                                                     <td>
                                                         <span className={`badge ${b.payment_status === 'paid' ? 'badge-completed' : 'badge-pending'}`}>
@@ -583,7 +623,6 @@ export default function CRMPage() {
                                                             <div style={{ fontWeight: 700, color: 'var(--warning)', whiteSpace: 'nowrap' }}>⭐ {b.rating}</div>
                                                         ) : '-'}
                                                     </td>
-
                                                     {/* Location */}
                                                     <td style={{ fontSize: '0.8rem' }} title={b.pickup_address}>📍 {formatLocation(b.pickup_address)}</td>
                                                     <td style={{ fontSize: '0.8rem' }} title={b.delivery_address}>🏁 {formatLocation(b.delivery_address)}</td>
@@ -691,33 +730,78 @@ export default function CRMPage() {
                                                     const newConds = [...conditions]
                                                     newConds[idx].metric = e.target.value
                                                     // Reset operator and value on metric change
-                                                    if (e.target.value === 'is_profile_complete') {
+                                                    const isNumeric = ['totalVisits', 'totalSpent', 'avgSpent', 'daysSinceLast', 'vehicleCount', 'totalSavings', 'avgRating', 'birthMonth'].includes(e.target.value)
+                                                    
+                                                    if (['is_profile_complete', 'hasDiscountUsage'].includes(e.target.value)) {
                                                         newConds[idx].operator = '==='
                                                         newConds[idx].value = 'true'
-                                                    } else if (['interests', 'addons'].includes(e.target.value)) {
-                                                        newConds[idx].operator = 'contains'
-                                                        newConds[idx].value = ''
-                                                    } else {
+                                                    } else if (e.target.value === 'gender') {
+                                                        newConds[idx].operator = '==='
+                                                        newConds[idx].value = uniqueGenders[0] || ''
+                                                    } else if (e.target.value === 'occupation') {
+                                                        newConds[idx].operator = '==='
+                                                        newConds[idx].value = uniqueOccupations[0] || ''
+                                                    } else if (e.target.value === 'interests') {
+                                                        newConds[idx].operator = '==='
+                                                        newConds[idx].value = uniqueInterests[0] || ''
+                                                    } else if (e.target.value === 'vehicle_brand') {
+                                                        newConds[idx].operator = '==='
+                                                        newConds[idx].value = uniqueVehicleBrands[0] || ''
+                                                    } else if (e.target.value === 'servicesUsed') {
+                                                        newConds[idx].operator = '==='
+                                                        newConds[idx].value = services[0]?.name || ''
+                                                    } else if (e.target.value === 'addons') {
+                                                        newConds[idx].operator = '==='
+                                                        newConds[idx].value = addons[0]?.name || ''
+                                                    } else if (e.target.value === 'lastBranchId') {
+                                                        newConds[idx].operator = '==='
+                                                        newConds[idx].value = branches[0]?.id || ''
+                                                    } else if (e.target.value === 'segment') {
+                                                        newConds[idx].operator = '==='
+                                                        newConds[idx].value = 'VIP'
+                                                    } else if (e.target.value === 'vehicle_size') {
+                                                        newConds[idx].operator = '==='
+                                                        newConds[idx].value = 'S'
+                                                    } else if (isNumeric) {
                                                         newConds[idx].operator = '>='
                                                         newConds[idx].value = '0'
+                                                    } else {
+                                                        newConds[idx].operator = '==='
+                                                        newConds[idx].value = ''
                                                     }
                                                     setConditions(newConds)
                                                 }}
                                             >
-                                                <option value="is_profile_complete">กรอกข้อมูลครบ (Boolean)</option>
-                                                <option value="totalVisits">จำนวนครั้งที่ล้าง</option>
-                                                <option value="totalSpent">ยอดรวมที่จ่าย</option>
-                                                <option value="daysSinceLast">หายไป (วัน)</option>
-                                                <option value="vehicle_size">ขนาดรถ (SML)</option>
-                                                <option value="segment">กลุ่ม RFM</option>
-                                                <option value="vehicle_brand">ยี่ห้อรถ</option>
-                                                <option value="gender">เพศ</option>
-                                                <option value="occupation">อาชีพ</option>
-                                                <option value="interests">สิ่งที่สนใจ (Array)</option>
-                                                <option value="addons">บริการเสริมที่เคยใช้ (Array)</option>
+                                                <optgroup label="👤 ข้อมูลโปรไฟล์">
+                                                    <option value="is_profile_complete">กรอกข้อมูลครบ (Boolean)</option>
+                                                    <option value="gender">เพศ</option>
+                                                    <option value="occupation">อาชีพ</option>
+                                                    <option value="birthMonth">เดือนเกิด (1-12)</option>
+                                                    <option value="interests">สิ่งที่สนใจ (Array)</option>
+                                                </optgroup>
+                                                <optgroup label="🚗 ข้อมูลรถ">
+                                                    <option value="vehicle_size">ขนาดรถ (SML)</option>
+                                                    <option value="vehicle_brand">ยี่ห้อรถ</option>
+                                                    <option value="vehicleCount">จำนวนรถที่บันทึก</option>
+                                                </optgroup>
+                                                <optgroup label="📊 พฤติกรรม (RFM)">
+                                                    <option value="totalVisits">จำนวนครั้งที่ล้าง</option>
+                                                    <option value="totalSpent">ยอดรวมที่จ่าย</option>
+                                                    <option value="avgSpent">ยอดใช้จ่ายเฉลี่ย/ครั้ง</option>
+                                                    <option value="daysSinceLast">หายไป (วัน)</option>
+                                                    <option value="segment">กลุ่ม RFM (แท็ก)</option>
+                                                </optgroup>
+                                                <optgroup label="🤝 การมีส่วนร่วม & ประวัติ">
+                                                    <option value="lastBranchId">สาขาล่าสุดที่ใช้</option>
+                                                    <option value="hasDiscountUsage">เคยใช้ส่วนลด (Boolean)</option>
+                                                    <option value="totalSavings">ยอดที่ประหยัดไปได้</option>
+                                                    <option value="avgRating">คะแนนรีวิวเฉลี่ย</option>
+                                                    <option value="servicesUsed">แพ็กเกจที่เคยใช้ (Array)</option>
+                                                    <option value="addons">บริการเสริมที่เคยใช้ (Array)</option>
+                                                </optgroup>
                                             </select>
 
-                                            {cond.metric === 'is_profile_complete' ? (
+                                            {['is_profile_complete', 'hasDiscountUsage', 'gender', 'occupation', 'interests', 'vehicle_brand', 'servicesUsed', 'addons', 'vehicle_size', 'lastBranchId', 'segment'].includes(cond.metric) ? (
                                                 <select 
                                                     className="form-input"
                                                     style={{ fontSize: '0.8rem', padding: '6px 8px' }}
@@ -728,22 +812,8 @@ export default function CRMPage() {
                                                         setConditions(newConds)
                                                     }}
                                                 >
-                                                    <option value="===">ใช่</option>
-                                                    <option value="!=">ไม่ใช่</option>
-                                                </select>
-                                            ) : ['interests', 'addons'].includes(cond.metric) ? (
-                                                <select 
-                                                    className="form-input"
-                                                    style={{ fontSize: '0.8rem', padding: '6px 8px' }}
-                                                    value={cond.operator}
-                                                    onChange={e => {
-                                                        const newConds = [...conditions]
-                                                        newConds[idx].operator = e.target.value
-                                                        setConditions(newConds)
-                                                    }}
-                                                >
-                                                    <option value="contains">มี</option>
-                                                    <option value="not_contains">ไม่มี</option>
+                                                    <option value="===">=</option>
+                                                    <option value="!=">!=</option>
                                                 </select>
                                             ) : (
                                                 <select 
@@ -763,8 +833,10 @@ export default function CRMPage() {
                                                 </select>
                                             )}
 
-                                            {cond.metric === 'is_profile_complete' ? (
-                                                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{cond.operator === '===' ? 'ครบ' : 'ไม่ครบ'}</div>
+                                            {['is_profile_complete', 'hasDiscountUsage'].includes(cond.metric) ? (
+                                                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                                    {cond.operator === '===' ? (cond.metric === 'is_profile_complete' ? 'กรอกข้อมูลครบ' : 'เคยใช้') : (cond.metric === 'is_profile_complete' ? 'ไม่ครบ' : 'ไม่เคยใช้')}
+                                                </div>
                                             ) : cond.metric === 'vehicle_size' ? (
                                                 <select 
                                                     className="form-input"
@@ -780,11 +852,116 @@ export default function CRMPage() {
                                                         <option key={v} value={v}>{v} ({VEHICLE_SIZE_LABEL[v]})</option>
                                                     ))}
                                                 </select>
+                                            ) : cond.metric === 'lastBranchId' ? (
+                                                <select 
+                                                    className="form-input"
+                                                    style={{ fontSize: '0.8rem', padding: '6px 8px' }}
+                                                    value={cond.value}
+                                                    onChange={e => {
+                                                        const newConds = [...conditions]
+                                                        newConds[idx].value = e.target.value
+                                                        setConditions(newConds)
+                                                    }}
+                                                >
+                                                    {branches.map(br => (
+                                                        <option key={br.id} value={br.id}>{br.name}</option>
+                                                    ))}
+                                                </select>
+                                            ) : cond.metric === 'segment' ? (
+                                                <select 
+                                                    className="form-input"
+                                                    style={{ fontSize: '0.8rem', padding: '6px 8px' }}
+                                                    value={cond.value}
+                                                    onChange={e => {
+                                                        const newConds = [...conditions]
+                                                        newConds[idx].value = e.target.value
+                                                        setConditions(newConds)
+                                                    }}
+                                                >
+                                                    {['VIP', 'Loyal', 'Churn Risk', 'Lost Customer', 'New', 'Big Ticket (Rare)', 'Promising', 'Inactive', 'Regular'].map(s => (
+                                                        <option key={s} value={s}>{s}</option>
+                                                    ))}
+                                                </select>
+                                            ) : cond.metric === 'gender' ? (
+                                                <select 
+                                                    className="form-input"
+                                                    style={{ fontSize: '0.8rem', padding: '6px 8px' }}
+                                                    value={cond.value}
+                                                    onChange={e => {
+                                                        const newConds = [...conditions]
+                                                        newConds[idx].value = e.target.value
+                                                        setConditions(newConds)
+                                                    }}
+                                                >
+                                                    {uniqueGenders.map(g => (
+                                                        <option key={g} value={g}>{g}</option>
+                                                    ))}
+                                                </select>
+                                            ) : cond.metric === 'occupation' ? (
+                                                <select 
+                                                    className="form-input"
+                                                    style={{ fontSize: '0.8rem', padding: '6px 8px' }}
+                                                    value={cond.value}
+                                                    onChange={e => {
+                                                        const newConds = [...conditions]
+                                                        newConds[idx].value = e.target.value
+                                                        setConditions(newConds)
+                                                    }}
+                                                >
+                                                    {uniqueOccupations.map(o => (
+                                                        <option key={o} value={o}>{o}</option>
+                                                    ))}
+                                                </select>
+                                            ) : cond.metric === 'interests' ? (
+                                                <select 
+                                                    className="form-input"
+                                                    style={{ fontSize: '0.8rem', padding: '6px 8px' }}
+                                                    value={cond.value}
+                                                    onChange={e => {
+                                                        const newConds = [...conditions]
+                                                        newConds[idx].value = e.target.value
+                                                        setConditions(newConds)
+                                                    }}
+                                                >
+                                                    {uniqueInterests.map(i => (
+                                                        <option key={i} value={i}>{i}</option>
+                                                    ))}
+                                                </select>
+                                            ) : cond.metric === 'vehicle_brand' ? (
+                                                <select 
+                                                    className="form-input"
+                                                    style={{ fontSize: '0.8rem', padding: '6px 8px' }}
+                                                    value={cond.value}
+                                                    onChange={e => {
+                                                        const newConds = [...conditions]
+                                                        newConds[idx].value = e.target.value
+                                                        setConditions(newConds)
+                                                    }}
+                                                >
+                                                    {uniqueVehicleBrands.map(v => (
+                                                        <option key={v} value={v}>{v}</option>
+                                                    ))}
+                                                </select>
+                                            ) : cond.metric === 'addons' ? (
+                                                <select 
+                                                    className="form-input"
+                                                    style={{ fontSize: '0.8rem', padding: '6px 8px' }}
+                                                    value={cond.value}
+                                                    onChange={e => {
+                                                        const newConds = [...conditions]
+                                                        newConds[idx].value = e.target.value
+                                                        setConditions(newConds)
+                                                    }}
+                                                >
+                                                    {addons.map(a => (
+                                                        <option key={a.id} value={a.name}>{a.name}</option>
+                                                    ))}
+                                                </select>
                                             ) : (
                                                 <input 
                                                     className="form-input"
                                                     style={{ fontSize: '0.8rem', padding: '6px 8px' }}
-                                                    placeholder="ค่า..."
+                                                    placeholder={['interests', 'vehicle_brand'].includes(cond.metric) ? "ระบุชื่อ..." : "ตัวเลข..."}
                                                     value={cond.value} 
                                                     onChange={e => {
                                                         const newConds = [...conditions]
@@ -918,6 +1095,8 @@ export default function CRMPage() {
                                                         {conditions[0]?.metric === 'totalSpent' ? '฿' : ''}
                                                         {conditions[0]?.metric === 'is_profile_complete' ? (c.is_profile_complete ? '✅ ครบ' : '❌ ไม่ครบ') : 
                                                          conditions[0]?.metric === 'vehicle_size' ? (VEHICLE_SIZE_LABEL[c.vehicle_size] || c.vehicle_size) :
+                                                         conditions[0]?.metric === 'lastBranchId' ? (branches.find(b => b.id === c.lastBranchId)?.name || 'N/A') :
+                                                         conditions[0]?.metric === 'segment' ? c.segment :
                                                          String(c[conditions[0]?.metric || 'totalVisits'])}
                                                     </td>
                                                 </tr>

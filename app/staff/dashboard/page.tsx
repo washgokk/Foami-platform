@@ -14,6 +14,18 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
+// ─── Utility to extract place name from address ─────────────
+function getPlaceName(addr: string) {
+    if (!addr) return 'ไม่ระบุสถานที่'
+    // Format: "Detail (Note) Address" -> take Detail
+    const parts = addr.split('(')
+    if (parts.length > 1) return parts[0].trim()
+    // Fallback: take first two words if too long
+    const words = addr.split(' ')
+    if (words.length > 2) return words.slice(0, 2).join(' ')
+    return addr
+}
+
 export default function StaffDashboard() {
     const [jobs, setJobs] = useState<any[]>([])
     const [availableJobs, setAvailableJobs] = useState<any[]>([])
@@ -233,9 +245,11 @@ export default function StaffDashboard() {
                                             <span className={styles.jobDate}>{job.scheduled_date}</span>
                                         </div>
                                         <div className={styles.jobBody}>
-                                            <div className={styles.jobCustomer}>{job.customers?.full_name}</div>
-                                            <div className={styles.jobDetail}>{job.customers?.vehicle_size} · {job.services?.name} · {job.zones?.name}</div>
-                                            <div className={styles.jobDetail} style={{ fontSize: '0.75rem', color: job.suitability === 'recommended' ? '#16a34a' : '#2563eb', fontWeight: 600 }}>
+                                            <div className={styles.jobCustomer} style={{ fontSize: '1.2rem', marginBottom: 2 }}>{getPlaceName(job.pickup_address)}</div>
+                                            <div className={styles.jobDetail}>
+                                                {job.customers?.vehicle_brand} {job.customers?.vehicle_model} · {job.services?.name} 
+                                            </div>
+                                            <div className={styles.jobDetail} style={{ fontSize: '0.75rem', color: job.suitability === 'recommended' ? '#16a34a' : '#2563eb', fontWeight: 600, marginTop: 4 }}>
                                                 {job.suitability === 'recommended' ? '✨ เหมาะสำหรับคุณ (อยู่ใกล้ที่สุด)' : '👥 มีพนักงานคนอื่นที่เหมาะสมกว่า'}
                                             </div>
                                         </div>
@@ -318,8 +332,10 @@ function JobCard({ job }: { job: any }) {
                 <span className={styles.jobDate}>{job.scheduled_date}</span>
             </div>
             <div className={styles.jobBody}>
-                <div className={styles.jobCustomer}>{job.customers?.full_name}</div>
-                <div className={styles.jobDetail}>{job.customers?.vehicle_brand} · {job.services?.name} · {job.zones?.name}</div>
+                <div className={styles.jobCustomer} style={{ fontSize: '1.2rem', marginBottom: 2 }}>{getPlaceName(job.pickup_address)}</div>
+                <div className={styles.jobDetail}>
+                    {job.customers?.vehicle_brand} {job.customers?.vehicle_model} · {job.services?.name}
+                </div>
             </div>
             <span className={`badge ${BOOKING_STATUS_CSS[job.status as BookingStatus] || ''}`}>
                 {BOOKING_STATUS_LABEL[job.status as BookingStatus] || job.status}
