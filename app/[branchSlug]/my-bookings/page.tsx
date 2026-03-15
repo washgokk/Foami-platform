@@ -95,11 +95,16 @@ export default function MyBookingsPage() {
 
                 setBookings([...bData])
                 
-                // 🚀 AUTO-POPUP: If there's a completed booking without a rating, open it
+                // 🚀 AUTO-POPUP: If there's a completed booking without a rating, OR any booking with unpaid additional price
                 const unrated = bData.find((b: any) => b.status === 'completed' && !b.rating)
-                if (unrated) {
-                    // Check if this specific booking was recently dismissed in this session
-                    const dismissed = sessionStorage.getItem('dismissed_review_' + unrated.id)
+                const unpaid = bData.find((b: any) => b.additional_price > 0 && !b.is_additional_paid)
+                
+                if (unpaid) {
+                    // Always show unpaid popup until paid
+                    setSelectedBooking(unpaid)
+                } else if (unrated) {
+                    // Only show unrated popup once per session
+                    const dismissed = sessionStorage.getItem('dismissed_popup_' + unrated.id)
                     if (!dismissed) {
                         setSelectedBooking(unrated)
                     }
@@ -258,7 +263,11 @@ export default function MyBookingsPage() {
 
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem' }}>
                                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                    {b.rating ? (
+                                    {b.additional_price > 0 && !b.is_additional_paid ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#fffbeb', color: '#b45309', padding: '2px 8px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 800, border: '1px solid #fcd34d' }}>
+                                            <AlertCircle size={12} /> มียอดค้างชำระ
+                                        </div>
+                                    ) : b.rating ? (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--warning-ghost)', color: 'var(--warning)', padding: '2px 8px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 800 }}>
                                             <Star size={12} fill="currentColor" /> {b.rating}
                                         </div>
@@ -276,8 +285,8 @@ export default function MyBookingsPage() {
             {/* Float Modal Details */}
             {selectedBooking && (
                 <div className={styles.overlay} onClick={() => {
-                    if (selectedBooking?.status === 'completed' && !selectedBooking.rating) {
-                        sessionStorage.setItem('dismissed_review_' + selectedBooking.id, 'true')
+                    if (selectedBooking) {
+                        sessionStorage.setItem('dismissed_popup_' + selectedBooking.id, 'true')
                     }
                     setSelectedBooking(null)
                 }}>
@@ -288,8 +297,8 @@ export default function MyBookingsPage() {
                                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>ID: #{selectedBooking.id.slice(0, 8)}</div>
                             </div>
                             <button className={styles.closeBtn} onClick={() => {
-                                if (selectedBooking?.status === 'completed' && !selectedBooking.rating) {
-                                    sessionStorage.setItem('dismissed_review_' + selectedBooking.id, 'true')
+                                if (selectedBooking) {
+                                    sessionStorage.setItem('dismissed_popup_' + selectedBooking.id, 'true')
                                 }
                                 setSelectedBooking(null)
                             }}><X size={24} /></button>
@@ -427,7 +436,7 @@ export default function MyBookingsPage() {
                                                     <div key={idx} className={styles.detailRow}>
                                                         <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem', paddingLeft: 12 }}>+ {label} {addon.variableState?.mode === 'full_tank' ? '(ตามจริง)' : ''}</span>
                                                         <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>
-                                                            {addon.isFree ? 'ฟรี' : (price === 0 && addon.variableState?.mode === 'full_tank') ? 'เก็บหน้างาน' : `฿${price}`}
+                                                            {addon.isFree ? 'ฟรี' : (price === 0 && addon.variableState?.mode === 'full_tank' && selectedBooking.additional_price > 0) ? `฿${selectedBooking.additional_price.toLocaleString()}` : (price === 0 && addon.variableState?.mode === 'full_tank') ? 'เก็บหน้างาน' : `฿${price.toLocaleString()}`}
                                                         </span>
                                                     </div>
                                                 )
@@ -469,12 +478,20 @@ export default function MyBookingsPage() {
                                         </div>
                                     )}
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                        {/* Multi-Slip Display */}
+                                        {(Array.isArray(selectedBooking.additional_price_slips) && selectedBooking.additional_price_slips.length > 0) || selectedBooking.additional_price_slip ? (
+                                            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+                                                {[...(selectedBooking.additional_price_slips || []), selectedBooking.additional_price_slip].filter(Boolean).map((url, i) => (
+                                                    <img 
+                                                        key={i} src={url} alt={`receipt-${i}`} 
+                                                        style={{ height: 80, width: 80, borderRadius: 12, objectFit: 'cover', flexShrink: 0, border: '1px solid #fcd34d' }} 
+                                                        onClick={() => window.open(url, '_blank')}
+                                                    />
+                                                ))}
+                                            </div>
+                                        ) : null}
+
                                         <div style={{ display: 'flex', gap: 8 }}>
-                                            {selectedBooking.additional_price_slip && (
-                                                <a href={selectedBooking.additional_price_slip} target="_blank" rel="noreferrer" className="btn btn-outline btn-sm" style={{ flex: 1, borderColor: '#fcd34d', color: '#b45309', borderRadius: '12px' }}>
-                                                    📄 ดูหลักฐาน
-                                                </a>
-                                            )}
                                             {!selectedBooking.is_additional_paid ? (
                                                 !clientSecret ? (
                                                     <button className="btn btn-primary btn-sm" style={{ flex: 2, borderRadius: '12px', background: '#b45309', border: 'none' }} onClick={handlePayAdditional} disabled={submitting}>

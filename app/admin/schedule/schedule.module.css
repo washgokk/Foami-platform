@@ -63,15 +63,27 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
-    overflow: hidden;
+    overflow-x: hidden; /* Changed from auto to hidden on desktop */
+    overflow-y: visible;
     box-shadow: var(--shadow-sm);
     box-sizing: border-box;
+    position: relative;
+}
+
+@media (max-width: 1023px) {
+    .grid {
+        overflow: auto; /* Allow scrolling on mobile */
+    }
 }
 
 .cornerCell {
     background: var(--surface-2);
     border-bottom: 2px solid var(--border);
     border-right: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    left: 0;
+    z-index: 20;
 }
 
 .dayHeader {
@@ -82,6 +94,9 @@
     text-align: center;
     font-weight: 700;
     color: var(--text-secondary);
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 .dayHeader:last-child {
@@ -112,8 +127,11 @@
     color: var(--text-muted);
     border-right: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
-    background: var(--surface);
+    background: var(--surface-2); /* Keep opaque so it covers the highlight */
     padding: 8px 0;
+    position: sticky;
+    left: 0;
+    z-index: 5;
 }
 
 .cell {
@@ -121,8 +139,41 @@
     border-bottom: 1px solid var(--border);
     min-height: 70px;
     padding: 4px;
-    background: var(--surface);
+    background: transparent; /* Must be transparent for highlight to show through */
     vertical-align: top;
+    position: relative;
+    transition: background-color 0.1s;
+}
+
+/* Desktop Hover Cross-highlight Effect */
+@media (min-width: 768px) { /* Lower threshold to be safe */
+    .cell:hover {
+        background-color: rgba(16, 185, 129, 0.15) !important;
+    }
+
+    .cell:hover::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -2000px;
+        right: -2000px;
+        bottom: 0;
+        background-color: rgba(16, 185, 129, 0.08); /* Faint green highlight */
+        z-index: -1;
+        pointer-events: none;
+    }
+
+    .cell:hover::after {
+        content: "";
+        position: absolute;
+        top: -2000px;
+        left: 0;
+        right: 0;
+        bottom: -2000px;
+        background-color: rgba(16, 185, 129, 0.08);
+        z-index: -1;
+        pointer-events: none;
+    }
 }
 
 .cell:nth-child(8n) {
@@ -152,13 +203,13 @@
 }
 
 .status-available {
-    background-color: var(--blue-100);
+    background-color: rgba(59, 130, 246, 0.1); /* Semi-transparent blue */
     color: var(--blue-700);
     border: 1px solid var(--blue-200);
 }
 
 .status-booked {
-    background-color: var(--gray-200);
+    background-color: rgba(107, 114, 128, 0.1); /* Semi-transparent gray */
     color: var(--gray-700);
     border: 1px solid var(--gray-300);
 }

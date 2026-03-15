@@ -15,12 +15,30 @@ export async function POST(req: NextRequest) {
     }
 
     if (event.type === 'payment_intent.succeeded') {
-        const pi = event.data.object
+        const pi = event.data.object as any
         const supabase = createServiceClient()
-        await supabase
-            .from('bookings')
-            .update({ payment_status: 'paid', status: 'pending' })
-            .eq('stripe_payment_intent_id', pi.id)
+        const bookingId = pi.metadata.booking_id
+        const paymentType = pi.metadata.type // 'additional_payment' or undefined
+
+        if (paymentType === 'additional_payment') {
+            await supabase
+                .from('bookings')
+                .update({ 
+                    is_additional_paid: true, 
+                    additional_payment_stripe_id: pi.id 
+                })
+                .eq('id', bookingId)
+        } else {
+            // Initial Booking Payment
+            await supabase
+                .from('bookings')
+                .update({ 
+                    payment_status: 'paid', 
+                    status: 'pending',
+                    stripe_payment_id: pi.id 
+                })
+                .eq('id', bookingId)
+        }
     }
 
     return NextResponse.json({ received: true })

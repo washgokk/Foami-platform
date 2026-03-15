@@ -23,7 +23,26 @@
     grid-template-columns: 56px repeat(7, 1fr);
     gap: 3px;
     margin-bottom: var(--space-4);
-    overflow-x: auto;
+    overflow: hidden; /* Changed to hidden to clip highlights */
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+}
+
+@media (max-width: 767px) {
+    .grid {
+        overflow: auto;
+        max-height: 70vh;
+    }
+}
+
+.cornerCell {
+    background: var(--surface-2);
+    position: sticky;
+    top: 0;
+    left: 0;
+    z-index: 20;
 }
 
 .dayHeader {
@@ -34,6 +53,9 @@
     font-size: 0.75rem;
     font-weight: 700;
     color: var(--text-muted);
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 .dayNum {
@@ -60,12 +82,16 @@
     font-weight: 700;
     color: var(--text-muted);
     padding-right: 6px;
+    background: var(--surface-2);
+    position: sticky;
+    left: 0;
+    z-index: 5;
 }
 
 .cell {
     height: 36px;
     border-radius: var(--radius-sm);
-    background: var(--surface-2);
+    background: transparent; /* Transparent for highlight */
     border: 1.5px solid transparent;
     cursor: pointer;
     transition: all 0.15s;
@@ -75,26 +101,53 @@
     justify-content: center;
 }
 
-.cell:hover:not(.past):not(.booked) {
-    border: 2.5px solid var(--primary);
-    background: var(--surface);
-    z-index: 10;
+/* Desktop Hover Cross-highlight Effect */
+@media (min-width: 768px) {
+    .cell:hover:not(.past):not(.booked) {
+        border: 2.5px solid var(--primary);
+        background-color: rgba(16, 185, 129, 0.15) !important;
+        z-index: 10;
+    }
+
+    .cell:hover::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -2000px;
+        right: -2000px;
+        bottom: 0;
+        background-color: rgba(16, 185, 129, 0.08);
+        z-index: -1;
+        pointer-events: none;
+    }
+
+    .cell:hover::after {
+        content: "";
+        position: absolute;
+        top: -2000px;
+        left: 0;
+        right: 0;
+        bottom: -2000px;
+        background-color: rgba(16, 185, 129, 0.08);
+        z-index: -1;
+        pointer-events: none;
+    }
 }
 
 .available {
-    background: var(--accent-blue-ghost);
+    background: rgba(59, 130, 246, 0.1);
     border: 1.5px solid var(--accent-blue);
 }
 
 .booked {
-    background: var(--success-light);
+    background: rgba(16, 185, 129, 0.1);
     border: 1.5px solid var(--success);
     cursor: not-allowed;
     opacity: 0.8;
 }
 
 .pending {
-    background: var(--accent-pink-ghost);
+    background: rgba(244, 184, 200, 0.2);
     border: 1.5px solid var(--accent-pink);
 }
 

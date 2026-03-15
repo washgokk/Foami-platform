@@ -26,8 +26,13 @@ export default function MapPicker({ lat, lng, mode, onChange }: Props) {
     const [locating, setLocating] = useState(false)
 
     useEffect(() => {
+        let isMounted = true
         if (mapInstanceRef.current) return
+
         import('leaflet').then(L => {
+            if (!isMounted || !mapRef.current) return
+            if (mapRef.current._leaflet_id) return // Map already exists
+
             // Inject Leaflet CSS
             if (!document.querySelector('link[href*="leaflet.css"]')) {
                 const link = document.createElement('link')
@@ -44,7 +49,7 @@ export default function MapPicker({ lat, lng, mode, onChange }: Props) {
                 shadowUrl: '/leaflet/marker-shadow.png',
             })
 
-            const map = L.map(mapRef.current!, {
+            const map = L.map(mapRef.current, {
                 center: [lat, lng],
                 zoom: 15,
                 zoomControl: true,
@@ -54,22 +59,10 @@ export default function MapPicker({ lat, lng, mode, onChange }: Props) {
                 attribution: '© OpenStreetMap',
             }).addTo(map)
 
-            const iconUrl = mode === 'pickup'
-                ? 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png'
-                : 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png'
+            const marker = L.marker([lat, lng], { draggable: true }).addTo(map)
+            markerRef.current = marker
 
-            const icon = new L.Icon({
-                iconUrl,
-                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                iconSize: [25, 41],
-                iconAnchor: [12, 41],
-                popupAnchor: [1, -34],
-                shadowSize: [41, 41]
-            })
-
-            markerRef.current = L.marker([lat, lng], { icon, draggable: true }).addTo(map)
-
-            markerRef.current.on('dragend', async (e: any) => {
+            marker.on('dragend', async (e: any) => {
                 const { lat: newLat, lng: newLng } = e.target.getLatLng()
                 const addr = await reverseGeocode(newLat, newLng)
                 onChange(newLat, newLng, addr)
@@ -78,7 +71,7 @@ export default function MapPicker({ lat, lng, mode, onChange }: Props) {
             map.on('click', async (e: any) => {
                 const { lat: newLat, lng: newLng } = e.latlng
                 const addr = await reverseGeocode(newLat, newLng)
-                markerRef.current?.setLatLng([newLat, newLng])
+                marker?.setLatLng([newLat, newLng])
                 onChange(newLat, newLng, addr)
             })
 
@@ -86,15 +79,38 @@ export default function MapPicker({ lat, lng, mode, onChange }: Props) {
         })
 
         return () => {
-            mapInstanceRef.current?.map.remove()
+            isMounted = false
+            // We don't necessarily remove the map on every effect run if we use []
+            // But if the component is truly unmounting:
+            if (!mapInstanceRef.current) return
+            const { map } = mapInstanceRef.current
+            map.remove()
             mapInstanceRef.current = null
         }
-    }, [mode])
+    }, []) // Initialize only once
 
-    // Update marker when coords change from outside
+    // Update marker icon and position when props change
     useEffect(() => {
-        markerRef.current?.setLatLng([lat, lng])
-    }, [lat, lng])
+        if (!mapInstanceRef.current || !markerRef.current) return
+        const { L, map } = mapInstanceRef.current
+
+        const iconUrl = mode === 'pickup'
+            ? 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png'
+            : 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png'
+
+        const icon = new L.Icon({
+            iconUrl,
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+        })
+
+        markerRef.current.setIcon(icon)
+        markerRef.current.setLatLng([lat, lng])
+        // Optional: map.panTo([lat, lng]) // Maybe too jarring? Let's leave for now
+    }, [lat, lng, mode])
 
     const getCurrentLocation = () => {
         setLocating(true)

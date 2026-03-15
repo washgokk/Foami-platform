@@ -20,23 +20,18 @@
 .topbarLeft {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
 }
 
-.topbarLogo {
-    font-size: 1.5rem;
-}
-
-.topbarName {
-    color: var(--text-primary);
-    font-weight: 700;
-    font-size: 0.95rem;
-    letter-spacing: -0.01em;
+.topbarRight {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
 }
 
 .topbarGreeting {
     display: flex;
     flex-direction: column;
+    text-align: right;
 }
 
 .logoutBtn {

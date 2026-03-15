@@ -37,7 +37,13 @@ export default function CheckoutForm({ amount, onSuccess, onCancel }: CheckoutFo
 
     return (
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <PaymentElement />
+            <PaymentElement options={{ 
+                fields: {
+                    billingDetails: {
+                        email: 'never'
+                    }
+                }
+            }} />
             {errorMessage && <div style={{ color: 'var(--danger)', fontSize: '0.9rem' }}>{errorMessage}</div>}
             
             <div style={{ display: 'flex', gap: 12 }}>

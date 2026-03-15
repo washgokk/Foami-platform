@@ -13,6 +13,9 @@ export const metadata: Metadata = {
     statusBarStyle: 'default',
     title: 'Foami',
   },
+  icons: {
+    icon: '/icon.svg',
+  },
 }
 
 export default function RootLayout({

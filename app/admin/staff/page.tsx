@@ -39,6 +39,7 @@ export default function StaffPage() {
     const [loading, setLoading] = useState(true)
     const [viewMode, setViewMode] = useState<'list' | 'payouts'>('list')
     const [revealed, setRevealed] = useState<Record<string, boolean>>({})
+    const [previewImage, setPreviewImage] = useState<string | null>(null)
 
     // Payout State
     const [selectedPayoutStaffId, setSelectedPayoutStaffId] = useState('')
@@ -243,6 +244,7 @@ export default function StaffPage() {
                         role: form.role,
                         email: form.email,
                         password: form.password,
+                        image_url: form.image_url
                     }).eq('id', editing.id)
                 } else {
                     const res = await fetch('/api/auth/update-staff', {
@@ -262,6 +264,7 @@ export default function StaffPage() {
                         branch_id: form.branch_id,
                         role: form.role,
                         email: form.email,
+                        image_url: form.image_url,
                         is_active: true
                     })
                 } else {
@@ -331,7 +334,24 @@ export default function StaffPage() {
                                 <tr key={s.id} style={{ background: 'var(--surface)', cursor: 'default' }}>
                                     <td style={{ borderRadius: 'var(--radius) 0 0 var(--radius)', border: '2.5px solid var(--border)', borderRight: 'none' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                            <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--accent-blue-ghost)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', border: '2px solid var(--accent-blue)', overflow: 'hidden' }}>
+                                            <div 
+                                                onClick={() => s.image_url && setPreviewImage(s.image_url)}
+                                                style={{ 
+                                                    width: 44, 
+                                                    height: 44, 
+                                                    borderRadius: '50%', 
+                                                    background: 'var(--surface-2)', 
+                                                    display: 'flex', 
+                                                    alignItems: 'center', 
+                                                    justifyContent: 'center', 
+                                                    color: 'var(--text-muted)', 
+                                                    border: '2px solid var(--border)', 
+                                                    overflow: 'hidden',
+                                                    cursor: s.image_url ? 'zoom-in' : 'default',
+                                                    transition: 'all 0.2s ease'
+                                                }}
+                                                title={s.image_url ? 'คลิกเพื่อขยายรูป' : ''}
+                                            >
                                                 {s.image_url ? (
                                                     <img src={s.image_url} alt={s.full_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                                 ) : (
@@ -843,6 +863,25 @@ export default function StaffPage() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+            {/* Image Preview Lightbox */}
+            {previewImage && (
+                <div className="overlay" onClick={() => setPreviewImage(null)} style={{ zIndex: 99999 }}>
+                    <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
+                        <img 
+                            src={previewImage} 
+                            alt="Preview" 
+                            style={{ maxWidth: '100%', maxHeight: '90vh', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-xl)', border: '4px solid white' }} 
+                        />
+                        <button 
+                            className="btn btn-ghost" 
+                            onClick={() => setPreviewImage(null)}
+                            style={{ position: 'absolute', top: -10, right: -10, background: 'var(--danger)', color: 'white', border: '2px solid white', borderRadius: '50%', width: 40, height: 40, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                            <X size={20} />
+                        </button>
                     </div>
                 </div>
             )}

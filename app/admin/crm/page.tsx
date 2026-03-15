@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import styles from './crm.module.css'
 import { getRFMScore, segmentCustomer, DEFAULT_CRM_CONFIG } from '@/lib/crm-utils'
 import { generateScalableId } from '@/lib/id-utils'
-import { VEHICLE_SIZE_LABEL } from '@/lib/types'
+import { VEHICLE_SIZE_LABEL, BOOKING_STATUS_LABEL, BOOKING_STATUS_CSS, BookingStatus } from '@/lib/types'
 
 /* 
 This CRM Page groups customer data into 4 tabs:
@@ -22,6 +22,15 @@ export default function CRMPage() {
     const [bookings, setBookings] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
+    const [branches, setBranches] = useState<any[]>([])
+    const [services, setServices] = useState<any[]>([])
+    const [txFilters, setTxFilters] = useState({
+        branchId: 'all',
+        status: 'all',
+        startDate: '',
+        endDate: '',
+        search: ''
+    })
 
     // Segment Builder State
     const [segmentName, setSegmentName] = useState('')
@@ -101,6 +110,8 @@ export default function CRMPage() {
 
             setCustomers(customersData)
             setBookings(enrichedBookings)
+            setBranches(branchesData)
+            setServices(servicesData)
             setLoading(false)
         }
         loadData()
@@ -159,6 +170,22 @@ export default function CRMPage() {
         c.occupation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (Array.isArray(c.interests) && c.interests.some((i: string) => i.toLowerCase().includes(searchTerm.toLowerCase())))
     )
+
+    // Transaction Filtering
+    const filteredTransactions = bookings.filter(b => {
+        const matchBranch = txFilters.branchId === 'all' || b.branch_id === txFilters.branchId || b.zones?.branch_id === txFilters.branchId
+        const matchStatus = txFilters.status === 'all' || b.status === txFilters.status
+        const matchDate = (!txFilters.startDate || b.scheduled_date >= txFilters.startDate) && 
+                          (!txFilters.endDate || b.scheduled_date <= txFilters.endDate)
+        const s = txFilters.search.toLowerCase()
+        const matchSearch = !s || 
+                            b.id.toLowerCase().includes(s) || 
+                            b.customers?.full_name?.toLowerCase().includes(s) || 
+                            b.customers?.phone?.includes(s) ||
+                            (b.vehicle_data?.license_plate || b.customers?.license_plate || '').toLowerCase().includes(s)
+        
+        return matchBranch && matchStatus && matchDate && matchSearch
+    })
 
     // Calculate how many users fit the segment builder condition
     const evaluateSegmentMatch = (c: any) => {
@@ -364,41 +391,116 @@ export default function CRMPage() {
             {activeTab === 'transactions' && (
                 <div className={styles.card}>
                     <h2 className={styles.tableTitle}>ประวัติธุรกรรมทั้งหมด (All Transactions)</h2>
+                    
+                    {/* Transaction Filters */}
+                    <div className={styles.txFilterBar}>
+                        <div className={styles.filterItem}>
+                            <label className={styles.filterLabel}>สาขา</label>
+                            <select 
+                                className="form-input" 
+                                style={{ width: 140 }}
+                                value={txFilters.branchId} 
+                                onChange={e => setTxFilters({ ...txFilters, branchId: e.target.value })}
+                            >
+                                <option value="all">ทั้งหมด</option>
+                                {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                            </select>
+                        </div>
+                        <div className={styles.filterItem}>
+                            <label className={styles.filterLabel}>สถานะงาน</label>
+                            <select 
+                                className="form-input" 
+                                style={{ width: 130 }}
+                                value={txFilters.status} 
+                                onChange={e => setTxFilters({ ...txFilters, status: e.target.value })}
+                            >
+                                <option value="all">ทั้งหมด</option>
+                                {Object.entries(BOOKING_STATUS_LABEL).map(([val, label]) => (
+                                    <option key={val} value={val}>{label}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className={styles.filterItem}>
+                            <label className={styles.filterLabel}>เริ่มวันที่</label>
+                            <input 
+                                type="date" 
+                                className="form-input" 
+                                value={txFilters.startDate} 
+                                onChange={e => setTxFilters({ ...txFilters, startDate: e.target.value })} 
+                            />
+                        </div>
+                        <div className={styles.filterItem}>
+                            <label className={styles.filterLabel}>ถึงวันที่</label>
+                            <input 
+                                type="date" 
+                                className="form-input" 
+                                value={txFilters.endDate} 
+                                onChange={e => setTxFilters({ ...txFilters, endDate: e.target.value })} 
+                            />
+                        </div>
+                        <div className={styles.filterItem} style={{ flex: 1 }}>
+                            <label className={styles.filterLabel}>ค้นหา (ชื่อ/เบอร์/ทะเบียน/ID)</label>
+                            <input 
+                                className="form-input" 
+                                placeholder="🔍 คีย์เวิร์ด..." 
+                                value={txFilters.search} 
+                                onChange={e => setTxFilters({ ...txFilters, search: e.target.value })} 
+                            />
+                        </div>
+                        <button 
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => setTxFilters({ branchId: 'all', status: 'all', startDate: '', endDate: '', search: '' })}
+                        >ล้างค่า</button>
+                    </div>
+
                     <div className={styles.tableContainer}>
                         <table>
                                     <thead>
+                                        {/* Category Grouping Row */}
                                         <tr>
-                                            <th> Timestamp </th>
-                                            <th> Booking ID </th>
-                                            <th> Customer ID </th>
-                                            <th> ชื่อลูกค้า </th>
-                                            <th> เบอร์โทร </th>
-                                            <th> ยี่ห้อ / รุ่นรถ </th>
-                                            <th> ทะเบียน </th>
-                                            <th> สีรถ </th>
-                                            <th> ว/ด/ป รับบริการ </th>
-                                            <th> เวลารับบริการ </th>
-                                            <th> สาขาที่รับผิดชอบ </th>
-                                            <th> โซน </th>
-                                            <th> ชื่อแพ็กเกจ </th>
-                                            <th> บริการเสริม </th>
-                                            <th> ราคาหลัก </th>
-                                            <th> ค่าพื้นที่ </th>
-                                            <th> เพิ่มเติม </th>
-                                            <th> ส่วนลด </th>
-                                            <th> ยอดรวม </th>
-                                            <th> ผู้รับผิดชอบ </th>
-                                            <th> คะแนนรีวิว </th>
-                                            <th> คอมเม้น </th>
-                                            <th> ชำระเงิน </th>
-                                            <th> สถานะจ่าย </th>
-                                            <th> สถานะงาน </th>
-                                            <th> ข้อมูลโปรไฟล์ </th>
-                                            <th> รับ/ส่งรถ </th>
+                                            <th colSpan={3} className={styles.bgGroupCustomer} style={{ textAlign: 'center', borderBottom: 'none' }}>👤 ข้อมูลลูกค้า</th>
+                                            <th colSpan={3} className={styles.bgGroupVehicle} style={{ textAlign: 'center', borderBottom: 'none' }}>🚗 ข้อมูลรถ</th>
+                                            <th colSpan={4} className={styles.bgGroupDetail} style={{ textAlign: 'center', borderBottom: 'none' }}>📝 รายละเอียดงาน</th>
+                                            <th colSpan={5} className={styles.bgGroupPricing} style={{ textAlign: 'center', borderBottom: 'none' }}>💰 การเงิน & ส่วนลด</th>
+                                            <th colSpan={3} className={styles.bgGroupStatus} style={{ textAlign: 'center', borderBottom: 'none' }}>🛡️ สถานะ & รีวิว</th>
+                                            <th colSpan={2} style={{ textAlign: 'center', borderBottom: 'none' }}>📍 รับ/ส่ง</th>
+                                        </tr>
+                                        <tr>
+                                            {/* Customer */}
+                                            <th className={styles.bgGroupCustomer}>Timestamp</th>
+                                            <th className={styles.bgGroupCustomer}>Booking ID</th>
+                                            <th className={styles.bgGroupCustomer}>ชื่อลูกค้า / เบอร์</th>
+
+                                            {/* Vehicle */}
+                                            <th className={styles.bgGroupVehicle}>ยี่ห้อ / รุ่น</th>
+                                            <th className={styles.bgGroupVehicle}>ทะเบียน</th>
+                                            <th className={styles.bgGroupVehicle}>สีรถ</th>
+
+                                            {/* Details */}
+                                            <th className={styles.bgGroupDetail}>วันที่นัด</th>
+                                            <th className={styles.bgGroupDetail}>เวลา</th>
+                                            <th className={styles.bgGroupDetail}>สาขา / โซน</th>
+                                            <th className={styles.bgGroupDetail}>แพ็กเกจ / เสริม</th>
+
+                                            {/* Pricing */}
+                                            <th className={styles.bgGroupPricing}>ราคาหลัก</th>
+                                            <th className={styles.bgGroupPricing}>นอกโซน</th>
+                                            <th className={styles.bgGroupPricing}>เพิ่มเติม</th>
+                                            <th className={styles.bgGroupPricing}>ส่วนลด</th>
+                                            <th className={styles.bgGroupPricing}>ยอดรวม</th>
+
+                                            {/* Status */}
+                                            <th className={styles.bgGroupStatus}>ชำระเงิน</th>
+                                            <th className={styles.bgGroupStatus}>สถานะงาน</th>
+                                            <th className={styles.bgGroupStatus}>รีวิว</th>
+
+                                            {/* Location */}
+                                            <th>รับรถ</th>
+                                            <th>ส่งรถ</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {bookings.map(b => {
+                                        {filteredTransactions.map(b => {
                                             const vData = b.vehicle_data || b.customers || {}
                                             const zonesData = b.zones as any
                                             const branchName = zonesData?.branches?.name || '-'
@@ -421,76 +523,75 @@ export default function CRMPage() {
 
                                             return (
                                                 <tr key={b.id}>
+                                                    {/* Customer */}
                                                     <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{new Date(b.created_at).toLocaleString('th-TH')}</td>
                                                     <td style={{ fontWeight: 600, fontSize: '0.72rem', fontFamily: 'monospace' }}>{b.id}</td>
-                                                    <td style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{b.customer_id || '-'}</td>
-                                                    <td style={{ fontWeight: 600 }}>{b.customers?.full_name || 'ไม่ทราบชื่อ'}</td>
-                                                    <td style={{ whiteSpace: 'nowrap' }}>{b.customers?.phone || '-'}</td>
+                                                    <td>
+                                                        <div style={{ fontWeight: 600 }}>{b.customers?.full_name || 'ไม่ทราบชื่อ'}</div>
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{b.customers?.phone || '-'}</div>
+                                                    </td>
+
+                                                    {/* Vehicle */}
                                                     <td style={{ fontWeight: 600 }}>{vData.vehicle_brand || '-'} {vData.vehicle_model || ''}</td>
                                                     <td style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{vData.license_plate || '-'}</td>
                                                     <td style={{ fontSize: '0.85rem' }}>{vData.vehicle_color || '-'}</td>
+
+                                                    {/* Details */}
                                                     <td>{b.scheduled_date ? new Date(b.scheduled_date).toLocaleDateString('th-TH') : '-'}</td>
                                                     <td>{b.scheduled_time?.substring(0, 5) || '-'}</td>
-                                                    <td style={{ fontWeight: 600, color: 'var(--primary)' }}>{branchName}</td>
-                                                    <td style={{ color: b.extra_fee > 0 ? 'var(--danger)' : 'inherit', fontWeight: b.extra_fee > 0 ? 600 : 400 }}>{zoneName}</td>
-                                                    <td style={{ color: 'var(--primary)', fontWeight: 600 }}>{b.services?.name || '-'}</td>
-                                                    <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={addonListStr}>
-                                                        {addonListStr}
+                                                    <td>
+                                                        <div style={{ fontWeight: 600, color: 'var(--primary)' }}>{branchName}</div>
+                                                        <div style={{ fontSize: '0.75rem', color: b.extra_fee > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>{zoneName}</div>
                                                     </td>
+                                                    <td>
+                                                        <div style={{ color: 'var(--primary)', fontWeight: 600 }}>{b.services?.name || '-'}</div>
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={addonListStr}>
+                                                            + {addonListStr}
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Pricing */}
                                                     <td>฿{b.base_price?.toLocaleString() || 0}</td>
-                                                    <td style={{ color: 'var(--primary)' }}>฿{b.extra_fee?.toLocaleString() || 0}</td>
+                                                    <td style={{ color: b.extra_fee > 0 ? 'var(--primary)' : 'inherit' }}>฿{b.extra_fee?.toLocaleString() || 0}</td>
                                                     <td style={{ color: 'var(--warning)' }}>
                                                         {b.slip_url ? (
                                                             <a href={b.slip_url} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline', color: 'var(--warning)', fontWeight: 600 }} title="กดเพื่อดูสลิป">
-                                                                ฿{b.additional_price?.toLocaleString() || 0}
+                                                                ฿{b.additional_price?.toLocaleString() || 0} 📄
                                                             </a>
                                                         ) : (
                                                             <>฿{b.additional_price?.toLocaleString() || 0}</>
                                                         )}
                                                     </td>
-
                                                     <td style={{ color: 'var(--danger)' }}>
                                                         {b.discount_amount ? `-฿${b.discount_amount.toLocaleString()}` : '฿0'}
                                                     </td>
-
                                                     <td style={{ fontWeight: 700, color: 'var(--primary)' }}>฿{b.total_price?.toLocaleString() || 0}</td>
-                                                    
-                                                    <td style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>
-                                                        {b.staff?.full_name || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>ยังไม่ได้รับ</span>}
-                                                    </td>
 
-                                                    <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--warning)' }}>
-                                                        {b.rating ? `⭐ ${b.rating}` : '-'}
-                                                    </td>
-
-                                                    <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                        {b.review_comment || '-'}
-                                                    </td>
-
-                                                    <td>{b.payment_method === 'stripe' ? 'บัตร/Stripe' : b.payment_method === 'transfer' ? 'โอนเงิน' : '-'}</td>
+                                                    {/* Status */}
                                                     <td>
-                                                        <span style={{ color: b.payment_status === 'paid' ? 'var(--success)' : 'var(--warning)', fontWeight: 600 }}>
-                                                            {b.payment_status === 'paid' ? 'จ่ายแล้ว' : b.payment_status === 'pending' ? 'รอชำระ' : b.payment_status || '-'}
+                                                        <span className={`badge ${b.payment_status === 'paid' ? 'badge-completed' : 'badge-pending'}`}>
+                                                            {b.payment_status === 'paid' ? 'จ่ายแล้ว' : 'รอชำระ'}
                                                         </span>
                                                     </td>
-                                                    <td><span className={styles.tag}>{b.status}</span></td>
+                                                    <td>
+                                                        <span className={`badge ${BOOKING_STATUS_CSS[b.status as BookingStatus] || ''}`}>
+                                                            {BOOKING_STATUS_LABEL[b.status as BookingStatus] || b.status}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        {b.rating ? (
+                                                            <div style={{ fontWeight: 700, color: 'var(--warning)', whiteSpace: 'nowrap' }}>⭐ {b.rating}</div>
+                                                        ) : '-'}
+                                                    </td>
 
-                                                    <td style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                                                        <div style={{ fontWeight: 600 }}>{b.customers?.gender === 'male' ? 'ชาย' : b.customers?.gender === 'female' ? 'หญิง' : b.customers?.gender || '-'}</div>
-                                                        <div style={{ color: 'var(--text-muted)' }}>{b.customers?.occupation || '-'}</div>
-                                                        <div style={{ fontSize: '0.7rem', color: 'var(--primary)' }}>
-                                                            {Array.isArray(b.customers?.interests) ? b.customers.interests.slice(0, 2).join(', ') : '-'}
-                                                        </div>
-                                                    </td>
-                                                    <td style={{ fontSize: '0.8rem', fontWeight: 600 }}>
-                                                        <div title={`จาก: ${b.pickup_address}`}>📍 {formatLocation(b.pickup_address)}</div>
-                                                        <div title={`ถึง: ${b.delivery_address}`}>🏁 {formatLocation(b.delivery_address)}</div>
-                                                    </td>
+                                                    {/* Location */}
+                                                    <td style={{ fontSize: '0.8rem' }} title={b.pickup_address}>📍 {formatLocation(b.pickup_address)}</td>
+                                                    <td style={{ fontSize: '0.8rem' }} title={b.delivery_address}>🏁 {formatLocation(b.delivery_address)}</td>
                                                 </tr>
                                             )
                                         })}
-                                {bookings.length === 0 && (
-                                    <tr><td colSpan={21} style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>ไม่พบข้อมูลธุรกรรม</td></tr>
+                                {filteredTransactions.length === 0 && (
+                                    <tr><td colSpan={21} style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>ไม่พบข้อมูลธุรกรรมในช่วงเวลานี้</td></tr>
                                 )}
                             </tbody>
                         </table>

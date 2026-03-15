@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
-    const { id, full_name, phone, branch_id, role, password, email, bank_account_number, bank_name, promptpay_number } = await req.json()
+    const { id, full_name, phone, branch_id, role, password, email, bank_account_number, bank_name, promptpay_number, image_url } = await req.json()
     const supabase = createServiceClient()
 
     try {
@@ -25,7 +25,8 @@ export async function POST(req: NextRequest) {
             email,
             bank_account_number,
             bank_name,
-            promptpay_number
+            promptpay_number,
+            image_url
         }
         
         // Also store the "viewable" password in the staff table as requested

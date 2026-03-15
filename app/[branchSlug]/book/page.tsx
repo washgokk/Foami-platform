@@ -138,7 +138,10 @@ export default function BookPage() {
     const [ccPriceGroups, setCcPriceGroups] = useState<CCPriceGroup[]>([])
     const [submitting, setSubmitting] = useState(false)
     const [clientSecret, setClientSecret] = useState('')
+    const [paymentError, setPaymentError] = useState<string | null>(null)
+    const [pendingBookingId, setPendingBookingId] = useState<string | null>(null)
     const [paymentSuccessful, setPaymentSuccessful] = useState(false)
+    const [previewImg, setPreviewImg] = useState<string | null>(null)
 
     // ─── Init ───────────────────────────────────────────────────
     useEffect(() => {
@@ -196,7 +199,8 @@ export default function BookPage() {
                         icon: s.name.includes('เคลือบ') ? 'sparkles' : s.name.includes('บำรุง') ? 'wrench' : 'droplets',
                         color: color,
                         image_url: s.image_url,
-                        availableAddons: addonsStr ? addonsStr.split(',') : []
+                        availableAddons: addonsStr ? addonsStr.split(',') : [],
+                        is_addon_required: s.is_addon_required
                     }
                 })
                 setDbPackages(parsed)
@@ -208,11 +212,18 @@ export default function BookPage() {
                 supabase.from('zones').select('*').eq('branch_id', branch.id).eq('is_active', true)
                     .then(({ data: zns }) => { if (zns) setZones(zns) })
                 
-                // Fetch CC price groups applicable to this branch
+                // Fetch all active CC price groups and filter by branch_id in JS to be safe
                 supabase.from('cc_price_groups').select('*')
-                    .contains('branch_ids', [branch.id])
                     .eq('is_active', true)
-                    .then(({ data: groups }) => { if (groups) setCcPriceGroups(groups as CCPriceGroup[]) })
+                    .then(({ data: groups, error }) => { 
+                        if (error) {
+                            console.error('[CC Pricing] Fetch error:', error)
+                        } else if (groups) {
+                            const branchGroups = (groups || []).filter(g => (g.branch_ids || []).includes(branch.id))
+                            console.log(`[CC Pricing] Total entries: ${groups.length}, Matches current branch: ${branchGroups.length}`)
+                            setCcPriceGroups(branchGroups as CCPriceGroup[]) 
+                        }
+                    })
             }
         })
 
@@ -521,28 +532,47 @@ export default function BookPage() {
     
     // Calculate Package Price based on CC Price Group
     const getPkgPrice = (pkg: any) => {
-        if (!pkg) return 0
-        const size = (selectedVehicle?.vehicle_size || 'S') as keyof CCPriceGroup['prices']
+        if (!pkg) return { price: 0, basePrice: 0, adjustment: 0, isCc: false, matchedGroupName: null }
+        const size = (selectedVehicle?.vehicle_size || 'S').toUpperCase() as keyof CCPriceGroup['prices']
         
-        // Find price group matching this branch and this service
-        const matchingGroup = ccPriceGroups.find(g => 
-            g.service_ids.includes(pkg.id)
-        )
+        // Base Price is ALWAYS the starting price (Size S)
+        const basePrice = pkg.price_s || pkg.price || 0
+
+        // Standard S/M/L Price (for fallback and comparison)
+        const standardPriceForSize = (size === 'S' ? pkg.price_s : size === 'M' ? pkg.price_m : pkg.price_l) || pkg.price || 0
+
+        // Find price group matching this service
+        const matchingGroup = ccPriceGroups.find(g => {
+            const ids = Array.isArray(g.service_ids) ? g.service_ids : []
+            return ids.includes(pkg.id)
+        })
         
-        if (matchingGroup && matchingGroup.prices[size]) {
-            return Number(matchingGroup.prices[size])
+        if (matchingGroup && matchingGroup.prices) {
+            const ccValue = matchingGroup.prices[size] || matchingGroup.prices[size.toLowerCase()]
+            if (ccValue !== undefined) {
+                const adjustment = Number(ccValue) 
+                // Treat CC value as the adjustment itself (additive to base)
+                return { 
+                    price: basePrice + adjustment, 
+                    basePrice,
+                    adjustment,
+                    isCc: true,
+                    matchedGroupName: matchingGroup.name
+                }
+            }
         }
 
-        // Fallback: Original Service Price
-        const fallbackPrices: Record<string, number> = {
-            S: pkg.price_s || 0,
-            M: pkg.price_m || 0,
-            L: pkg.price_l || 0
+        // Fallback to standard absolute prices
+        return { 
+            price: standardPriceForSize, 
+            basePrice, 
+            adjustment: standardPriceForSize - basePrice, 
+            isCc: false,
+            matchedGroupName: null
         }
-        return fallbackPrices[size] || 0
     }
 
-    const pkgPrice = getPkgPrice(selectedPkg)
+    const { price: pkgPrice, basePrice: pkgBasePrice, adjustment: pkgAdjustment, isCc: isCcPrice, matchedGroupName } = getPkgPrice(selectedPkg)
     const currentAddonTotal = addonTotal()
     const total = pkgPrice + currentAddonTotal + extraFee - discountAmount
     const basePrice = pkgPrice 
@@ -605,7 +635,11 @@ export default function BookPage() {
         setDiscountLoading(false)
     }
     const fetchPaymentIntent = async () => {
+        if (clientSecret || submitting) return
         setSubmitting(true)
+        const bId = pendingBookingId || generateScalableId('BK')
+        setPendingBookingId(bId)
+
         try {
             const res = await fetch('/api/stripe/create-intent', {
                 method: 'POST',
@@ -613,7 +647,8 @@ export default function BookPage() {
                 body: JSON.stringify({
                     amount: total,
                     booking_metadata: {
-                        customer_name: customer.full_name,
+                        booking_id: bId,
+                        customer_name: customer?.full_name || 'Guest',
                         service: selectedPkg?.name,
                     }
                 }),
@@ -621,15 +656,24 @@ export default function BookPage() {
             const data = await res.json()
             if (data.clientSecret) {
                 setClientSecret(data.clientSecret)
+                setPaymentError(null)
             } else {
-                throw new Error('Failed to create payment intent')
+                throw new Error(data.error || 'Failed to create payment intent')
             }
         } catch (err: any) {
-            alert('เกิดข้อผิดพลาดในการเตรียมชำระเงิน: ' + err.message)
+            console.error('[Stripe] Intent fetch error:', err)
+            setPaymentError(err.message || 'ไม่สามารถเตรียมชำระเงินได้')
         } finally {
             setSubmitting(false)
         }
     }
+
+    // Auto-fetch when reaching payment step
+    useEffect(() => {
+        if (step === 4 && payMethod === 'stripe' && !clientSecret) {
+            fetchPaymentIntent()
+        }
+    }, [step, payMethod, clientSecret])
 
     const handleStripeSuccess = async (paymentIntentId: string) => {
         setPaymentSuccessful(true)
@@ -683,7 +727,7 @@ export default function BookPage() {
         }
         
         // Identify active branch for the booking
-        const bookingId = generateScalableId('BK')
+        const bookingId = pendingBookingId || generateScalableId('BK')
         const activeSlot = slots[selectedDate]?.find((s: any) => s.time_slot === selectedSlot)
         const activeBranchId = activeSlot ? zones.find(z => z.id === activeSlot.serving_zone_id)?.branch_id : null
 
@@ -783,12 +827,17 @@ export default function BookPage() {
     }
 
     const canNext = [
-        !!selectedPkg && Object.keys(addons).every(name => !addons[name] || isAddonComplete(name)),
-        !!pickupAddress,
+        !!selectedPkg && 
+        Object.keys(addons).every(name => !addons[name] || isAddonComplete(name)) &&
+        (selectedPkg.is_addon_required === true ? Object.values(addons).some(v => v === true) : true),
+        !!selectedVehicle && !!pickupAddress && !!pickupAddressDetail.trim(),
         !!(selectedDate && selectedSlot),
         true,
         !!payMethod,
     ]
+
+    const isDeliveryValid = !showDelivery || (!!deliveryAddress && !!deliveryAddressDetail.trim())
+    const currentCanNext = canNext[step] && (step === 1 ? isDeliveryValid : true)
 
     if (!customer) return <div className="empty-state"><div className="spinner" /></div>
 
@@ -825,40 +874,65 @@ export default function BookPage() {
                             รถของคุณ: {customer.vehicle_brand} {customer.vehicle_model} · {customer.license_plate}
                         </p>
 
-                        {/* Package cards — uses CSS class for responsive 1→3 col */}
+                        {/* Package cards — uses CSS class for responsive grid */}
                         <div className={styles.packageGrid}>
                             {dbPackages.map(pkg => {
                                 const IconComp = pkg.icon === 'sparkles' ? Sparkles : pkg.icon === 'wrench' ? Wrench : Droplets
+                                const isSelected = selectedPkg?.id === pkg.id
                                 return (
                                     <div
                                         key={pkg.id}
                                         onClick={() => { setSelectedPkg(pkg); setAddons({}) }}
                                         className={styles.packageCard}
                                         style={{
-                                            border: selectedPkg?.id === pkg.id ? `2.5px solid ${pkg.color}` : '1.5px solid var(--border)',
-                                            background: selectedPkg?.id === pkg.id ? `${pkg.color}10` : 'var(--surface)',
-                                            boxShadow: selectedPkg?.id === pkg.id ? `0 4px 20px ${pkg.color}25` : 'var(--shadow-card)',
+                                            borderColor: isSelected ? pkg.color : 'var(--border)',
+                                            boxShadow: isSelected ? `0 8px 30px ${pkg.color}30` : 'var(--shadow-card)',
                                         }}
                                     >
-                                        <div style={{
-                                            width: 52, height: 52, borderRadius: 'var(--radius-lg)', background: `${pkg.color}18`,
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center', color: pkg.color, flexShrink: 0,
-                                            overflow: 'hidden'
-                                        }}>
+                                        {/* Image Header */}
+                                        <div className={styles.packageImageContainer}>
                                             {pkg.image_url ? (
-                                                <img src={pkg.image_url} alt={pkg.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                <img src={pkg.image_url} alt={pkg.name} className={styles.packageImg} />
                                             ) : (
-                                                <IconComp size={28} />
+                                                <div className={styles.packageIconOverlay}>
+                                                    <IconComp size={48} color={pkg.color} style={{ opacity: 0.2 }} />
+                                                </div>
+                                            )}
+                                            
+                                            {/* Badge for Maintenance */}
+                                            {pkg.name.includes('บำรุง') && (
+                                                <div className={styles.packageBadge}>
+                                                    PREMIUM CARE
+                                                </div>
+                                            )}
+
+                                            {/* Selection Indicator */}
+                                            {isSelected && (
+                                                <div className={styles.selectedIndicator}>
+                                                    <CheckCircle size={20} />
+                                                </div>
                                             )}
                                         </div>
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{pkg.name}</div>
-                                            <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: 2, lineHeight: 1.4 }}>{pkg.description}</div>
-                                        </div>
-                                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                                            <div style={{ fontWeight: 800, fontSize: '1.2rem', color: pkg.color }}>฿{getPkgPrice(pkg)}</div>
-                                            {pkg.name.includes('บำรุง') && <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>+ บริการ</div>}
-                                            {selectedPkg?.id === pkg.id && <div style={{ fontSize: '0.85rem' }}><CheckCircle size={20} color={pkg.color} /></div>}
+
+                                        {/* Package Info */}
+                                        <div className={styles.packageInfo}>
+                                            <div className={styles.packageName}>{pkg.name}</div>
+                                            <div className={styles.packageDesc}>{pkg.description}</div>
+                                            
+                                            <div className={styles.packagePriceRow}>
+                                                <div>
+                                                    <div className={styles.packagePriceLabel}>เริ่มต้น</div>
+                                                    <div style={{ color: pkg.color }}>
+                                                        <span className={styles.packageCurrency}>฿</span>
+                                                        <span className={styles.packageAmount}>{getPkgPrice(pkg).price}</span>
+                                                    </div>
+                                                </div>
+                                                {!isSelected && (
+                                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 600 }}>
+                                                        คลิกเลือก
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 )
@@ -977,7 +1051,12 @@ export default function BookPage() {
                                                                     }}
                                                                 >
                                                                     {opt.image_url && (
-                                                                        <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: 8, overflow: 'hidden' }}>
+                                                                        <div 
+                                                                            style={{ width: '100%', aspectRatio: '1/1', borderRadius: 8, overflow: 'hidden', cursor: 'zoom-in', transition: 'transform 0.2s' }} 
+                                                                            onClick={(e) => { e.stopPropagation(); setPreviewImg(opt.image_url) }}
+                                                                            onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05)'}
+                                                                            onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
+                                                                        >
                                                                             <img src={opt.image_url} alt={opt.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                                                         </div>
                                                                     )}
@@ -1017,6 +1096,11 @@ export default function BookPage() {
                                         )
                                     })}
                                 </div>
+                                {selectedPkg.is_addon_required && !Object.values(addons).some(v => v === true) && (
+                                    <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3)', borderRadius: 'var(--radius)', background: 'rgba(217, 119, 6, 0.1)', color: '#D97706', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <AlertTriangle size={16} /> แพ็กเกจนี้บังคับเลือกบริการเสริมอย่างน้อย 1 อย่างครับ
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -1419,7 +1503,12 @@ export default function BookPage() {
                                 <Coins size={20} color="var(--primary)" /> ราคา
                             </div>
                             {[
-                                { label: `แพ็กเกจ ${selectedPkg?.name}`, val: pkgPrice },
+                                { label: `แพ็กเกจ ${selectedPkg?.name}`, val: pkgBasePrice },
+                                ...( (pkgAdjustment !== 0 || (selectedVehicle?.vehicle_size && selectedVehicle.vehicle_size !== 'S') || isCcPrice) ? [{ 
+                                    label: isCcPrice ? `ค่าบริการตาม CC` : `ส่วนต่างตามขนาดรถ (${selectedVehicle?.vehicle_size})`, 
+                                    val: pkgAdjustment, 
+                                    note: pkgAdjustment === 0 ? '฿0' : (pkgAdjustment > 0 ? `+฿${pkgAdjustment.toLocaleString()}` : `-฿${Math.abs(pkgAdjustment).toLocaleString()}`)
+                                }] : []),
                                 ...Object.entries(addons).map(([name, isSelected]) => {
                                     if (!isSelected) return null
                                     const dbA = dbAddons.find(a => a.name === name)
@@ -1448,10 +1537,12 @@ export default function BookPage() {
                                 ...(extraFee > 0 ? [{ label: 'ค่าระยะทางนอกโซน', val: extraFee }] : []),
                                 ...(discountAmount > 0 ? [{ label: `ส่วนลด (${discountCode})`, val: -discountAmount }] : []),
                             ].map((row: any) => (
-                                <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: 8 }}>
-                                    <span style={{ color: 'var(--text-secondary)' }}>{row.label}</span>
+                                <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: 8, alignItems: 'center' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <span style={{ color: 'var(--text-secondary)' }}>{row.label}</span>
+                                    </div>
                                     <span style={{ fontWeight: 600, color: row.val < 0 ? 'var(--success)' : 'inherit' }}>
-                                        {row.note || (row.val === 0 ? 'ฟรี' : `${row.val > 0 ? '' : ''}฿${Math.abs(row.val).toLocaleString()}`)}
+                                        {row.note || (row.val === 0 ? 'ฟรี' : `฿${Math.abs(row.val).toLocaleString()}`)}
                                     </span>
                                 </div>
                             ))}
@@ -1487,41 +1578,23 @@ export default function BookPage() {
                             <div style={{ fontSize: '2.2rem', fontWeight: 900, color: 'var(--primary)' }}>฿{total.toLocaleString()}</div>
                         </div>
 
-                        {/* Payment method */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginBottom: 'var(--space-5)' }}>
-                            {[
-                                { id: 'stripe', label: 'ชำระผ่าน QR Code', desc: 'PromptPay / บัตรเครดิต ผ่าน Stripe', icon: 'smartphone' },
-                            ].map(m => (
-                                <div
-                                    key={m.id}
-                                    onClick={() => setPayMethod(m.id as any)}
-                                    style={{
-                                        border: payMethod === m.id ? '2.5px solid var(--primary)' : '1.5px solid var(--border)',
-                                        borderRadius: 'var(--radius-xl)', padding: 'var(--space-4)',
-                                        cursor: 'pointer', background: payMethod === m.id ? 'var(--primary-ghost)' : 'var(--surface)',
-                                        display: 'flex', alignItems: 'center', gap: 'var(--space-4)',
-                                        transition: 'all 0.2s',
-                                    }}
-                                >
-                                    <div className={styles.iconBox} style={{ fontSize: '1.8rem', width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface-2)', borderRadius: 12 }}>
-                                        <Smartphone size={24} />
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ fontWeight: 700 }}>{m.label}</div>
-                                        <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{m.desc}</div>
-                                    </div>
-                                    {payMethod === m.id && <CheckCircle size={20} color="var(--primary)" />}
+                        {/* Payment method - Hidden if only one option or already fetching */}
+                        {paymentError ? (
+                            <div className="alert alert-danger" style={{ marginBottom: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', textAlign: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <AlertTriangle size={20} />
+                                    <div style={{ fontWeight: 600 }}>{paymentError}</div>
                                 </div>
-                            ))}
-                        </div>
-
-                        {payMethod === 'stripe' && !clientSecret && (
-                            <div className="alert alert-info" style={{ marginBottom: 'var(--space-4)' }}>
-                                <Info size={18} /> หลังกด &ldquo;ชำระเงิน&rdquo; ระบบจะเตรียมรายการสำหรับชำระเงิน
+                                <button className="btn btn-primary btn-sm" onClick={() => fetchPaymentIntent()}>
+                                    ลองใหม่
+                                </button>
                             </div>
-                        )}
-
-                        {clientSecret && payMethod === 'stripe' && (
+                        ) : !clientSecret ? (
+                            <div style={{ textAlign: 'center', padding: 'var(--space-8)' }}>
+                                <div className="spinner" style={{ margin: '0 auto 12px', border: '3px solid var(--primary-ghost)', borderTop: '3px solid var(--primary)' }} />
+                                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>กำลังเตรียมรายการชำระเงิน...</div>
+                            </div>
+                        ) : (
                             <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-5)', border: '1px solid var(--border)' }}>
                                 <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe' } }}>
                                     <CheckoutForm 
@@ -1544,29 +1617,50 @@ export default function BookPage() {
                             <ChevronLeft size={18} /> ย้อนกลับ
                         </button>
                     )}
-                    {step < STEPS.length - 1 ? (
+                    {(step < STEPS.length - 1 && step !== 4) ? (
                         <button
                             className="btn btn-primary"
                             style={{ flex: 2, gap: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                            disabled={!canNext[step]}
+                            disabled={!currentCanNext}
                             onClick={() => setStep(s => s + 1)}
                         >
                             ถัดไป <ChevronRight size={18} />
                         </button>
                     ) : (
-                        <button
-                            className="btn btn-primary"
-                            style={{ flex: 2, gap: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)' }}
-                            disabled={submitting || !canNext[step] || !!clientSecret}
-                            onClick={payMethod === 'stripe' ? fetchPaymentIntent : () => submit()}
-                        >
-                            {submitting ? <span className="spinner" /> : 
-                             payMethod === 'stripe' ? <><CreditCard size={18} /> ชำระเงิน</> :
-                             <><CheckCircle size={18} /> ยืนยันการจอง</>}
-                        </button>
+                        // Hide main footer button when Stripe form is active (CheckoutForm has its own button)
+                        clientSecret && step === 4 ? null : (
+                            <button
+                                className="btn btn-primary"
+                                style={{ flex: 2, gap: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)' }}
+                                disabled={submitting || !currentCanNext}
+                                onClick={payMethod === 'stripe' ? fetchPaymentIntent : () => submit()}
+                            >
+                                {submitting ? <span className="spinner" /> : 
+                                 payMethod === 'stripe' ? <><CreditCard size={18} /> ชำระเงิน</> :
+                                 <><CheckCircle size={18} /> ยืนยันการจอง</>}
+                            </button>
+                        )
                     )}
                 </div>
             </div>
+
+            {/* Image Preview Modal */}
+            {previewImg && (
+                <div 
+                    style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+                    onClick={() => setPreviewImg(null)}
+                >
+                    <div style={{ position: 'relative', maxWidth: '100%', maxHeight: '100%' }} onClick={e => e.stopPropagation()}>
+                        <button 
+                            onClick={() => setPreviewImg(null)}
+                            style={{ position: 'absolute', top: -40, right: 0, color: '#fff', background: 'none', border: 'none', cursor: 'pointer' }}
+                        >
+                            <X size={32} />
+                        </button>
+                        <img src={previewImg} style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 100px)', borderRadius: 12, objectFit: 'contain', boxShadow: '0 0 40px rgba(0,0,0,0.5)' }} />
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

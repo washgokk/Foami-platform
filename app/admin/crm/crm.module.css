@@ -105,6 +105,39 @@
     background: var(--surface-2);
 }
 
+/* Category Headers */
+.bgGroupCustomer { background: rgba(59, 95, 204, 0.05) !important; }
+.bgGroupVehicle { background: rgba(124, 58, 237, 0.05) !important; }
+.bgGroupDetail { background: rgba(6, 182, 212, 0.05) !important; }
+.bgGroupPricing { background: rgba(34, 197, 94, 0.05) !important; }
+.bgGroupStatus { background: rgba(245, 158, 11, 0.05) !important; }
+
+/* Filter Bar */
+.txFilterBar {
+    display: flex;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+    flex-wrap: wrap;
+    align-items: flex-end;
+    background: var(--surface-2);
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+}
+
+.filterItem {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.filterLabel {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin-left: 4px;
+}
+
 /* CRM Tags/Segments */
 .tag {
     display: inline-block;

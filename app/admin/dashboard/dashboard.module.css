@@ -13,20 +13,62 @@
 }
 
 .statCard {
-    background: var(--surface);
-    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    border-radius: var(--radius-xl);
     padding: var(--space-5);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow-card);
+    border: 2px solid var(--border);
+    box-shadow: var(--shadow-sm);
     display: flex;
     align-items: center;
     gap: var(--space-4);
-    min-height: 80px;
-    transition: box-shadow 0.2s;
+    min-height: 90px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .statCard:hover {
-    box-shadow: var(--shadow);
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--primary);
+}
+
+.wideCard {
+    grid-column: span 2;
+}
+
+@media (max-width: 900px) {
+    .wideCard {
+        grid-column: span 1;
+    }
+}
+
+.filterToggle {
+    display: flex;
+    background: var(--surface-2);
+    padding: 4px;
+    border-radius: var(--radius-lg);
+    border: 2px solid var(--border);
+    margin-bottom: var(--space-6);
+    width: fit-content;
+    gap: 4px;
+}
+
+.filterBtn {
+    padding: 6px 16px;
+    border-radius: var(--radius-md);
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.filterBtn.active {
+    background: var(--primary);
+    color: white;
+    box-shadow: var(--shadow-sm);
 }
 
 .loadingGrid .statCard {

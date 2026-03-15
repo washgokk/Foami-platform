@@ -117,14 +117,13 @@
 }
 
 .menuBtn {
-    display: none;
     background: var(--primary-ghost);
     border: none;
     color: var(--primary);
     cursor: pointer;
     padding: 8px;
     border-radius: var(--radius-sm);
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
 }
@@ -175,7 +174,7 @@
     }
 
     .menuBtn {
-        display: block;
+        display: flex;
     }
 
     .content {

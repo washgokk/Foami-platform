@@ -51,13 +51,16 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
                         alt="Foami" 
                         style={{ height: 26, width: 'auto' }} 
                     />
+                </div>
+                
+                <div className={styles.topbarRight}>
                     <div className={styles.topbarGreeting}>
                         <span className={styles.topbarName}>สวัสดี, {staffName || 'พนักงาน'}</span>
                     </div>
+                    <button className={styles.logoutBtn} onClick={handleLogout}>
+                        <LogOut size={18} />
+                    </button>
                 </div>
-                <button className={styles.logoutBtn} onClick={handleLogout}>
-                    <LogOut size={18} />
-                </button>
             </header>
 
             <main className={styles.main}>{children}</main>

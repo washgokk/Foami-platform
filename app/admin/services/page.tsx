@@ -30,7 +30,8 @@ export default function ServicesPage() {
     const [svcForm, setSvcForm] = useState({
         name: '', description: '', price: '0',
         imageUrl: '',
-        addons: [] as string[]
+        addons: [] as string[],
+        is_addon_required: false
     })
     const [addonForm, setAddonForm] = useState({
         name: '', description: '',
@@ -70,6 +71,7 @@ export default function ServicesPage() {
                 price_m: +svcForm.price,
                 price_l: +svcForm.price,
                 is_active: true,
+                is_addon_required: svcForm.is_addon_required,
                 image_url: svcForm.imageUrl
             }
             if (editingSvc) {
@@ -255,9 +257,16 @@ export default function ServicesPage() {
                 const addonsStr = descParts[1].replace(']', '')
                 selectedAddons = addonsStr.split(',').map(name => name.trim()).filter(Boolean)
             }
-            setSvcForm({ name: s.name, description: desc, price: String(s.price_s), imageUrl: s.image_url || '', addons: selectedAddons })
+            setSvcForm({ 
+                name: s.name, 
+                description: desc, 
+                price: String(s.price_s), 
+                imageUrl: s.image_url || '', 
+                addons: selectedAddons,
+                is_addon_required: s.is_addon_required || false
+            })
         } else {
-            setSvcForm({ name: '', description: '', price: '0', imageUrl: '', addons: [] })
+            setSvcForm({ name: '', description: '', price: '0', imageUrl: '', addons: [], is_addon_required: false })
         }
         setShowModal(true)
     }
@@ -576,6 +585,19 @@ export default function ServicesPage() {
                                         />
                                     </div>
                                     <div className="form-group"><label className="form-label">ราคาพื้นฐาน (฿)</label><input type="number" className="form-input" value={svcForm.price} onChange={e => setSvcForm(p => ({ ...p, price: e.target.value }))} required /></div>
+                                    <div className="form-group">
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '12px 16px', background: 'var(--surface-2)', borderRadius: 12, border: '2px solid var(--border)' }}>
+                                            <input 
+                                                type="checkbox" 
+                                                checked={svcForm.is_addon_required} 
+                                                onChange={e => setSvcForm(p => ({ ...p, is_addon_required: e.target.checked }))} 
+                                            />
+                                            <div>
+                                                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>บังคับเลือกบริการเสริม</div>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>ลูกค้าจะไม่สามารถสั่งจองได้หากไม่เลือกบริการเสริมอย่างน้อย 1 อย่าง</div>
+                                            </div>
+                                        </label>
+                                    </div>
                                     <div className="form-group">
                                         <label className="form-label">บริการเสริมที่พ่วงได้</label>
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, background: 'var(--surface-2)', padding: 12, borderRadius: 12 }}>

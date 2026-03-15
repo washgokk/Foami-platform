@@ -24,12 +24,49 @@ export default function GlobalRegisterPage() {
     })
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState('')
+    const [checkingAuth, setCheckingAuth] = useState(true)
 
     useEffect(() => {
-        if (profile?.displayName) {
-            setForm(p => ({ ...p, full_name: profile.displayName }))
+        const checkExisting = async () => {
+            // 1. Check LocalStorage
+            const stored = localStorage.getItem('liff_customer')
+            if (stored) {
+                router.replace('/search')
+                return
+            }
+
+            // 2. Check Database using LINE ID
+            const lineUserId = profile?.userId || localStorage.getItem('liff_line_user_id')
+            if (lineUserId && lineUserId !== 'mock_user') {
+                const { data } = await supabase
+                    .from('customers')
+                    .select('*')
+                    .eq('line_user_id', lineUserId)
+                    .single()
+
+                if (data) {
+                    localStorage.setItem('liff_customer', JSON.stringify(data))
+                    router.replace('/search')
+                    return
+                }
+            }
+
+            if (profile?.displayName) {
+                setForm(p => ({ ...p, full_name: profile.displayName }))
+            }
+            setCheckingAuth(false)
         }
-    }, [profile])
+
+        if (profile) {
+            checkExisting()
+        } else {
+            // Fallback for mock/loading
+            const timeout = setTimeout(() => {
+                if (checkingAuth) setCheckingAuth(false)
+            }, 2000)
+            return () => clearTimeout(timeout)
+        }
+    }, [profile, router])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -78,6 +115,15 @@ export default function GlobalRegisterPage() {
 
         localStorage.setItem('liff_customer', JSON.stringify(data))
         router.replace('/search')
+    }
+
+    if (checkingAuth) {
+        return (
+            <div className={styles.page} style={{ alignItems: 'center', justifyContent: 'center' }}>
+                <div className="spinner" style={{ width: 40, height: 40 }} />
+                <p style={{ marginTop: 16, color: 'var(--text-muted)' }}>กำลังสั่งการ...</p>
+            </div>
+        )
     }
 
     return (

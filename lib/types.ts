@@ -177,6 +177,7 @@ export interface Service {
     price_m: number
     price_l: number
     is_active: boolean
+    is_addon_required: boolean
     image_url?: string
 }
 

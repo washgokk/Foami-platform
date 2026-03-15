@@ -33,7 +33,7 @@ const InfoSection = ({ job }: { job: any }) => {
         })
     }
     
-    const derivedPkgPrice = (job.total_price || 0) - addonsTotal - (job.extra_fee || 0) + (job.discount_amount || 0)
+    const derivedPkgPrice = (job.total_price || 0) - addonsTotal - (job.extra_fee || 0) + (job.discount_amount || 0) - (job.additional_price || 0)
 
     return (
         <div className={styles.jobItem}>
@@ -60,7 +60,9 @@ const InfoSection = ({ job }: { job: any }) => {
                         }
                         return (
                             <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                                <span style={{ color: 'var(--text-secondary)' }}>• {label} {addon.variableState?.mode === 'full_tank' ? '(ตามจริง)' : ''}</span>
+                                <span style={{ color: 'var(--text-secondary)' }}>
+                                    • {label} {addon.variableState?.mode === 'full_tank' ? '(เต็มถัง)' : addon.variableState?.mode === 'custom' ? `(กำหนดเอง ฿${Number(addon.variableState.customAmount).toLocaleString()})` : ''}
+                                </span>
                                 <span style={{ fontWeight: 700 }}>
                                     {addon.isFree ? 'ฟรี' : (price === 0 && addon.variableState?.mode === 'full_tank') ? 'เก็บหน้างาน' : `฿${price.toLocaleString()}`}
                                 </span>
@@ -90,6 +92,12 @@ const InfoSection = ({ job }: { job: any }) => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                         <span>ค่าระยะทางนอกโซน</span>
                         <span>฿{job.extra_fee.toLocaleString()}</span>
+                    </div>
+                )}
+                {job.additional_price > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        <span>ค่าใช้จ่ายเพิ่มเติมหน้างาน</span>
+                        <span>฿{job.additional_price.toLocaleString()}</span>
                     </div>
                 )}
                 {job.discount_amount > 0 && (
@@ -180,7 +188,18 @@ export default function JobDetailPage() {
                 const after = photoData?.find((p: any) => p.type === 'after')?.photo_urls || []
                 setPhotos({ before, after })
 
-                if (currentJob.additional_price) setAdditionalPrice(currentJob.additional_price)
+                if (currentJob.additional_price) {
+                    setAdditionalPrice(currentJob.additional_price)
+                } else {
+                    // Pre-populate from custom variable addons if not already set
+                    const customAddon = (currentJob.addon_ids || []).find((a: any) => 
+                        typeof a !== 'string' && a.variableState?.mode === 'custom' && a.variableState?.customAmount
+                    )
+                    if (customAddon) {
+                        setAdditionalPrice(Number(customAddon.variableState.customAmount))
+                    }
+                }
+
                 if (currentJob.additional_price_note) setAdditionalNote(currentJob.additional_price_note)
 
                 // Fetch size adjustments for the branch
@@ -292,6 +311,11 @@ export default function JobDetailPage() {
         if (job.status === 'washing') {
             setUploadType('after')
             setShowPhotoUpload(true)
+            return
+        }
+
+        if (action.next === 'completed' && Number(job.additional_price) > 0 && !job.is_additional_paid) {
+            alert('ลูกค้ายังไม่ได้ชำระค่าใช้จ่ายเพิ่มเติม กรุณารอให้ระบบแจ้งว่าชำระแล้วก่อนกดจบงาน')
             return
         }
 
@@ -493,7 +517,14 @@ export default function JobDetailPage() {
 
             {['washing', 'delivering', 'completed'].includes(job.status) && (
                 <div className={`card ${styles.section} ${styles.costCard}`}>
-                    <div className={styles.sectionTitle} style={{ marginBottom: 'var(--space-3)' }}>💰 ค่าใช้จ่ายเพิ่มเติมหน้างาน</div>
+                    <div className={styles.sectionTitle} style={{ marginBottom: 'var(--space-3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>💰 ค่าใช้จ่ายเพิ่มเติมหน้างาน</span>
+                        {Number(job.additional_price) > 0 && (
+                            <span className={`badge ${job.is_additional_paid ? 'badge-completed' : 'badge-pending'}`} style={{ fontSize: '0.75rem' }}>
+                                {job.is_additional_paid ? '✅ ชำระแล้ว' : '🕒 รอชำระ'}
+                            </span>
+                        )}
+                    </div>
                     
                     <div className={styles.costInputGroup}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
@@ -608,13 +639,15 @@ export default function JobDetailPage() {
                             color: '#fff',
                             opacity: (
                                 (job.status === 'washing' && Number(additionalPrice) > 0 && additionalSlipFiles.length === 0 && (!job.additional_price_slips || job.additional_price_slips.length === 0)) ||
-                                (job.status === 'washing' && isFuelJob && (Number(additionalPrice) === 0 || additionalPrice === ''))
+                                (job.status === 'washing' && isFuelJob && (Number(additionalPrice) === 0 || additionalPrice === '')) ||
+                                (job.status === 'delivering' && Number(job.additional_price) > 0 && !job.is_additional_paid)
                             ) ? 0.5 : 1
                         }}
                         onClick={handleStatusAction}
                         disabled={actionLoading || 
                             (job.status === 'washing' && Number(additionalPrice) > 0 && additionalSlipFiles.length === 0 && (!job.additional_price_slips || job.additional_price_slips.length === 0)) ||
-                            (job.status === 'washing' && isFuelJob && (Number(additionalPrice) === 0 || additionalPrice === ''))
+                            (job.status === 'washing' && isFuelJob && (Number(additionalPrice) === 0 || additionalPrice === '')) ||
+                            (job.status === 'delivering' && Number(job.additional_price) > 0 && !job.is_additional_paid)
                         }
                     >
                         {actionLoading ? <span className="spinner" /> : action.label}
