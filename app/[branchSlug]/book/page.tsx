@@ -857,7 +857,12 @@ export default function BookPage() {
     const isDeliveryValid = !showDelivery || (!!deliveryAddress && !!deliveryAddressDetail.trim())
     const currentCanNext = canNext[step] && (step === 1 ? isDeliveryValid : true)
 
-    if (!customer) return <div className="empty-state"><div className="spinner" /></div>
+    if (!customer) return (
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+            <div className="spinner" style={{ width: 40, height: 40 }} />
+            <p style={{ color: 'var(--text-muted)' }}>กำลังโหลด...</p>
+        </div>
+    )
 
     return (
         <div className={styles.page}>

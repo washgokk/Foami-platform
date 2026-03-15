@@ -219,8 +219,9 @@ export default function MyBookingsPage() {
             )}
 
             {loading ? (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-10)' }}>
-                    <div className="spinner" />
+                <div style={{ minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+                    <div className="spinner" style={{ width: 40, height: 40 }} />
+                    <p style={{ color: 'var(--text-muted)' }}>กำลังโหลด...</p>
                 </div>
             ) : bookings.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: 'var(--space-10) var(--space-6)' }}>
@@ -495,7 +496,7 @@ export default function MyBookingsPage() {
                                             {!selectedBooking.is_additional_paid ? (
                                                 !clientSecret ? (
                                                     <button className="btn btn-primary btn-sm" style={{ flex: 2, borderRadius: '12px', background: '#b45309', border: 'none' }} onClick={handlePayAdditional} disabled={submitting}>
-                                                        {submitting ? <div className="spinner spinner-white" /> : '💰 ชำระเงินส่วนนี้'}
+                                                        {submitting ? <div className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff' }} /> : '💰 ชำระเงินส่วนนี้'}
                                                     </button>
                                                 ) : null
                                             ) : (

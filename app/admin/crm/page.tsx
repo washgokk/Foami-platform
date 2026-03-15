@@ -317,7 +317,12 @@ export default function CRMPage() {
         window.location.reload()
     }
 
-    if (loading) return <div className="p-8 text-center text-gray-500">กำลังโหลดข้อมูล CRM... <span className="spinner" /></div>
+    if (loading) return (
+        <div style={{ minHeight: '80vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+            <div className="spinner" style={{ width: 40, height: 40 }} />
+            <div className="animate-fade" style={{ color: 'var(--text-muted)' }}>กำลังโหลดข้อมูล CRM...</div>
+        </div>
+    )
 
     return (
         <>

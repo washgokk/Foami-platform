@@ -132,7 +132,12 @@ export default function StaffSettingsPage() {
         setLoadingHistoryDetail(false)
     }
 
-    if (loading) return <div className="animate-fade" style={{ padding: 20 }}>กำลังโหลด...</div>
+    if (loading) return (
+        <div style={{ minHeight: '80vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+            <div className="spinner" style={{ width: 40, height: 40 }} />
+            <div className="animate-fade" style={{ color: 'var(--text-muted)' }}>กำลังโหลด...</div>
+        </div>
+    )
 
     return (
         <div className={`${styles.container} animate-fade`}>

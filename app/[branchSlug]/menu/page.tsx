@@ -105,7 +105,12 @@ export default function MenuPage() {
         }
     }
 
-    if (!customer) return null
+    if (!customer) return (
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+            <div className="spinner" style={{ width: 40, height: 40 }} />
+            <p style={{ color: 'var(--text-muted)' }}>กำลังโหลด...</p>
+        </div>
+    )
 
     return (
         <div className={styles.page}>
@@ -212,7 +217,7 @@ export default function MenuPage() {
                                     disabled={rating === 0 || submitting}
                                     onClick={handleReview}
                                 >
-                                    {submitting ? <div className="spinner spinner-white" /> : 'ส่งรีวิว'}
+                                    {submitting ? <div className="spinner" style={{ width: 20, height: 20, borderTopColor: '#fff' }} /> : 'ส่งรีวิว'}
                                 </button>
                             </div>
                         </div>

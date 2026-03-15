@@ -119,7 +119,7 @@ export default function GlobalRegisterPage() {
 
     if (checkingAuth) {
         return (
-            <div className={styles.page} style={{ alignItems: 'center', justifyContent: 'center' }}>
+            <div className={styles.page} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                 <div className="spinner" style={{ width: 40, height: 40 }} />
                 <p style={{ marginTop: 16, color: 'var(--text-muted)' }}>กำลังสั่งการ...</p>
             </div>

@@ -55,7 +55,7 @@ export default function SettingsPage() {
     const [saved, setSaved] = useState(false)
     const [showSuccessModal, setShowSuccessModal] = useState(false)
 
-    // Modal state for adding a new location
+    const [loading, setLoading] = useState(true)
     const [showLocModal, setShowLocModal] = useState(false)
     const [locForm, setLocForm] = useState<Partial<SavedLocation>>({ lat: 16.4419, lng: 102.8360 })
 
@@ -141,6 +141,7 @@ export default function SettingsPage() {
             setRecentLocations(Object.values(unique).slice(0, 5))
         }
         loadHistory()
+        setLoading(false)
     }, [router, branchSlug])
 
     const handleSave = async (e?: React.FormEvent) => {
@@ -628,7 +629,7 @@ export default function SettingsPage() {
                 </div>}
 
                 <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={saving} style={{ marginTop: 'var(--space-2)', gap: 8, borderRadius: 'var(--radius-xl)' }}>
-                    {saving ? <span className="spinner" /> : <><Save size={18} /> บันทึกข้อมูล</>}
+                    {saving ? <div className="spinner" style={{ width: 22, height: 22, borderTopColor: '#fff' }} /> : <><Save size={18} /> บันทึกข้อมูล</>}
                 </button>
 
                 <div style={{ 
