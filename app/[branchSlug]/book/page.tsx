@@ -355,7 +355,12 @@ export default function BookPage() {
             for (const b of data || []) {
                 // Pickup
                 if (b.pickup_address) {
+                    // Logic to extract original components to avoid duplication
+                    // Format: "Detail (Note) RawAddr"
                     const detail = b.pickup_address.split(' (')[0]
+                    const note = b.pickup_address.includes('(') ? b.pickup_address.split('(')[1].split(')')[0] : ''
+                    const raw = b.pickup_address.split(') ').length > 1 ? b.pickup_address.split(') ').slice(1).join(') ') : b.pickup_address
+
                     const nameKey = detail || b.pickup_address
                     if (!unique[nameKey]) {
                         let name = detail || 'สถานที่เดิม'
@@ -363,15 +368,18 @@ export default function BookPage() {
                         unique[nameKey] = {
                             name: name,
                             lat: b.pickup_lat, lng: b.pickup_lng,
-                            address: b.pickup_address,
+                            address: raw,
                             detail: detail,
-                            note: b.pickup_address.includes('(') ? b.pickup_address.split('(')[1].split(')')[0] : ''
+                            note: note
                         }
                     }
                 }
                 // Delivery
                 if (b.delivery_address) {
                     const detail = b.delivery_address.split(' (')[0]
+                    const note = b.delivery_address.includes('(') ? b.delivery_address.split('(')[1].split(')')[0] : ''
+                    const raw = b.delivery_address.split(') ').length > 1 ? b.delivery_address.split(') ').slice(1).join(') ') : b.delivery_address
+
                     const nameKey = detail || b.delivery_address
                     if (!unique[nameKey]) {
                         let name = detail || 'สถานที่เดิม'
@@ -379,9 +387,9 @@ export default function BookPage() {
                         unique[nameKey] = {
                             name: name,
                             lat: b.delivery_lat, lng: b.delivery_lng,
-                            address: b.delivery_address,
+                            address: raw,
                             detail: detail,
-                            note: b.delivery_address.includes('(') ? b.delivery_address.split('(')[1].split(')')[0] : ''
+                            note: note
                         }
                     }
                 }

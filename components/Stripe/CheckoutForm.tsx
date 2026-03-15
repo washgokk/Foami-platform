@@ -4,11 +4,12 @@ import { PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
 
 interface CheckoutFormProps {
     amount: number
+    customerEmail?: string
     onSuccess: (paymentIntentId: string) => void
     onCancel: () => void
 }
 
-export default function CheckoutForm({ amount, onSuccess, onCancel }: CheckoutFormProps) {
+export default function CheckoutForm({ amount, customerEmail, onSuccess, onCancel }: CheckoutFormProps) {
     const stripe = useStripe()
     const elements = useElements()
     const [isProcessing, setIsProcessing] = useState(false)
@@ -25,6 +26,13 @@ export default function CheckoutForm({ amount, onSuccess, onCancel }: CheckoutFo
         const { error, paymentIntent } = await stripe.confirmPayment({
             elements,
             redirect: 'if_required',
+            confirmParams: {
+                payment_method_data: {
+                    billing_details: {
+                        email: customerEmail || 'customer@foami-app.com' // Fallback to satisfy Stripe if hidden
+                    }
+                }
+            }
         })
 
         if (error) {
