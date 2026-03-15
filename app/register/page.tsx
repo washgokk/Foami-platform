@@ -103,8 +103,7 @@ export default function GlobalRegisterPage() {
             interests: [],
             is_profile_complete: false,
             reward_claimed: false,
-            created_at: now,
-            updated_at: now
+            created_at: now
         }).select().single()
 
         if (err) {
