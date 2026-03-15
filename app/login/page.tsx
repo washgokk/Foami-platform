@@ -1,7 +1,6 @@
 'use client'
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
 export default function GlobalLogin() {
@@ -68,19 +67,6 @@ export default function GlobalLogin() {
                 <div className="spinner" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)', width: 32, height: 32 }} />
                 <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.85rem', fontWeight: 500, letterSpacing: '0.05em' }}>กำลังเข้าสู่ระบบทาง LINE...</p>
             </div>
-
-            <Link 
-                href="/portal" 
-                style={{ 
-                    marginTop: 'var(--space-8)', 
-                    color: 'rgba(255,255,255,0.6)', 
-                    fontSize: '0.75rem', 
-                    textDecoration: 'underline',
-                    textUnderlineOffset: '4px'
-                }}
-            >
-                Foami Operations Portal (Admin/Staff)
-            </Link>
         </div>
     )
 }
