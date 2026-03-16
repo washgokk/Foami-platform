@@ -14,8 +14,10 @@ import {
     Ticket,
     LogOut,
     Menu,
-    ChevronLeft
+    ChevronLeft,
+    History
 } from 'lucide-react'
+import AuditLogModal from '@/components/Admin/AuditLogModal'
 
 const NAV_ITEMS = [
     { href: '/admin/dashboard', icon: LayoutDashboard, label: 'ภาพรวม' },
@@ -34,6 +36,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const pathname = usePathname()
     const router = useRouter()
     const [sidebarOpen, setSidebarOpen] = useState(false)
+    const [auditOpen, setAuditOpen] = useState(false)
 
     useEffect(() => {
         const token = localStorage.getItem('admin_token')
@@ -75,6 +78,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     })}
                 </nav>
                 <div className={styles.sidebarFooter}>
+                    <button 
+                        onClick={() => setAuditOpen(true)}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6,
+                            width: '100%',
+                            padding: '10px 0',
+                            marginBottom: 8,
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--text-muted)',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            textDecoration: 'underline',
+                            cursor: 'pointer',
+                            opacity: 0.8,
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.8' }}
+                    >
+                        <History size={14} /> ประวัติการแก้ไข
+                    </button>
                     <button className={styles.logoutBtn} onClick={handleLogout}>
                         <LogOut size={18} /> ออกจากระบบ
                     </button>
@@ -101,6 +129,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </header>
                 <main className={styles.content}>{children}</main>
             </div>
+
+            <AuditLogModal isOpen={auditOpen} onClose={() => setAuditOpen(false)} />
         </div>
     )
 }

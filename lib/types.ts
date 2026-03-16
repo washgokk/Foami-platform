@@ -344,6 +344,22 @@ export interface Payout {
     staff?: Staff
 }
 
+// ─── Audit Log Types ──────────────────────────────────────────
+export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'TOGGLE_STATUS' | 'PAYOUT' | 'RESTORE'
+export type AuditEntity = 'staff' | 'branch' | 'service' | 'booking' | 'payout'
+
+export interface AuditLog {
+    id: string
+    admin_id: string
+    action_type: AuditAction
+    entity_type: AuditEntity
+    entity_id: string
+    old_data: any
+    new_data: any
+    description: string
+    created_at: string
+}
+
 export const THAI_BANKS = [
     { code: '002', name: 'ธนาคารกรุงเทพ' },
     { code: '004', name: 'ธนาคารกสิกรไทย' },

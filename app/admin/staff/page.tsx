@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { Staff, Branch, Booking } from '@/lib/types'
 import styles from './staff.module.css'
 import { format } from 'date-fns'
+import { trackAuditLog } from '@/lib/audit'
 import { 
     UserCircle2, 
     Wallet, 
@@ -31,7 +32,8 @@ import {
     Shield,
     Briefcase,
     Banknote,
-    Lock
+    Lock,
+    Trash2
 } from 'lucide-react'
 import { Payout, THAI_BANKS } from '@/lib/types'
 import ImageUpload from '@/components/ImageUpload'
@@ -197,7 +199,7 @@ export default function StaffPage() {
             const bName = s?.full_name?.toLowerCase() || ''
             const brId = s?.branch_id || ''
             const svcName = (b as any).services?.name?.toLowerCase() || ''
-            const dateStr = format(new Date(b.scheduled_date), 'dd/MM/yyyy')
+            const dateStr = b.scheduled_date ? format(new Date(b.scheduled_date), 'dd/MM/yyyy') : ''
             const q = searchQuery.toLowerCase()
 
             const matchesSearch = !q || bName.includes(q) || svcName.includes(q) || dateStr.includes(q)
@@ -206,6 +208,20 @@ export default function StaffPage() {
             return matchesSearch && matchesBranch
         })
     }, [bookings, searchQuery, branchFilter, staff])
+
+    const filteredStaff = useMemo(() => {
+        return staff.filter(s => {
+            const name = s.full_name?.toLowerCase() || ''
+            const phone = s.phone?.toLowerCase() || ''
+            const email = (s as any).email?.toLowerCase() || ''
+            const q = searchQuery.toLowerCase()
+            
+            const matchesSearch = !q || name.includes(q) || phone.includes(q) || email.includes(q)
+            const matchesBranch = !branchFilter || s.branch_id === branchFilter
+            
+            return matchesSearch && matchesBranch
+        })
+    }, [staff, searchQuery, branchFilter])
 
     const selectedByStaff = useMemo(() => {
         const groups: Record<string, { 
@@ -313,9 +329,20 @@ export default function StaffPage() {
                     const data = await res.json()
                     if (!res.ok) throw new Error(data.error)
                 }
+                
+                // [AUDIT Phase 17] Update staff
+                await trackAuditLog({
+                    action_type: 'UPDATE',
+                    entity_type: 'staff',
+                    entity_id: editing.id,
+                    old_data: editing,
+                    new_data: { ...editing, ...form },
+                    description: `แก้ไขข้อมูลพนักงาน: ${editing.full_name}`
+                })
             } else {
+                let newStaffId = ''
                 if (localStorage.getItem('foami_mock_db_enabled') === 'true') {
-                    await supabase.from('staff').insert({
+                    const res = await supabase.from('staff').insert({
                         full_name: form.full_name,
                         phone: form.phone,
                         branch_id: form.branch_id,
@@ -323,7 +350,8 @@ export default function StaffPage() {
                         email: form.email,
                         image_url: form.image_url,
                         is_active: true
-                    })
+                    }).select().single()
+                    newStaffId = res.data?.id
                 } else {
                     const res = await fetch('/api/auth/create-staff', {
                         method: 'POST',
@@ -332,6 +360,18 @@ export default function StaffPage() {
                     })
                     const data = await res.json()
                     if (!res.ok) throw new Error(data.error)
+                    newStaffId = data.id || data.data?.id
+                }
+                
+                // [AUDIT Phase 17] Create staff
+                if (newStaffId) {
+                    await trackAuditLog({
+                        action_type: 'CREATE',
+                        entity_type: 'staff',
+                        entity_id: newStaffId,
+                        new_data: form,
+                        description: `เพิ่มพนักงานใหม่: ${form.full_name}`
+                    })
                 }
             }
             setShowModal(false)
@@ -344,8 +384,43 @@ export default function StaffPage() {
     }
 
     const toggleActive = async (s: Staff) => {
-        await supabase.from('staff').update({ is_active: !s.is_active }).eq('id', s.id)
+        const nextState = !s.is_active
+        await supabase.from('staff').update({ is_active: nextState }).eq('id', s.id)
+        
+        // [AUDIT Phase 17] Toggle status
+        await trackAuditLog({
+            action_type: 'TOGGLE_STATUS',
+            entity_type: 'staff',
+            entity_id: s.id,
+            old_data: { is_active: s.is_active },
+            new_data: { is_active: nextState },
+            description: `${nextState ? 'เปิด' : 'ปิด'}การใช้งานพนักงาน: ${s.full_name}`
+        })
+        
         load()
+    }
+    
+    const handleDeleteStaff = async (s: Staff) => {
+        if (!confirm(`ยืนยันการลบพนักงาน "${s.full_name}"? \nการลบนี้จะไม่สามารถย้อนคืนได้`)) return
+        
+        try {
+            const { error } = await supabase.from('staff').delete().eq('id', s.id)
+            if (error) throw error
+            
+            // [AUDIT Phase 19] Delete staff
+            await trackAuditLog({
+                action_type: 'DELETE',
+                entity_type: 'staff',
+                entity_id: s.id,
+                old_data: s,
+                description: `ลบพนักงาน: ${s.full_name}`
+            })
+            
+            load()
+            alert('ลบข้อมูลพนักงานเรียบร้อยแล้ว')
+        } catch (err: any) {
+            alert('ลบพนักงานไม่สำเร็จ: ' + err.message)
+        }
     }
 
     return (
@@ -379,6 +454,38 @@ export default function StaffPage() {
                 </button>
             </div>
 
+            <div className={styles.payoutHeader} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 24, background: 'var(--surface)', padding: 20, borderRadius: 16, border: '1px solid var(--border)', visibility: 'visible' }}>
+                <div className="form-group">
+                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Search size={14} /> ค้นหา{viewMode === 'list' ? 'พนักงาน' : 'พนักงาน/บริการ'}</label>
+                    <input 
+                        className="form-input" 
+                        style={{ borderRadius: 10, padding: '8px 12px' }}
+                        placeholder="พิมพ์เพื่อค้นหา..." 
+                        value={searchQuery} 
+                        onChange={e => setSearchQuery(e.target.value)} 
+                    />
+                </div>
+                <div className="form-group">
+                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Building2 size={14} /> กรองสาขา</label>
+                    <select className="form-input" style={{ borderRadius: 10, padding: '8px 12px' }} value={branchFilter} onChange={e => setBranchFilter(e.target.value)}>
+                        <option value="">-- ทั้งหมดทุกสาขา --</option>
+                        {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                </div>
+                {viewMode === 'payouts' && (
+                    <>
+                        <div className="form-group">
+                            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Calendar size={14} /> จากวันที่</label>
+                            <input type="date" className="form-input" style={{ borderRadius: 10, padding: '8px 12px' }} value={dateRange.start} onChange={e => setDateRange(p => ({ ...p, start: e.target.value }))} />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Calendar size={14} /> ถึงวันที่</label>
+                            <input type="date" className="form-input" style={{ borderRadius: 10, padding: '8px 12px' }} value={dateRange.end} onChange={e => setDateRange(p => ({ ...p, end: e.target.value }))} />
+                        </div>
+                    </>
+                )}
+            </div>
+
             {loading ? (
                 <div className="empty-state animate-fade"><div className="spinner" /></div>
             ) : viewMode === 'list' ? (
@@ -396,9 +503,9 @@ export default function StaffPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {staff.length === 0 ? (
-                                <tr><td colSpan={7}><div className="empty-state"><span className="empty-state-icon"></span><p className="empty-state-title">ยังไม่มีพนักงาน</p></div></td></tr>
-                            ) : staff.map(s => (
+                            {filteredStaff.length === 0 ? (
+                                <tr><td colSpan={7}><div className="empty-state"><span className="empty-state-icon"></span><p className="empty-state-title">ไม่พบพนักงานที่ค้นหา</p></div></td></tr>
+                            ) : filteredStaff.map(s => (
                                 <tr key={s.id} style={{ background: 'var(--surface)', cursor: 'default' }}>
                                     <td style={{ borderRadius: 'var(--radius) 0 0 var(--radius)', border: '2.5px solid var(--border)', borderRight: 'none' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -475,6 +582,9 @@ export default function StaffPage() {
                                             <button className="btn btn-outline btn-sm" onClick={() => openEdit(s)} style={{ padding: 6 }}>
                                                 <Edit2 size={16} />
                                             </button>
+                                            <button className="btn btn-outline btn-sm" onClick={() => handleDeleteStaff(s)} style={{ padding: 6, color: 'var(--danger)' }}>
+                                                <Trash2 size={16} />
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -484,33 +594,6 @@ export default function StaffPage() {
                 </div>
             ) : (
                 <div className="animate-fade">
-                    <div className={styles.payoutHeader} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 24, background: 'var(--surface)', padding: 20, borderRadius: 16, border: '1px solid var(--border)' }}>
-                        <div className="form-group">
-                            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Search size={14} /> ค้นหาพนักงาน/บริการ</label>
-                            <input 
-                                className="form-input" 
-                                style={{ borderRadius: 10, padding: '8px 12px' }}
-                                placeholder="พิมพ์เพื่อค้นหา..." 
-                                value={searchQuery} 
-                                onChange={e => setSearchQuery(e.target.value)} 
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Building2 size={14} /> กรองสาขา</label>
-                            <select className="form-input" style={{ borderRadius: 10, padding: '8px 12px' }} value={branchFilter} onChange={e => setBranchFilter(e.target.value)}>
-                                <option value="">-- ทั้งหมดทุกสาขา --</option>
-                                {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Calendar size={14} /> จากวันที่</label>
-                            <input type="date" className="form-input" style={{ borderRadius: 10, padding: '8px 12px' }} value={dateRange.start} onChange={e => setDateRange(p => ({ ...p, start: e.target.value }))} />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Calendar size={14} /> ถึงวันที่</label>
-                            <input type="date" className="form-input" style={{ borderRadius: 10, padding: '8px 12px' }} value={dateRange.end} onChange={e => setDateRange(p => ({ ...p, end: e.target.value }))} />
-                        </div>
-                    </div>
 
                     <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h2 style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--brand-dominant)', display: 'flex', alignItems: 'center', gap: 10 }}>

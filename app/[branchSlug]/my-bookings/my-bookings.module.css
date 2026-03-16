@@ -209,8 +209,8 @@
 }
 
 /* Status Badge Enhancements */
-:global(.badge-pending) { background: #EEF2FF; color: #4F46E5; }
-:global(.badge-confirmed) { background: #ECFDF5; color: #059669; }
-:global(.badge-washing) { background: #EFF6FF; color: #2563EB; }
-:global(.badge-completed) { background: var(--brand-subordinate-ghost); color: var(--brand-dominant); }
-:global(.badge-cancelled) { background: #FEF2F2; color: #DC2626; }
+.page :global(.badge-pending) { background: #EEF2FF; color: #4F46E5; }
+.page :global(.badge-confirmed) { background: #ECFDF5; color: #059669; }
+.page :global(.badge-washing) { background: #EFF6FF; color: #2563EB; }
+.page :global(.badge-completed) { background: var(--brand-subordinate-ghost); color: var(--brand-dominant); }
+.page :global(.badge-cancelled) { background: #FEF2F2; color: #DC2626; }

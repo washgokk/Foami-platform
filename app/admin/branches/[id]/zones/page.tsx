@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { Zone, Branch } from '@/lib/types'
 import { Map, Plus, Edit2, Trash2, ArrowLeft, CheckCircle, AlertCircle, Save, MousePointer2, MapPin } from 'lucide-react'
+import { trackAuditLog } from '@/lib/audit'
 
 // Distinct colors for each zone
 const ZONE_COLORS = ['#3B5FCC', '#16A34A', '#D97706', '#DC2626', '#7C3AED', '#0891B2', '#DB2777', '#059669']
@@ -36,12 +37,11 @@ export default function ZonesPage() {
 
     useEffect(() => { load() }, [load])
 
-    // Save a brand-new zone (just name+desc, polygon gets added after drawing)
     const saveNewZone = async (polygon_coords: [number, number][]) => {
         if (!newName.trim()) return
         setSaving(true)
         const color = ZONE_COLORS[zones.length % ZONE_COLORS.length]
-        await supabase.from('zones').insert({
+        const { data, error } = await supabase.from('zones').insert({
             name: newName.trim(),
             description: newDesc.trim(),
             branch_id: id,
@@ -49,7 +49,19 @@ export default function ZonesPage() {
             extra_fee: 0,
             polygon_coords,
             color,
-        })
+        }).select().single()
+        
+        if (!error && data) {
+            // [AUDIT Phase 22] Create zone
+            await trackAuditLog({
+                action_type: 'CREATE',
+                entity_type: 'service', // Using service as generic for zones too or we could add 'zone' if supported
+                entity_id: data.id,
+                new_data: data,
+                description: `สร้างโซนใหม่: ${data.name} (สาขา ${branch?.name || id})`
+            })
+        }
+        
         setSaving(false)
         setCreateMode('idle')
         setNewName('')
@@ -60,20 +72,61 @@ export default function ZonesPage() {
     const saveRedraw = async (polygon_coords: [number, number][]) => {
         if (!redrawZone) return
         setSaving(true)
-        await supabase.from('zones').update({ polygon_coords }).eq('id', redrawZone.id)
+        const { error } = await supabase.from('zones').update({ polygon_coords }).eq('id', redrawZone.id)
+        
+        if (!error) {
+            // [AUDIT Phase 22] Redraw zone
+            await trackAuditLog({
+                action_type: 'UPDATE',
+                entity_type: 'service',
+                entity_id: redrawZone.id,
+                old_data: { polygon_coords: redrawZone.polygon_coords },
+                new_data: { polygon_coords },
+                description: `แก้ไขพื้นที่ (วาดใหม่) โซน: ${redrawZone.name}`
+            })
+        }
+        
         setSaving(false)
         setRedrawZone(null)
         load()
     }
 
     const deleteZone = async (zid: string) => {
+        const z = zones.find(item => item.id === zid)
+        if (!z) return
         if (!confirm('ลบโซนนี้?')) return
-        await supabase.from('zones').delete().eq('id', zid)
+        const { error } = await supabase.from('zones').delete().eq('id', zid)
+        
+        if (!error) {
+            // [AUDIT Phase 22] Delete zone
+            await trackAuditLog({
+                action_type: 'DELETE',
+                entity_type: 'service',
+                entity_id: zid,
+                old_data: z,
+                description: `ลบโซน: ${z.name}`
+            })
+        }
+        
         load()
     }
 
     const toggleActive = async (z: Zone) => {
-        await supabase.from('zones').update({ is_active: !z.is_active }).eq('id', z.id)
+        const nextState = !z.is_active
+        const { error } = await supabase.from('zones').update({ is_active: nextState }).eq('id', z.id)
+        
+        if (!error) {
+            // [AUDIT Phase 22] Toggle status
+            await trackAuditLog({
+                action_type: 'TOGGLE_STATUS',
+                entity_type: 'service',
+                entity_id: z.id,
+                old_data: { is_active: z.is_active },
+                new_data: { is_active: nextState },
+                description: `${nextState ? 'เปิด' : 'ปิด'}การใช้งานโซน: ${z.name}`
+            })
+        }
+        
         load()
     }
 

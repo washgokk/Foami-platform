@@ -124,6 +124,9 @@ class CreateLocalMockQueryBuilder {
                 if (this.table === 'staff_payouts' && !localStorage.getItem('foami_mock_db_staff_payouts')) {
                     localStorage.setItem('foami_mock_db_staff_payouts', '[]')
                 }
+                if (this.table === 'audit_logs' && !localStorage.getItem('foami_mock_db_audit_logs')) {
+                    localStorage.setItem('foami_mock_db_audit_logs', '[]')
+                }
 
                 data = JSON.parse(localStorage.getItem('foami_mock_db_' + this.table) || '[]');
                 if (!Array.isArray(data)) data = [];

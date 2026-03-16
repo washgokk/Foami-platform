@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { Branch, Zone } from '@/lib/types'
 import { Store, Map as MapIcon, List, Plus, MapPin, Copy, Edit3, Pause, Play, Trash2, Globe, Phone, Clock, ArrowRight, Coins, Fuel as GasStation, Wrench, Settings } from 'lucide-react'
 import styles from './branches.module.css'
+import { trackAuditLog } from '@/lib/audit'
 
 const BranchMapPicker = dynamic(() => import('./BranchMapPicker'), { ssr: false })
 const MasterBranchesMap = dynamic(() => import('./MasterBranchesMap'), { ssr: false })
@@ -125,21 +126,69 @@ export default function BranchesPage() {
         let err
         if (editing) {
             ({ error: err } = await supabase.from('branches').update(payload).eq('id', editing.id))
+            
+            // [AUDIT Phase 17] Update branch
+            if (!err) {
+                await trackAuditLog({
+                    action_type: 'UPDATE',
+                    entity_type: 'branch',
+                    entity_id: editing.id,
+                    old_data: editing,
+                    new_data: { ...editing, ...payload },
+                    description: `แก้ไขสาขา: ${payload.name}`
+                })
+            }
         } else {
-            ({ error: err } = await supabase.from('branches').insert({ ...payload, is_active: true }))
+            const { data, error } = await supabase.from('branches').insert({ ...payload, is_active: true }).select().single()
+            err = error
+            
+            // [AUDIT Phase 17] Create branch
+            if (!err && data) {
+                await trackAuditLog({
+                    action_type: 'CREATE',
+                    entity_type: 'branch',
+                    entity_id: data.id,
+                    new_data: { ...payload, is_active: true },
+                    description: `เพิ่มสาขาใหม่: ${payload.name}`
+                })
+            }
         }
         if (err) { setError(err.message) } else { setShowModal(false); load() }
         setSaving(false)
     }
 
     const toggleActive = async (b: Branch) => {
-        await supabase.from('branches').update({ is_active: !b.is_active }).eq('id', b.id)
+        const nextState = !b.is_active
+        await supabase.from('branches').update({ is_active: nextState }).eq('id', b.id)
+        
+        // [AUDIT Phase 17] Toggle status
+        await trackAuditLog({
+            action_type: 'TOGGLE_STATUS',
+            entity_type: 'branch',
+            entity_id: b.id,
+            old_data: { is_active: b.is_active },
+            new_data: { is_active: nextState },
+            description: `${nextState ? 'เปิด' : 'ปิด'}การใช้งานสาขา: ${b.name}`
+        })
+        
         load()
     }
 
     const deleteBranch = async (id: string) => {
+        const b = branches.find(item => item.id === id)
+        if (!b) return
         if (!confirm('ต้องการลบสาขานี้?')) return
         await supabase.from('branches').delete().eq('id', id)
+        
+        // [AUDIT Phase 17] Delete branch
+        await trackAuditLog({
+            action_type: 'DELETE',
+            entity_type: 'branch',
+            entity_id: id,
+            old_data: b,
+            description: `ลบสาขา: ${b.name}`
+        })
+        
         load()
     }
 

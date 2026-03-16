@@ -5,6 +5,7 @@ import { Service, ServiceAddon, Branch, VEHICLE_SIZE_LABEL, CCPriceGroup } from 
 import ImageUpload from '@/components/ImageUpload'
 import { Plus, Trash2, Edit2, Check, X as XIcon, ChevronDown, CheckSquare, Square, Wrench, Package, TrendingUp } from 'lucide-react'
 import styles from './services.module.css'
+import { trackAuditLog } from '@/lib/audit'
 
 type Tab = 'services' | 'addons' | 'groups'
 
@@ -77,9 +78,30 @@ export default function ServicesPage() {
             if (editingSvc) {
                 const { error } = await supabase.from('services').update(payload).eq('id', editingSvc.id)
                 if (error) throw error
+                
+                // [AUDIT Phase 17] Update service
+                await trackAuditLog({
+                    action_type: 'UPDATE',
+                    entity_type: 'service',
+                    entity_id: editingSvc.id,
+                    old_data: editingSvc,
+                    new_data: { ...editingSvc, ...payload },
+                    description: `แก้ไขค่าบริการ: ${payload.name}`
+                })
             } else {
-                const { error } = await supabase.from('services').insert(payload)
+                const { data, error } = await supabase.from('services').insert(payload).select().single()
                 if (error) throw error
+                
+                // [AUDIT Phase 17] Create service
+                if (data) {
+                    await trackAuditLog({
+                        action_type: 'CREATE',
+                        entity_type: 'service',
+                        entity_id: data.id,
+                        new_data: payload,
+                        description: `เพิ่มบริการใหม่: ${payload.name}`
+                    })
+                }
             }
             setShowModal(false); load(); setSaving(false)
         } catch (err: any) {
@@ -125,9 +147,30 @@ export default function ServicesPage() {
             if (editingAddon) {
                 const { error } = await supabase.from('service_addons').update(payload).eq('id', editingAddon.id)
                 if (error) throw error
+                
+                // [AUDIT Phase 17] Update addon
+                await trackAuditLog({
+                    action_type: 'UPDATE',
+                    entity_type: 'service', // Using 'service' as generic entity or custom 'addon' if added
+                    entity_id: editingAddon.id,
+                    old_data: editingAddon,
+                    new_data: { ...editingAddon, ...payload },
+                    description: `แก้ไขบริการเสริม: ${payload.name}`
+                })
             } else {
-                const { error } = await supabase.from('service_addons').insert(payload)
+                const { data, error } = await supabase.from('service_addons').insert(payload).select().single()
                 if (error) throw error
+                
+                // [AUDIT Phase 17] Create addon
+                if (data) {
+                    await trackAuditLog({
+                        action_type: 'CREATE',
+                        entity_type: 'service',
+                        entity_id: data.id,
+                        new_data: payload,
+                        description: `เพิ่มบริการเสริมใหม่: ${payload.name}`
+                    })
+                }
             }
             setShowModal(false); load(); setSaving(false)
         } catch (err: any) {
@@ -180,10 +223,31 @@ export default function ServicesPage() {
             if (editingGroup) {
                 const { error } = await supabase.from('cc_price_groups').update(groupPayload).eq('id', editingGroup.id)
                 if (error) throw error
+                
+                // [AUDIT Phase 17] Update price group
+                await trackAuditLog({
+                    action_type: 'UPDATE',
+                    entity_type: 'service',
+                    entity_id: editingGroup.id,
+                    old_data: editingGroup,
+                    new_data: { ...editingGroup, ...groupPayload },
+                    description: `แก้ไขกลุ่มราคา: ${groupPayload.name}`
+                })
             } else {
                 const { data, error } = await supabase.from('cc_price_groups').insert(groupPayload).select().single()
                 if (error) throw error
                 groupId = data.id
+                
+                // [AUDIT Phase 17] Create price group
+                if (data) {
+                    await trackAuditLog({
+                        action_type: 'CREATE',
+                        entity_type: 'service',
+                        entity_id: data.id,
+                        new_data: groupPayload,
+                        description: `สร้างกลุ่มราคาใหม่: ${groupPayload.name}`
+                    })
+                }
             }
 
             if (groupId) {
@@ -208,43 +272,132 @@ export default function ServicesPage() {
     }
 
     const deleteGroup = async (id: string) => {
+        const pg = priceGroups.find(p => p.id === id)
+        if (!pg) return
         if (!confirm('ยืนยันการลบกลุ่มราคานี้?')) return
         const { error } = await supabase.from('cc_price_groups').delete().eq('id', id)
         if (error) alert(error.message)
-        else load()
+        else {
+            // [AUDIT Phase 17] Delete price group
+            await trackAuditLog({
+                action_type: 'DELETE',
+                entity_type: 'service',
+                entity_id: id,
+                old_data: pg,
+                description: `ลบกลุ่มราคา: ${pg.name}`
+            })
+            load()
+        }
     }
 
     const toggleGroupStatus = async (id: string, current: boolean) => {
-        const { error } = await supabase.from('cc_price_groups').update({ is_active: !current }).eq('id', id)
+        const pg = priceGroups.find(p => p.id === id)
+        const nextState = !current
+        const { error } = await supabase.from('cc_price_groups').update({ is_active: nextState }).eq('id', id)
         if (error) alert(error.message)
-        else load()
+        else {
+            // [AUDIT Phase 17] Toggle status
+            if (pg) {
+                await trackAuditLog({
+                    action_type: 'TOGGLE_STATUS',
+                    entity_type: 'service',
+                    entity_id: id,
+                    old_data: { is_active: current },
+                    new_data: { is_active: nextState },
+                    description: `${nextState ? 'เปิด' : 'ปิด'}การใช้งานกลุ่มราคา: ${pg.name}`
+                })
+            }
+            load()
+        }
     }
 
-
     const toggleSvcStatus = async (id: string, current: boolean) => {
-        const { error } = await supabase.from('services').update({ is_active: !current }).eq('id', id)
-        if (error) alert(error.message)
-        else load()
+        const s = services.find(item => item.id === id)
+        const nextState = !current
+        
+        let updateRes
+        if (typeof window !== 'undefined' && localStorage.getItem('foami_mock_db_enabled') === 'true') {
+            updateRes = await supabase.from('services').update({ is_active: nextState }).eq('id', id)
+        } else {
+            updateRes = await supabase.from('services').update({ is_active: nextState }).eq('id', id)
+        }
+        
+        if (updateRes.error) alert(updateRes.error.message)
+        else {
+            // [AUDIT Phase 17] Toggle status
+            if (s) {
+                await trackAuditLog({
+                    action_type: 'TOGGLE_STATUS',
+                    entity_type: 'service',
+                    entity_id: id,
+                    old_data: { is_active: current },
+                    new_data: { is_active: nextState },
+                    description: `${nextState ? 'เปิด' : 'ปิด'}การใช้งานบริการ: ${s.name}`
+                })
+            }
+            load()
+        }
     }
 
     const toggleAddonStatus = async (id: string, current: boolean) => {
-        const { error } = await supabase.from('service_addons').update({ is_active: !current }).eq('id', id)
+        const a = addons.find(item => item.id === id)
+        const nextState = !current
+        
+        const { error } = await supabase.from('service_addons').update({ is_active: nextState }).eq('id', id)
+        
         if (error) alert(error.message)
-        else load()
+        else {
+            // [AUDIT Phase 21] Toggle status
+            if (a) {
+                await trackAuditLog({
+                    action_type: 'TOGGLE_STATUS',
+                    entity_type: 'service', // Using service as generic for addons too
+                    entity_id: id,
+                    old_data: { is_active: current },
+                    new_data: { is_active: nextState },
+                    description: `${nextState ? 'เปิด' : 'ปิด'}การใช้งานบริการเสริม: ${a.name}`
+                })
+            }
+            load()
+        }
     }
 
     const deleteSvc = async (id: string) => {
+        const s = services.find(item => item.id === id)
+        if (!s) return
         if (!confirm('ยืนยันการลบตัวเลือกนี้?')) return
         const { error } = await supabase.from('services').delete().eq('id', id)
         if (error) alert(error.message)
-        else load()
+        else {
+            // [AUDIT Phase 17] Delete service
+            await trackAuditLog({
+                action_type: 'DELETE',
+                entity_type: 'service',
+                entity_id: id,
+                old_data: s,
+                description: `ลบบริการ: ${s.name}`
+            })
+            load()
+        }
     }
 
     const deleteAddon = async (id: string) => {
+        const a = addons.find(item => item.id === id)
+        if (!a) return
         if (!confirm('ยืนยันการลบบริการเสริมนี้?')) return
         const { error } = await supabase.from('service_addons').delete().eq('id', id)
         if (error) alert(error.message)
-        else load()
+        else {
+            // [AUDIT Phase 21] Delete addon
+            await trackAuditLog({
+                action_type: 'DELETE',
+                entity_type: 'service',
+                entity_id: id,
+                old_data: a,
+                description: `ลบบริการเสริม: ${a.name}`
+            })
+            load()
+        }
     }
 
     const openSvcModal = (s?: Service) => {

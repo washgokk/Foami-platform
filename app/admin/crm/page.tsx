@@ -29,8 +29,11 @@ import {
     Map,
     Sparkles,
     BarChart3,
-    History
+    History,
+    Search,
+    X
 } from 'lucide-react'
+import { trackAuditLog } from '@/lib/audit'
 
 /* 
 This CRM Page groups customer data into 4 tabs:
@@ -353,10 +356,13 @@ export default function CRMPage() {
     return (
         <>
         <div className={`animate-fade ${styles.page}`}>
-            <div className={styles.header}>
-                <h1 className={styles.title} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <Users size={28} color="var(--brand-dominant)" /> ลูกค้า & CRM
-                </h1>
+            <div className="page-header animate-fade">
+                <div>
+                    <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <Users size={28} color="var(--brand-dominant)" /> ลูกค้า & CRM
+                    </h1>
+                    <p className="page-subtitle">จัดการฐานข้อมูลลูกค้า วิเคราะห์พฤติกรรม และสร้างกลุ่มเป้าหมาย</p>
+                </div>
                 <button className="btn btn-sm btn-ghost" onClick={runIdMigration} style={{ opacity: 0.6, fontSize: '0.7rem', gap: 4 }}>
                     <Settings size={14} /> อัปเกรด ID ระบบ
                 </button>
@@ -396,11 +402,20 @@ export default function CRMPage() {
             {/* TAB 1: PROFILES */}
             {activeTab === 'profiles' && (
                 <div className={styles.card}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-                        <h2 className={styles.tableTitle} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <User size={20} color="var(--primary)" /> ฐานข้อมูลลูกค้า (Profiles)
-                        </h2>
-                        <input className="form-input" style={{ width: 250 }} placeholder="ค้นหาชื่อ, เบอร์, ทะเบียน..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, gap: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div style={{ background: 'var(--primary-ghost)', color: 'var(--primary)', width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <User size={24} />
+                            </div>
+                            <div>
+                                <h2 className={styles.tableTitle} style={{ margin: 0 }}>ฐานข้อมูลลูกค้า (Profiles)</h2>
+                                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>รวมข้อมูลพื้นฐาน พฤติกรรม และความสนใจของลูกค้ารายบุคคล</p>
+                            </div>
+                        </div>
+                        <div style={{ position: 'relative', width: 280 }}>
+                            <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                            <input className="form-input" style={{ width: '100%', paddingLeft: 36 }} placeholder="ค้นหาชื่อ, เบอร์, ทะเบียน..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                        </div>
                     </div>
 
                     <div className={styles.tableContainer}>
@@ -484,7 +499,15 @@ export default function CRMPage() {
             {/* TAB 2: TRANSACTIONS */}
             {activeTab === 'transactions' && (
                 <div className={styles.card}>
-                    <h2 className={styles.tableTitle}>ประวัติธุรกรรมทั้งหมด (All Transactions)</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+                        <div style={{ background: 'var(--primary-ghost)', color: 'var(--primary)', width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <ClipboardList size={24} />
+                        </div>
+                        <div>
+                            <h2 className={styles.tableTitle} style={{ margin: 0 }}>ประวัติธุรกรรมทั้งหมด (All Transactions)</h2>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>รายการจองและการชำระเงินย้อนหลังของลูกค้าทุกคน</p>
+                        </div>
+                    </div>
                     
                     {/* Transaction Filters */}
                     <div className={styles.txFilterBar}>
@@ -714,20 +737,20 @@ export default function CRMPage() {
             {/* TAB 3: ANALYTICS (RFM) */}
             {activeTab === 'analytics' && (
                 <div className={styles.card}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, gap: 16 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                <div style={{ background: 'var(--brand-dominant)', color: 'white', width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <ShieldCheck size={24} />
-                                </div>
-                                <div>
-                                    <h2 className={styles.tableTitle} style={{ margin: 0 }}>วิเคราะห์พฤติกรรม (Behavior & RFM)</h2>
-                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>ระบบคำนวณจาก Recency, Frequency, และ Monetary</p>
-                                </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, gap: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div style={{ background: 'var(--primary-ghost)', color: 'var(--primary)', width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <BarChart3 size={24} />
                             </div>
-                            <button className="btn btn-sm btn-ghost" style={{ background: 'var(--surface-2)', borderRadius: '10px', gap: 8 }} onClick={() => setShowLegend(true)}>
-                                <Info size={16} /> ดูความหมายแท็ก
-                            </button>
+                            <div>
+                                <h2 className={styles.tableTitle} style={{ margin: 0 }}>วิเคราะห์พฤติกรรม (Behavior & RFM)</h2>
+                                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>สรุปสถิติลูกค้าตามพฤติกรรมและการจัดกลุ่ม (R+F+M)</p>
+                            </div>
                         </div>
+                        <button className="btn btn-sm btn-ghost" style={{ background: 'var(--surface-2)', borderRadius: '10px', gap: 8 }} onClick={() => setShowLegend(true)}>
+                            <Info size={16} /> ดูความหมายแท็ก
+                        </button>
+                    </div>
 
 
                     <div className={styles.tableContainer}>
@@ -771,14 +794,14 @@ export default function CRMPage() {
 
             {/* TAB 4: SEGMENT BUILDER */}
             {activeTab === 'segments' && (
-                <div className={styles.card}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                        <div style={{ background: 'var(--brand-secondary)', color: 'white', width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div className={styles.card} style={{ border: '2px solid var(--primary-ghost)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+                        <div style={{ background: 'var(--primary-ghost)', color: 'var(--primary)', width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Target size={24} />
                         </div>
                         <div>
                             <h2 className={styles.tableTitle} style={{ margin: 0 }}>เครื่องมือสร้างกลุ่มเป้าหมาย (Segment Builder)</h2>
-                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>กำหนดเงื่อนไขเพื่อดึงรายชื่อลูกค้าเป้าหมาย</p>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>กำหนดเงื่อนไขเพื่อดึงรายชื่อลูกค้าเป้าหมายสำหรับทำแคมเปญ</p>
                         </div>
                     </div>
 
@@ -855,26 +878,26 @@ export default function CRMPage() {
                                                     setConditions(newConds)
                                                 }}
                                             >
-                                                <optgroup label="👤 ข้อมูลโปรไฟล์">
+                                                <optgroup label="ข้อมูลโปรไฟล์">
                                                     <option value="is_profile_complete">กรอกข้อมูลครบ (Boolean)</option>
                                                     <option value="gender">เพศ</option>
                                                     <option value="occupation">อาชีพ</option>
                                                     <option value="birthMonth">เดือนเกิด (1-12)</option>
                                                     <option value="interests">สิ่งที่สนใจ (Array)</option>
                                                 </optgroup>
-                                                <optgroup label="🚗 ข้อมูลรถ">
+                                                <optgroup label="ข้อมูลรถ">
                                                     <option value="vehicle_size">ขนาดรถ (SML)</option>
                                                     <option value="vehicle_brand">ยี่ห้อรถ</option>
                                                     <option value="vehicleCount">จำนวนรถที่บันทึก</option>
                                                 </optgroup>
-                                                <optgroup label="📊 พฤติกรรม (RFM)">
+                                                <optgroup label="พฤติกรรม (RFM)">
                                                     <option value="totalVisits">จำนวนครั้งที่ล้าง</option>
                                                     <option value="totalSpent">ยอดรวมที่จ่าย</option>
                                                     <option value="avgSpent">ยอดใช้จ่ายเฉลี่ย/ครั้ง</option>
                                                     <option value="daysSinceLast">หายไป (วัน)</option>
                                                     <option value="segment">กลุ่ม RFM (แท็ก)</option>
                                                 </optgroup>
-                                                <optgroup label="🤝 การมีส่วนร่วม & ประวัติ">
+                                                <optgroup label="การมีส่วนร่วม & ประวัติ">
                                                     <option value="lastBranchId">สาขาล่าสุดที่ใช้</option>
                                                     <option value="hasDiscountUsage">เคยใช้ส่วนลด (Boolean)</option>
                                                     <option value="totalSavings">ยอดที่ประหยัดไปได้</option>
@@ -1093,6 +1116,17 @@ export default function CRMPage() {
                                         
                                         localStorage.setItem('crm_custom_segments', JSON.stringify(updated));
                                         setSavedSegments(updated);
+                                        
+                                        // [AUDIT Phase 17/18] Track Segment Action
+                                        trackAuditLog({
+                                            action_type: editingSegmentId ? 'UPDATE' : 'CREATE',
+                                            entity_type: 'service', // Using service as generic or custom if needed
+                                            entity_id: newSegment.id,
+                                            old_data: editingSegmentId ? savedSegments.find(s => s.id === editingSegmentId) : null,
+                                            new_data: newSegment,
+                                            description: `${editingSegmentId ? 'แก้ไข' : 'สร้าง'} Segment: ${segmentName}`
+                                        });
+
                                         alert(`บันทึก Segment "${segmentName}" สำเร็จแล้ว!`);
                                         setSegmentName('');
                                         setConditions([{ id: Date.now(), metric: 'totalVisits', operator: '>=', value: '5' }]);
@@ -1148,9 +1182,21 @@ export default function CRMPage() {
                                                 }}><Edit3 size={14} /></button>
                                                 <button className="btn btn-xs btn-ghost" style={{ color: 'var(--danger)', borderRadius: 6 }} onClick={() => {
                                                     if (confirm(`ยืนยันลบ Segment "${seg.name}"?`)) {
-                                                        const updated = savedSegments.filter(s => s.id !== seg.id);
-                                                        localStorage.setItem('crm_custom_segments', JSON.stringify(updated));
-                                                        setSavedSegments(updated);
+                                                        // [FIX] Use functional update for state safety
+                                                        setSavedSegments(prev => {
+                                                            const updated = prev.filter(s => s.id !== seg.id);
+                                                            localStorage.setItem('crm_custom_segments', JSON.stringify(updated));
+                                                            return updated;
+                                                        });
+
+                                                        // [AUDIT Phase 17/18] Track Delete Segment
+                                                        trackAuditLog({
+                                                            action_type: 'DELETE',
+                                                            entity_type: 'service',
+                                                            entity_id: seg.id,
+                                                            old_data: seg,
+                                                            description: `ลบ Segment: ${seg.name}`
+                                                        });
                                                     }
                                                 }}><Trash2 size={14} /></button>
                                             </div>
@@ -1170,29 +1216,39 @@ export default function CRMPage() {
                                     <table>
                                         <thead>
                                             <tr>
-                                                <th>ชื่อ</th>
-                                                <th>ข้อมูล (เงื่อนไขแรก)</th>
+                                                <th style={{ width: 140 }}>ชื่อ</th>
+                                                {conditions.map((cond, idx) => (
+                                                    <th key={cond.id} style={{ fontSize: '0.75rem' }}>
+                                                        {idx + 1}. {(cond.metric.charAt(0).toUpperCase() + cond.metric.slice(1)).replace(/([A-Z])/g, ' $1')}
+                                                    </th>
+                                                ))}
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {customerStats.filter(evaluateSegmentMatch).slice(0, 10).map(c => (
                                                 <tr key={c.id}>
-                                                    <td>{c.full_name}</td>
-                                                    <td style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.85rem' }}>
-                                                        {conditions[0]?.metric === 'totalSpent' ? '฿' : ''}
-                                                        {conditions[0]?.metric === 'is_profile_complete' ? (c.is_profile_complete ? '✅ ครบ' : '❌ ไม่ครบ') : 
-                                                         conditions[0]?.metric === 'vehicle_size' ? (VEHICLE_SIZE_LABEL[c.vehicle_size] || c.vehicle_size) :
-                                                         conditions[0]?.metric === 'lastBranchId' ? (branches.find(b => b.id === c.lastBranchId)?.name || 'N/A') :
-                                                         conditions[0]?.metric === 'segment' ? c.segment :
-                                                         String(c[conditions[0]?.metric || 'totalVisits'])}
-                                                    </td>
+                                                    <td style={{ fontWeight: 600 }}>{c.full_name}</td>
+                                                    {conditions.map(cond => (
+                                                        <td key={cond.id} style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.85rem' }}>
+                                                            {cond.metric === 'totalSpent' || cond.metric === 'avgSpent' || cond.metric === 'totalSavings' ? '฿' : ''}
+                                                            {cond.metric === 'is_profile_complete' ? (c.is_profile_complete ? '✅ ครบ' : '❌ ไม่ครบ') : 
+                                                             cond.metric === 'vehicle_size' ? (VEHICLE_SIZE_LABEL[c.vehicle_size] || c.vehicle_size) :
+                                                             cond.metric === 'lastBranchId' ? (branches.find(b => b.id === c.lastBranchId)?.name || 'N/A') :
+                                                             cond.metric === 'segment' ? c.segment :
+                                                             cond.metric === 'hasDiscountUsage' ? (c.hasDiscountUsage ? 'เคยใช้' : 'ไม่เคย') :
+                                                             ['interests', 'addons', 'servicesUsed'].includes(cond.metric) ? (Array.isArray(c[cond.metric]) ? c[cond.metric].join(', ') : '-') :
+                                                             String(c[cond.metric] ?? '-')}
+                                                            {cond.metric === 'totalVisits' || cond.metric === 'vehicleCount' ? ' ครั้ง' : 
+                                                             cond.metric === 'daysSinceLast' ? ' วัน' : ''}
+                                                        </td>
+                                                    ))}
                                                 </tr>
                                             ))}
                                             {matchedUsersCount > 10 && (
-                                                <tr><td colSpan={2} style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>และอีก {matchedUsersCount - 10} คน...</td></tr>
+                                                <tr><td colSpan={conditions.length + 1} style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>และอีก {matchedUsersCount - 10} คน...</td></tr>
                                             )}
                                             {matchedUsersCount === 0 && (
-                                                <tr><td colSpan={2} style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่มีลูกค้าตรงตามเงื่อนไขนี้</td></tr>
+                                                <tr><td colSpan={conditions.length + 1} style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่มีลูกค้าตรงตามเงื่อนไขนี้</td></tr>
                                             )}
                                         </tbody>
                                     </table>
