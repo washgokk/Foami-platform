@@ -1,0 +1,21 @@
+{
+  "name": "Foami Staff",
+  "short_name": "Staff",
+  "description": "ระบบพนักงาน Foami สำหรับรับงานและบันทึกข้อมูล",
+  "start_url": "/staff/dashboard",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#315EC3",
+  "icons": [
+    {
+      "src": "/icon-192x192_staff.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512x512_staff.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

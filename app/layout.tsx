@@ -17,7 +17,8 @@ export const metadata: Metadata = {
     title: 'Foami',
   },
   icons: {
-    icon: '/icon.svg',
+    icon: '/icon-192x192_user.png',
+    apple: '/icon-192x192_user.png',
   },
 }
 
@@ -26,7 +27,7 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || ''
+  const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID || ''
 
   return (
     <html lang="th" suppressHydrationWarning>
