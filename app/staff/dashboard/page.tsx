@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { BOOKING_STATUS_LABEL, BOOKING_STATUS_CSS, BookingStatus } from '@/lib/types'
 import styles from './dashboard.module.css'
+import { ShoppingBag, Calendar, Clock, Star, MapPin, ChevronRight, CheckCircle, AlertCircle, Sparkles, Info, HelpCircle } from 'lucide-react'
 
 // ─── Haversine distance (km) ─────────────────────────────────
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
@@ -177,24 +178,49 @@ export default function StaffDashboard() {
 
     const handleAccept = async () => {
         if (!confirmingJob) return
-        const { id: jobId, zone_id: zoneId, scheduled_date: date, scheduled_time: time } = confirmingJob
+        const { id: jobId } = confirmingJob
         
         setActionLoading(jobId)
         setConfirmingJob(null)
         
         try {
-            const { error: updateError } = await supabase.from('bookings').update({ staff_id: staffId, status: 'confirmed' }).eq('id', jobId)
-            if (updateError) throw updateError
+            if (localStorage.getItem('foami_mock_db_enabled') === 'true') {
+                // Handle locally for Mock DB
+                const { error: updateError } = await supabase
+                    .from('bookings')
+                    .update({ 
+                        staff_id: staffId, 
+                        status: 'confirmed',
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', jobId)
+                
+                if (updateError) throw updateError
 
-            // Also mark their specific schedule slot as booked to avoid double booking
-            await supabase.from('staff_schedules').update({ is_booked: true })
-                .eq('staff_id', staffId).eq('zone_id', zoneId)
-                .eq('date', date).eq('time_slot', time)
+                // Mark schedule
+                await supabase.from('staff_schedules')
+                    .update({ is_booked: true })
+                    .eq('staff_id', staffId)
+                    .eq('zone_id', confirmingJob.zone_id)
+                    .eq('date', confirmingJob.scheduled_date)
+                    .eq('time_slot', confirmingJob.scheduled_time)
+
+                // Optional: Trigger a client-side success alert or re-load
+            } else {
+                const res = await fetch(`/api/bookings/${jobId}/accept`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ staff_id: staffId })
+                })
+                
+                const data = await res.json()
+                if (!res.ok) throw new Error(data.error || 'ไม่สามารถรับงานได้')
+            }
             
             await load()
         } catch (e: any) {
             console.error('Accept error:', e)
-            alert('ไม่สามารถรับงานได้: ' + (e.message || 'เกิดข้อผิดพลาดบางอย่าง'))
+            alert(e.message || 'เกิดข้อผิดพลาดบางอย่าง')
         } finally {
             setActionLoading(null)
         }
@@ -204,26 +230,36 @@ export default function StaffDashboard() {
     const upcomingJobs = jobs.filter(j => j.scheduled_date > today)
 
     return (
-        <div className="animate-fade">
-            <div className={styles.header}>
+        <>
+            <div className="animate-fade">
+                <div className={styles.header}>
                 <div>
-                    <h1 className={styles.title}>🏠 หน้าหลัก</h1>
+                    <h1 className={styles.title}>หน้าหลัก</h1>
                     <p className={styles.date}>{new Date().toLocaleDateString('th-TH', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
                 </div>
             </div>
 
-            <div className={styles.statsRow}>
-                <div className={styles.statPill} style={{ background: 'var(--info-light)', color: 'var(--info)' }}>
-                    <span style={{ fontSize: '1.3rem' }}>🛍️</span>
-                    <div><div className={styles.statN}>{availableJobs.length}</div><div className={styles.statL}>ตลาดงาน</div></div>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-8)' }}>
+                <div className={styles.statPill} style={{ background: 'var(--brand-subordinate-ghost)', color: 'var(--brand-dominant)', borderColor: 'var(--brand-subordinate)' }}>
+                    <div className={styles.iconBox}>
+                        <ShoppingBag size={20} />
+                    </div>
+                    <div className={styles.statN}>{availableJobs.length}</div>
+                    <div className={styles.statL}>ตลาดงาน</div>
                 </div>
-                <div className={styles.statPill} style={{ background: 'var(--warning-light)', color: 'var(--warning)' }}>
-                    <span style={{ fontSize: '1.3rem' }}>📅</span>
-                    <div><div className={styles.statN}>{todayJobs.length}</div><div className={styles.statL}>งานวันนี้</div></div>
+                <div className={styles.statPill} style={{ background: 'var(--brand-accent-ghost)', color: 'var(--brand-accent-dark)', borderColor: 'var(--brand-accent)' }}>
+                    <div className={styles.iconBox}>
+                        <Calendar size={20} />
+                    </div>
+                    <div className={styles.statN}>{todayJobs.length}</div>
+                    <div className={styles.statL}>งานวันนี้</div>
                 </div>
-                <div className={styles.statPill} style={{ background: 'var(--primary-ghost)', color: 'var(--primary)' }}>
-                    <span style={{ fontSize: '1.3rem' }}>⏰</span>
-                    <div><div className={styles.statN}>{upcomingJobs.length}</div><div className={styles.statL}>งานที่จะถึง</div></div>
+                <div className={styles.statPill} style={{ background: 'var(--info-ghost)', color: 'var(--info)', borderColor: 'var(--info-light)' }}>
+                    <div className={styles.iconBox}>
+                        <Clock size={20} />
+                    </div>
+                    <div className={styles.statN}>{upcomingJobs.length}</div>
+                    <div className={styles.statL}>งานที่จะถึง</div>
                 </div>
             </div>
 
@@ -233,7 +269,9 @@ export default function StaffDashboard() {
                 <>
                     {availableJobs.length > 0 && (
                         <>
-                            <h2 className={styles.sectionTitle} style={{ color: 'var(--info)' }}>🛍️ ตลาดงาน</h2>
+                            <h2 className={styles.sectionTitle} style={{ color: 'var(--brand-dominant)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <ShoppingBag size={20} /> ตลาดงาน
+                            </h2>
                             <div className={styles.marketList}>
                                 {availableJobs.map(job => (
                                     <div 
@@ -247,17 +285,17 @@ export default function StaffDashboard() {
                                         <div className={styles.jobBody}>
                                             <div className={styles.jobCustomer} style={{ fontSize: '1.2rem', marginBottom: 2 }}>{getPlaceName(job.pickup_address)}</div>
                                             <div className={styles.jobDetail}>
-                                                {job.customers?.vehicle_brand} {job.customers?.vehicle_model} · {job.services?.name} 
+                                                {job.customers?.vehicle_brand} {job.customers?.vehicle_model} {job.customers?.vehicle_color && `(${job.customers.vehicle_color})`} · {job.services?.name} 
                                             </div>
-                                            <div className={styles.jobDetail} style={{ fontSize: '0.75rem', color: job.suitability === 'recommended' ? '#16a34a' : '#2563eb', fontWeight: 600, marginTop: 4 }}>
-                                                {job.suitability === 'recommended' ? '✨ เหมาะสำหรับคุณ (อยู่ใกล้ที่สุด)' : '👥 มีพนักงานคนอื่นที่เหมาะสมกว่า'}
+                                            <div className={styles.jobDetail} style={{ fontSize: '0.75rem', color: job.suitability === 'recommended' ? 'var(--brand-dominant)' : 'var(--text-muted)', fontWeight: 700, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                {job.suitability === 'recommended' ? <><Sparkles size={12} /> เหมาะสำหรับคุณ (อยู่ใกล้ที่สุด)</> : <><Info size={12} /> มีพนักงานคนอื่นที่เหมาะสมกว่า</>}
                                             </div>
                                         </div>
                                         <button 
                                             className="btn btn-primary btn-sm" 
                                             onClick={() => setConfirmingJob(job)}
                                             disabled={!!actionLoading}
-                                            style={{ borderRadius: 'var(--radius-full)', background: job.suitability === 'recommended' ? '#16a34a' : '#2563eb', border: 'none', minWidth: 80 }}
+                                            style={{ borderRadius: 'var(--radius-full)', background: job.suitability === 'recommended' ? 'var(--brand-dominant)' : 'var(--brand-subordinate)', color: job.suitability === 'recommended' ? 'white' : 'var(--brand-dominant)', border: 'none', minWidth: 80, fontWeight: 700 }}
                                         >
                                             {actionLoading === job.id ? <span className="spinner spinner-white" style={{ width: 14, height: 14 }} /> : 'รับงาน'}
                                         </button>
@@ -267,17 +305,21 @@ export default function StaffDashboard() {
                         </>
                     )}
 
-                    <h2 className={styles.sectionTitle} style={{ marginTop: 'var(--space-6)' }}>📅 งานวันนี้</h2>
+                    <h2 className={styles.sectionTitle} style={{ marginTop: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Calendar size={20} /> งานวันนี้
+                    </h2>
                     {todayJobs.length === 0 ? (
                         <div className="empty-state" style={{ padding: 'var(--space-10)' }}>
-                            <span className="empty-state-icon">✅</span>
+                            <CheckCircle size={40} color="var(--brand-dominant)" style={{ opacity: 0.5, marginBottom: 16 }} />
                             <p className="empty-state-title">ไม่มีงานที่ต้องทำ</p>
                         </div>
                     ) : todayJobs.map(job => <JobCard key={job.id} job={job} />)}
 
                     {upcomingJobs.length > 0 && (
                         <>
-                            <h2 className={styles.sectionTitle} style={{ marginTop: 'var(--space-6)' }}>⏰ งานที่จะมาถึง</h2>
+                            <h2 className={styles.sectionTitle} style={{ marginTop: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <Clock size={20} /> งานที่จะมาถึง
+                            </h2>
                             {/* Group by date, sorted ascending (nearest first) */}
                             {Object.entries(
                                 upcomingJobs.reduce((acc: any, job) => {
@@ -291,7 +333,8 @@ export default function StaffDashboard() {
                             .map(([date, dateJobs]: [string, any]) => (
                                 <div key={date} style={{ marginBottom: 'var(--space-4)' }}>
                                     <div className={styles.dateHeader}>
-                                        📅 {new Date(date).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                        <Calendar size={14} style={{ display: 'inline', marginRight: 6, verticalAlign: 'text-bottom' }} />
+                                        {new Date(date).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short' })}
                                     </div>
                                     {dateJobs.map((job: any) => <JobCard key={job.id} job={job} />)}
                                 </div>
@@ -300,28 +343,31 @@ export default function StaffDashboard() {
                     )}
                 </>
             )}
+        </div>
 
-            {/* Custom Confirm Modal */}
-            {confirmingJob && (
-                <div className={styles.modalOverlay} onClick={() => setConfirmingJob(null)}>
-                    <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
-                        <div style={{ fontSize: '2.5rem', marginBottom: 'var(--space-3)' }}>🤔</div>
-                        <h3 className={styles.modalTitle}>รับงานนี้ใช่หรือไม่?</h3>
-                        <p className={styles.modalDesc}>
-                            เมื่อกดรับแล้ว คุณจะต้องรับผิดชอบงานนี้<br/>
-                            {confirmingJob.scheduled_time?.slice(0, 5)} น. ({confirmingJob.scheduled_date})
-                        </p>
-                        <div className={styles.modalActions}>
-                            <button className="btn btn-ghost btn-full" onClick={() => setConfirmingJob(null)}>ยกเลิก</button>
-                            <button className="btn btn-primary btn-full" style={{ background: 'var(--info)', borderColor: 'var(--info)' }} onClick={handleAccept}>
-                                ✅ ยืนยันรับงาน
-                            </button>
-                        </div>
+        {/* Custom Confirm Modal */}
+        {confirmingJob && (
+            <div className={styles.modalOverlay} onClick={() => setConfirmingJob(null)}>
+                <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-4)' }}>
+                        <HelpCircle size={64} color="var(--brand-dominant)" />
+                    </div>
+                    <h3 className={styles.modalTitle}>รับงานนี้ใช่หรือไม่?</h3>
+                    <p className={styles.modalDesc}>
+                        เมื่อกดรับแล้ว คุณจะต้องรับผิดชอบงานนี้<br/>
+                        {confirmingJob.scheduled_time?.slice(0, 5)} น. ({confirmingJob.scheduled_date})
+                    </p>
+                    <div className={styles.modalActions}>
+                        <button className="btn btn-ghost btn-full" style={{ borderRadius: '16px' }} onClick={() => setConfirmingJob(null)}>ยกเลิก</button>
+                        <button className="btn btn-primary btn-full" style={{ background: 'var(--brand-dominant)', border: 'none', borderRadius: '18px', gap: 8, height: 50, fontWeight: 700 }} onClick={handleAccept}>
+                            <CheckCircle size={20} /> ยืนยันรับงาน
+                        </button>
                     </div>
                 </div>
-            )}
-        </div>
-    )
+            </div>
+        )}
+    </>
+)
 }
 
 function JobCard({ job }: { job: any }) {
@@ -334,7 +380,7 @@ function JobCard({ job }: { job: any }) {
             <div className={styles.jobBody}>
                 <div className={styles.jobCustomer} style={{ fontSize: '1.2rem', marginBottom: 2 }}>{getPlaceName(job.pickup_address)}</div>
                 <div className={styles.jobDetail}>
-                    {job.customers?.vehicle_brand} {job.customers?.vehicle_model} · {job.services?.name}
+                    {job.customers?.vehicle_brand} {job.customers?.vehicle_model} {job.customers?.vehicle_color && `(${job.customers.vehicle_color})`} {job.customers?.license_plate && `· ${job.customers.license_plate}`} · {job.services?.name}
                 </div>
             </div>
             <span className={`badge ${BOOKING_STATUS_CSS[job.status as BookingStatus] || ''}`}>

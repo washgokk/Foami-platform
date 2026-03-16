@@ -77,10 +77,17 @@
   --radius-full: 9999px;
 
   /* ─── Shadows ─── */
-  --shadow-sm: 0 1px 3px rgba(49, 94, 195, 0.08), 0 1px 2px rgba(49, 94, 195, 0.05);
-  --shadow: 0 4px 16px rgba(49, 94, 195, 0.1), 0 2px 4px rgba(49, 94, 195, 0.05);
-  --shadow-lg: 0 10px 40px rgba(49, 94, 195, 0.15), 0 4px 8px rgba(49, 94, 195, 0.08);
-  --shadow-card: 0 2px 20px rgba(26, 35, 64, 0.06);
+  --shadow-sm: 0 1px 2px rgba(26, 35, 64, 0.05);
+  --shadow: 0 6px 12px rgba(26, 35, 64, 0.04), 0 2px 4px rgba(26, 35, 64, 0.02);
+  --shadow-md: 0 12px 24px rgba(26, 35, 64, 0.06), 0 4px 8px rgba(26, 35, 64, 0.04);
+  --shadow-lg: 0 20px 40px rgba(26, 35, 64, 0.1), 0 8px 16px rgba(26, 35, 64, 0.05);
+  --shadow-card: 0 8px 30px rgba(26, 35, 64, 0.04);
+  --shadow-primary: 0 8px 20px rgba(49, 94, 195, 0.25);
+
+  /* ─── Transitions ─── */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 
   /* ─── Typography ─── */
   --font-main: 'Kanit', sans-serif;
@@ -181,10 +188,11 @@ select {
   font-size: 0.95rem;
   font-weight: 600;
   border: none;
-  transition: all 0.2s ease;
+  transition: all var(--transition);
   cursor: pointer;
   text-decoration: none;
   white-space: nowrap;
+  user-select: none;
 }
 
 .btn:disabled {
@@ -193,15 +201,19 @@ select {
 }
 
 .btn-primary {
-  background: var(--primary);
+  background: var(--brand-dominant);
   color: #fff;
-  box-shadow: 0 4px 12px rgba(59, 95, 204, 0.3);
+  box-shadow: var(--shadow-primary);
 }
 
 .btn-primary:hover:not(:disabled) {
   background: var(--primary-dark);
-  box-shadow: 0 6px 18px rgba(59, 95, 204, 0.4);
-  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(49, 94, 195, 0.35);
+  transform: translateY(-2px);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .btn-ghost {
@@ -259,6 +271,11 @@ select {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   border: 1px solid var(--border);
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .card-padded {

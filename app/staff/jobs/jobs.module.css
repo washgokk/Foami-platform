@@ -1,0 +1,69 @@
+.jobCard {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 28px;
+    padding: var(--space-5);
+    margin-bottom: var(--space-3);
+    text-decoration: none;
+    color: inherit;
+    transition: var(--transition);
+    box-shadow: var(--shadow-sm);
+}
+
+.jobCard:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+    border-color: var(--brand-subordinate);
+}
+
+.jobTime {
+    text-align: center;
+    min-width: 65px;
+    color: var(--brand-dominant);
+    font-weight: 900;
+    border-right: 1px solid var(--border);
+    padding-right: var(--space-3);
+}
+
+.jobDate {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    display: block;
+    font-weight: 600;
+    margin-top: 2px;
+}
+
+.jobBody {
+    flex: 1;
+    padding-left: var(--space-1);
+}
+
+.jobCustomer {
+    font-weight: 800;
+    font-size: 1.05rem;
+    color: var(--text-primary);
+}
+
+.jobDetail {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+    font-weight: 500;
+}
+
+.jobStatusPrice {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--space-2);
+}
+
+.jobPrice {
+    font-size: 1.1rem;
+    font-weight: 900;
+    color: var(--brand-dominant);
+    letter-spacing: -0.02em;
+}

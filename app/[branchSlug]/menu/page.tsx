@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Bath, ClipboardList, Settings, FileText, Bike, Sparkles, ChevronRight, Search } from 'lucide-react'
+import { Bath, ClipboardList, Settings, Bike, ChevronRight, Search, User } from 'lucide-react'
+import Logo from '@/components/Branding/Logo'
 import styles from './menu.module.css'
 
 export default function MenuPage() {
@@ -117,15 +118,15 @@ export default function MenuPage() {
             {/* Header */}
             <div className={styles.header}>
                 <div className={styles.brandRow}>
-                    <img src="/logo - lanscape.svg" alt="Foami" className={styles.brandLogo} />
+                    <Logo width={120} />
                     {branchName && (
                         <Link href="/search" className={styles.branchSelector}>
-                            <Search size={14} /> สาขา: {branchName}
+                            <Search size={14} /> {branchName}
                         </Link>
                     )}
                 </div>
                 <div className={styles.greeting}>
-                    <p className={styles.greetText}>สวัสดี คุณ{customer.full_name?.split(' ')[0]} <Sparkles size={20} className={styles.greetIcon} /></p>
+                    <p className={styles.greetText}>สวัสดี คุณ{customer.full_name?.split(' ')[0]}</p>
                     <p className={styles.vehicleText}><Bike size={16} /> {customer.vehicle_brand} {customer.vehicle_model} · {customer.license_plate}</p>
                 </div>
             </div>

@@ -2,6 +2,8 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import styles from './login.module.css'
+import Logo from '@/components/Branding/Logo'
 
 export default function GlobalLogin() {
     const router = useRouter()
@@ -51,21 +53,13 @@ export default function GlobalLogin() {
     }, [router])
 
     return (
-        <div style={{
-            minHeight: '100vh', display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg, var(--primary) 0%, var(--accent-blue) 100%)',
-            gap: '24px',
-            padding: 'var(--space-6)'
-        }}>
-            <img 
-                src="/logo - lanscape.svg" 
-                alt="Foami Logo" 
-                style={{ width: '100%', maxWidth: '240px', height: 'auto' }}
-            />
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                <div className="spinner" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)', width: 32, height: 32 }} />
-                <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.85rem', fontWeight: 500, letterSpacing: '0.05em' }}>กำลังเข้าสู่ระบบทาง LINE...</p>
+        <div className={`${styles.page} animate-fade`}>
+            <div className={styles.content}>
+                <Logo width={180} />
+                <div className={styles.loading}>
+                    <div className={styles.spinner} />
+                    <p className={styles.text}>กำลังเข้าสู่ระบบทาง LINE...</p>
+                </div>
             </div>
         </div>
     )

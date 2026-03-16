@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import styles from './login.module.css'
+import Logo from '@/components/Branding/Logo'
 
 export default function StaffLoginPage() {
     const router = useRouter()
@@ -48,12 +49,14 @@ export default function StaffLoginPage() {
     return (
         <div className={styles.page}>
             <div className={styles.card}>
-                <div className={styles.logo}>🫧</div>
-                <h1 className={styles.title}>Foami Staff</h1>
-                <p className={styles.sub}>ระบบพนักงาน</p>
+                <div className={styles.logo}>
+                    <Logo width={140} variant="landscape" />
+                </div>
+                <h1 className={styles.title}>Staff Portal</h1>
+                <p className={styles.sub}>แผงควบคุมสำหรับพนักงาน</p>
                 <form onSubmit={handleLogin} className={styles.form}>
                     <div className="form-group">
-                        <label className="form-label">อีเมล</label>
+                        <label className="form-label">อีเมลผู้ใช้งาน</label>
                         <input type="email" className="form-input" value={email} onChange={e => setEmail(e.target.value)} placeholder="staff@foami.th" required />
                     </div>
                     <div className="form-group">
@@ -61,8 +64,8 @@ export default function StaffLoginPage() {
                         <input type="password" className="form-input" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
                     </div>
                     {error && <div className="alert alert-error">{error}</div>}
-                    <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={loading}>
-                        {loading ? <span className="spinner" /> : '🔐 เข้าสู่ระบบ'}
+                    <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={loading} style={{ borderRadius: 'var(--radius-xl)' }}>
+                        {loading ? <span className="spinner" /> : 'เข้าสู่ระบบ'}
                     </button>
                 </form>
             </div>

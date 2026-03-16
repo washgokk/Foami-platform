@@ -14,7 +14,20 @@ export async function GET(req: NextRequest) {
 
     const supabase = createServiceClient()
     
-    // 1. Fetch Capacity
+    // 1. Fetch Zone and its Branch ID
+    const { data: zoneData } = await supabase
+        .from('zones')
+        .select('branch_id')
+        .eq('id', zone_id)
+        .single()
+    
+    if (!zoneData) {
+        return NextResponse.json({ error: 'Zone not found' }, { status: 404 })
+    }
+
+    const branch_id = zoneData.branch_id
+
+    // 2. Fetch Capacity (Specific to this zone)
     const { data: schedules } = await supabase
         .from('staff_schedules')
         .select('date, time_slot')
@@ -22,11 +35,11 @@ export async function GET(req: NextRequest) {
         .gte('date', start_date)
         .lte('date', end_date)
 
-    // 2. Fetch Usage
+    // 3. Fetch Usage (Branch-wide to account for overflow/busy staff)
     const { data: bookings } = await supabase
         .from('bookings')
         .select('scheduled_date, scheduled_time')
-        .eq('zone_id', zone_id)
+        .eq('branch_id', branch_id)
         .neq('status', 'cancelled')
         .gte('scheduled_date', start_date)
         .lte('scheduled_date', end_date)

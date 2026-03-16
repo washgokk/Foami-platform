@@ -9,6 +9,8 @@ import {
     Smartphone
 } from 'lucide-react'
 
+import Logo from '@/components/Branding/Logo'
+
 export default function PortalPage() {
     return (
         <div style={{ 
@@ -21,22 +23,12 @@ export default function PortalPage() {
         }}>
             <div style={{ maxWidth: 400, width: '100%' }}>
                 <div style={{ textAlign: 'center', marginBottom: 'var(--space-10)' }}>
-                    <div style={{ 
-                        width: 80, 
-                        height: 80, 
-                        background: 'var(--primary)', 
-                        borderRadius: 24, 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        margin: '0 auto var(--space-4)',
-                        boxShadow: 'var(--shadow-lg)'
-                    }}>
-                        <Sparkles size={40} color="white" />
+                    <div style={{ marginBottom: 'var(--space-6)', display: 'flex', justifyContent: 'center' }}>
+                        <Logo width={160} />
                     </div>
-                    <h1 style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>Foami Portal</h1>
-                    <p style={{ color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>
-                        Select the app version to install or access
+                    <h1 style={{ fontSize: '1.85rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Foami Portal</h1>
+                    <p style={{ color: 'var(--text-muted)', marginTop: 'var(--space-2)', fontWeight: 500 }}>
+                        เลือกเวอร์ชันแอปเพื่อเข้าใช้งาน
                     </p>
                 </div>
 

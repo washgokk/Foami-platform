@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { BOOKING_STATUS_LABEL, BOOKING_STATUS_CSS, BookingStatus } from '@/lib/types'
+import { Search, Filter, ClipboardList, Trash2, X, ChevronRight, User, Package, Calendar as CalendarIcon, MapPin, Phone, CreditCard } from 'lucide-react'
+import ImageZoom from '@/components/Global/ImageZoom'
 
 export default function AdminBookingsPage() {
     const [bookings, setBookings] = useState<any[]>([])
@@ -9,6 +11,7 @@ export default function AdminBookingsPage() {
     const [filter, setFilter] = useState<string>('all')
     const [search, setSearch] = useState('')
     const [selected, setSelected] = useState<any>(null)
+    const [zoomConfig, setZoomConfig] = useState<{ images: { src: string; alt?: string }[]; initialIndex: number } | null>(null)
 
     const load = useCallback(async () => {
         setLoading(true)
@@ -63,17 +66,39 @@ export default function AdminBookingsPage() {
         <div className="animate-fade">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">📋 การจองทั้งหมด</h1>
-                    <p className="page-subtitle">{filtered.length} รายการ</p>
+                    <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <ClipboardList size={28} color="var(--brand-dominant)" /> การจองทั้งหมด
+                    </h1>
+                    <p className="page-subtitle">{filtered.length} รายการที่พบ</p>
                 </div>
             </div>
 
             {/* Filters */}
-            <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-6)', flexWrap: 'wrap' }}>
-                <input className="form-input" style={{ maxWidth: 280 }} placeholder="🔍 ค้นหา ชื่อ / เบอร์ / ID" value={search} onChange={e => setSearch(e.target.value)} />
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-4)', marginBottom: 'var(--space-8)', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ position: 'relative', flex: 1, maxWidth: 320 }}>
+                    <Search size={18} style={{ position: 'absolute', left: 16, top: 14, color: 'var(--text-muted)', opacity: 0.6 }} />
+                    <input 
+                        className="form-input" 
+                        style={{ paddingLeft: 46, borderRadius: '18px' }} 
+                        placeholder="ค้นหา ชื่อ / เบอร์ / ID..." 
+                        value={search} 
+                        onChange={e => setSearch(e.target.value)} 
+                    />
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', background: 'var(--surface-2)', padding: 6, borderRadius: '20px' }}>
                     {STATUS_OPTIONS.map(s => (
-                        <button key={s} className={`btn btn-sm ${filter === s ? 'btn-primary' : 'btn-outline'}`} onClick={() => setFilter(s)}>
+                        <button 
+                            key={s} 
+                            className={`btn btn-sm ${filter === s ? 'btn-primary' : 'btn-ghost'}`} 
+                            style={{ 
+                                borderRadius: '14px', 
+                                padding: '6px 14px',
+                                background: filter === s ? 'var(--brand-dominant)' : 'transparent',
+                                border: 'none',
+                                color: filter === s ? 'white' : 'var(--text-muted)'
+                            }}
+                            onClick={() => setFilter(s)}
+                        >
                             {STATUS_OPTS_TH[s]}
                         </button>
                     ))}
@@ -88,7 +113,16 @@ export default function AdminBookingsPage() {
                         </thead>
                         <tbody>
                             {filtered.length === 0 ? (
-                                <tr><td colSpan={8}><div className="empty-state"><span className="empty-state-icon">📋</span><p className="empty-state-title">ไม่พบการจอง</p></div></td></tr>
+                                <tr>
+                                    <td colSpan={8}>
+                                        <div className="empty-state" style={{ padding: 'var(--space-12)' }}>
+                                            <div style={{ background: 'var(--surface-2)', width: 64, height: 64, borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: 'var(--text-muted)' }}>
+                                                <ClipboardList size={32} />
+                                            </div>
+                                            <p className="empty-state-title" style={{ fontWeight: 800 }}>ยังไม่มีการจอง</p>
+                                        </div>
+                                    </td>
+                                </tr>
                             ) : filtered.map(b => (
                                 <tr key={b.id} style={{ cursor: 'pointer' }} onClick={() => setSelected(b)}>
                                     <td>
@@ -114,6 +148,12 @@ export default function AdminBookingsPage() {
                                     <td onClick={e => e.stopPropagation()}>
                                         {b.status === 'pending' && (
                                             <button className="btn btn-danger btn-sm" onClick={async () => {
+                                                const { data: booking } = await supabase.from('bookings').select('*').eq('id', b.id).single()
+                                                if (booking?.staff_id) {
+                                                    await supabase.from('staff_schedules').update({ is_booked: false })
+                                                        .eq('staff_id', booking.staff_id).eq('zone_id', booking.zone_id)
+                                                        .eq('date', booking.scheduled_date).eq('time_slot', booking.scheduled_time)
+                                                }
                                                 await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', b.id)
                                                 load()
                                             }}>ยกเลิก</button>
@@ -158,12 +198,25 @@ export default function AdminBookingsPage() {
                             {selected.slip_url && (
                                 <div>
                                     <div style={{ color: 'var(--text-muted)', marginBottom: 8 }}>สลิปโอนเงิน</div>
-                                    <img src={selected.slip_url} alt="slip" style={{ width: '100%', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }} />
+                                    <img 
+                                        src={selected.slip_url} 
+                                        alt="slip" 
+                                        style={{ width: '100%', borderRadius: 'var(--radius)', border: '1px solid var(--border)', cursor: 'zoom-in' }} 
+                                         onClick={() => setZoomConfig({ images: [{ src: selected.slip_url, alt: `สลิปการจอง: ${selected.customers?.full_name}` }], initialIndex: 0 })}
+                                    />
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
+            )}
+
+            {zoomConfig && (
+                <ImageZoom 
+                    images={zoomConfig.images} 
+                    initialIndex={zoomConfig.initialIndex}
+                    onClose={() => setZoomConfig(null)} 
+                />
             )}
         </div>
     )

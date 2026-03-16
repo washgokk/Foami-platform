@@ -56,12 +56,24 @@ export default function MasterBranchesMap({ branches, zones }: Props) {
             // Draw Branches
             branches.forEach(b => {
                 if (b.lat && b.lng) {
+                    const brandColor = '#0066FF'
+                    const svg = `
+                        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M20 38C20 38 34 26 34 16C34 8.26801 27.732 2 20 2C12.268 2 6 8.26801 6 16C6 26 20 38 20 38Z" fill="${brandColor}" stroke="white" stroke-width="2.5"/>
+                            <circle cx="20" cy="16" r="6" fill="white"/>
+                            <rect x="17" y="15" width="6" height="6" fill="${brandColor}" rx="1"/>
+                        </svg>
+                    `
                     const icon = L.divIcon({
-                        html: `<div style="background:#0F172A;color:#fff;padding:6px 10px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.3);text-align:center;">
-                                🏪 <br/>${b.name}
+                        html: `<div style="position:relative;display:flex;flex-direction:column;align-items:center;">
+                                ${svg}
+                                <div style="background:rgba(15,23,42,0.9);color:#fff;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-top:-4px;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.2);">
+                                    ${b.name}
+                                </div>
                                </div>`,
                         className: '',
-                        iconAnchor: [30, 40],
+                        iconSize: [40, 50],
+                        iconAnchor: [20, 38],
                     })
                     L.marker([b.lat, b.lng], { icon }).addTo(layerGroupRef.current).bindPopup(`<strong>${b.name}</strong><br/>${b.address}`)
                 }
@@ -74,7 +86,7 @@ export default function MasterBranchesMap({ branches, zones }: Props) {
                 if (z.polygon_coords && z.polygon_coords.length >= 3) {
                     const branchName = branches.find(b => b.id === z.branch_id)?.name || 'ไม่ทราบสาขา'
                     L.polygon(z.polygon_coords, {
-                        color, fillColor: color, fillOpacity: 0.15, weight: 2.5,
+                        color, fillColor: color, fillOpacity: 0.1, weight: 2, dashArray: '5, 5'
                     }).addTo(layerGroupRef.current).bindTooltip(`<strong>${z.name}</strong><br/><span style="font-size:0.8rem;color:#666;">สาขา ${branchName}</span>`, {
                         permanent: true, direction: 'center', className: 'leaflet-zone-label',
                     })

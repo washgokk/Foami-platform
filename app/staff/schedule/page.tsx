@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { TIME_SLOTS } from '@/lib/types'
 import { addDays, format, startOfWeek } from 'date-fns'
 import { th } from 'date-fns/locale'
+import { Calendar, ChevronLeft, ChevronRight, Save, X, Info } from 'lucide-react'
 import styles from './schedule.module.css'
 
 export default function StaffSchedulePage() {
@@ -114,11 +115,13 @@ export default function StaffSchedulePage() {
 
     return (
         <div className="animate-fade">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
-                <h1 className={styles.title}>📅 ตารางเวลา</h1>
-                <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setWeekStart(d => addDays(d, -7))}>‹</button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setWeekStart(d => addDays(d, 7))}>›</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-6)' }}>
+                <h1 className={styles.title} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Calendar size={28} className="text-primary" /> ตารางเวลา
+                </h1>
+                <div style={{ display: 'flex', gap: 12 }}>
+                    <button className="btn btn-ghost btn-sm" style={{ padding: 8 }} onClick={() => setWeekStart(d => addDays(d, -7))}><ChevronLeft size={20} /></button>
+                    <button className="btn btn-ghost btn-sm" style={{ padding: 8 }} onClick={() => setWeekStart(d => addDays(d, 7))}><ChevronRight size={20} /></button>
                 </div>
             </div>
 
@@ -199,12 +202,17 @@ export default function StaffSchedulePage() {
 
             {Object.keys(pendingSlots).length > 0 && (
                 <div className={styles.saveBar}>
-                    <span>เลือกไว้ {Object.keys(pendingSlots).length} ช่อง</span>
-                    <button className="btn btn-primary btn-sm" onClick={save} disabled={saving}>
-                        {saving ? <span className="spinner" /> : '💾 บันทึก'}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <Info size={20} />
+                        <span>เลือกไว้ {Object.keys(pendingSlots).length} ช่อง</span>
+                    </div>
+                    <button className="btn btn-primary" onClick={save} disabled={saving} style={{ background: 'white', color: 'var(--brand-dominant)', border: 'none', fontWeight: 800 }}>
+                        {saving ? <span className="spinner" /> : <><Save size={18} /> บันทึก</>}
                     </button>
                 </div>
             )}
+
+            <div style={{ height: 100 }} />
 
             <div className={styles.legend}>
                 <span className={styles.legendItem}><span className={`${styles.dot} ${styles.available}`} /> ลงเวลาแล้ว</span>

@@ -9,12 +9,41 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--space-5) var(--space-6);
+    padding: var(--space-4) var(--space-6);
     background: var(--surface);
     border-bottom: 2.5px solid var(--brand-subordinate);
     position: sticky;
     top: 0;
     z-index: 10;
+    height: 64px;
+}
+
+.exitButton {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-2);
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.exitButton:hover {
+    background: var(--brand-subordinate);
+    border-color: var(--brand-dominant);
+    color: var(--brand-dominant);
+    transform: scale(1.05);
+}
+
+.topbarCenter {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .topTitle {

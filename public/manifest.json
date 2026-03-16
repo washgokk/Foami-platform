@@ -1,11 +1,11 @@
 {
-  "name": "Foami Admin & Staff",
+  "name": "Foami",
   "short_name": "Foami",
-  "description": "Storage Lifecycle & Management for Foami",
-  "start_url": "/admin",
+  "description": "บริการล้างมอเตอร์ไซค์ รับ-ส่งถึงบ้าน",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#10b981",
+  "theme_color": "#ffffff",
   "icons": [
     {
       "src": "/icon-192x192.png",

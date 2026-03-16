@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { BOOKING_STATUS_LABEL, BOOKING_STATUS_CSS, BookingStatus } from '@/lib/types'
+import { Wrench, Search, Calendar, Clock, ClipboardList, CheckCircle2, Droplets, Truck, XCircle, Bike } from 'lucide-react'
+import styles from './jobs.module.css'
 
 const STATUS_FILTERS: { label: string; value: string }[] = [
     { label: 'ทั้งหมด', value: 'all' },
@@ -14,6 +16,16 @@ const STATUS_FILTERS: { label: string; value: string }[] = [
     { label: 'กำลังส่ง', value: 'delivering' },
     { label: 'เสร็จแล้ว', value: 'completed' },
 ]
+
+// ─── Utility to extract place name from address ─────────────
+function getPlaceName(addr: string) {
+    if (!addr) return 'ไม่ระบุสถานที่'
+    const parts = addr.split('(')
+    if (parts.length > 1) return parts[0].trim()
+    const words = addr.split(' ')
+    if (words.length > 2) return words.slice(0, 2).join(' ')
+    return addr
+}
 
 export default function StaffJobsPage() {
     const router = useRouter()
@@ -31,6 +43,32 @@ export default function StaffJobsPage() {
     useEffect(() => {
         if (!staffId) return
         async function load() {
+            setLoading(true)
+
+            // Manual Joins Fallback (Mock DB)
+            const resolveRelations = async (bData: any[]) => {
+                const sIds = [...new Set(bData.filter(b => b.service_id).map(b => b.service_id))]
+                const zIds = [...new Set(bData.filter(b => b.zone_id).map(b => b.zone_id))]
+                const cIds = [...new Set(bData.filter(b => b.customer_id).map(b => b.customer_id))]
+
+                if (sIds.length > 0) {
+                    const { data: sData } = await supabase.from('services').select('*').in('id', sIds)
+                    const smap = Object.fromEntries(sData?.map((s: any) => [s.id, s]) || [])
+                    bData.forEach(b => { if (b.service_id) b.services = smap[b.service_id] })
+                }
+                if (zIds.length > 0) {
+                    const { data: zData } = await supabase.from('zones').select('*').in('id', zIds)
+                    const zmap = Object.fromEntries(zData?.map((z: any) => [z.id, z]) || [])
+                    bData.forEach(b => { if (b.zone_id) b.zones = zmap[b.zone_id] })
+                }
+                if (cIds.length > 0) {
+                    const { data: cData } = await supabase.from('customers').select('*').in('id', cIds)
+                    const cmap = Object.fromEntries(cData?.map((c: any) => [c.id, c]) || [])
+                    bData.forEach(b => { if (b.customer_id) b.customers = cmap[b.customer_id] })
+                }
+                return bData
+            }
+
             let q = supabase
                 .from('bookings')
                 .select('*, customers(full_name, vehicle_brand, vehicle_model, license_plate), services(name), zones(name)')
@@ -41,29 +79,35 @@ export default function StaffJobsPage() {
             if (filter !== 'all') q = (q as any).eq('status', filter)
 
             const { data } = await (q as any)
-            setJobs(data || [])
+            const finalJobs = await resolveRelations(data || [])
+            setJobs(finalJobs)
             setLoading(false)
         }
         load()
     }, [staffId, filter])
 
-    const STATUS_ICON: Record<string, string> = {
-        pending: '⏳', confirmed: '✅', picking_up: '🏍️',
-        washing: '🫧', delivering: '🚗', completed: '🎉', cancelled: '❌',
-    }
-
     return (
         <div className="animate-fade">
-            <h1 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: 'var(--space-4)' }}>🔧 รายการงาน</h1>
+            <h1 style={{ fontSize: '1.4rem', fontWeight: 900, marginBottom: 'var(--space-5)', display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-primary)' }}>
+                <Wrench size={24} color="var(--brand-dominant)" /> รายการงาน
+            </h1>
 
             {/* Filter tabs */}
-            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 'var(--space-4)', paddingBottom: 4 }}>
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 'var(--space-6)', paddingBottom: 8 }}>
                 {STATUS_FILTERS.map(f => (
                     <button
                         key={f.value}
-                        className={`btn btn-sm ${filter === f.value ? 'btn-primary' : 'btn-ghost'}`}
+                        className={`btn btn-sm`}
                         onClick={() => setFilter(f.value)}
-                        style={{ flexShrink: 0 }}
+                        style={{ 
+                            flexShrink: 0, 
+                            borderRadius: '12px', 
+                            padding: '8px 16px',
+                            background: filter === f.value ? 'var(--brand-dominant)' : 'var(--surface)',
+                            border: filter === f.value ? 'none' : '1px solid var(--border)',
+                            color: filter === f.value ? '#fff' : 'var(--text-secondary)',
+                            fontWeight: 700
+                        }}
                     >
                         {f.label}
                     </button>
@@ -73,10 +117,10 @@ export default function StaffJobsPage() {
             {loading ? (
                 <div className="empty-state"><div className="spinner" /></div>
             ) : jobs.length === 0 ? (
-                <div className="empty-state">
-                    <span className="empty-state-icon">📋</span>
-                    <p className="empty-state-title">ไม่มีงาน</p>
-                    <p className="empty-state-desc">ยังไม่มีงานในหมวดนี้</p>
+                <div className="empty-state" style={{ padding: 'var(--space-12)' }}>
+                    <Search size={48} color="var(--brand-dominant)" style={{ opacity: 0.3, marginBottom: 16 }} />
+                    <p className="empty-state-title">ไม่พบรายการงาน</p>
+                    <p className="empty-state-desc">ยังไม่มีงานในหมวดนี้ที่คุณดูแล</p>
                 </div>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
@@ -84,31 +128,25 @@ export default function StaffJobsPage() {
                         <Link
                             key={job.id}
                             href={`/staff/jobs/${job.id}`}
-                            style={{
-                                display: 'flex', alignItems: 'center', gap: 'var(--space-4)',
-                                background: 'var(--surface)', borderRadius: 'var(--radius-lg)',
-                                border: '1px solid var(--border)', padding: 'var(--space-4)',
-                                textDecoration: 'none', color: 'inherit',
-                                transition: 'box-shadow 0.2s, transform 0.2s',
-                            }}
+                            className={styles.jobCard}
                         >
-                            <div style={{ fontSize: '1.6rem' }}>{STATUS_ICON[job.status] || '🔧'}</div>
-                            <div style={{ flex: 1 }}>
-                                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{job.customers?.full_name}</div>
-                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                                    {job.customers?.vehicle_brand} · {job.services?.name} · {job.zones?.name}
-                                </div>
-                                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                                    📅 {job.scheduled_date} {job.scheduled_time?.slice(0, 5)}
+                            <div className={styles.jobTime} style={{ minWidth: '75px' }}>
+                                <span style={{ fontSize: '1.2rem', fontWeight: 900 }}>{job.scheduled_time?.slice(0, 5)}</span>
+                                <span className={styles.jobDate}>{job.scheduled_date}</span>
+                            </div>
+                            <div className={styles.jobBody}>
+                                <div className={styles.jobCustomer} style={{ fontSize: '1.1rem', marginBottom: 2 }}>{getPlaceName(job.pickup_address)}</div>
+                                <div className={styles.jobDetail}>
+                                    {job.customers?.vehicle_brand} {job.customers?.vehicle_model} {job.customers?.vehicle_color && `(${job.customers.vehicle_color})`} {job.customers?.license_plate && `(${job.customers.license_plate})`} · {job.services?.name}
                                 </div>
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                                <span className={`badge ${BOOKING_STATUS_CSS[job.status as BookingStatus] || ''}`}>
+                            <div className={styles.jobStatusPrice}>
+                                <span className={`badge ${BOOKING_STATUS_CSS[job.status as BookingStatus] || ''}`} style={{ fontSize: '0.7rem' }}>
                                     {BOOKING_STATUS_LABEL[job.status as BookingStatus] || job.status}
                                 </span>
-                                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary)' }}>
-                                    ฿{job.total_price?.toLocaleString()}
-                                </span>
+                                <div className={styles.jobPrice}>
+                                    ฿{(job.total_price || 0).toLocaleString()}
+                                </div>
                             </div>
                         </Link>
                     ))}

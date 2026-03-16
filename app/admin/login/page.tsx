@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import styles from './login.module.css'
 
+import Logo from '@/components/Branding/Logo'
+
 export default function AdminLoginPage() {
     const router = useRouter()
     const [email, setEmail] = useState('')
@@ -45,13 +47,15 @@ export default function AdminLoginPage() {
     return (
         <div className={styles.page}>
             <div className={styles.card}>
-                <div className={styles.logo}>🫧</div>
-                <h1 className={styles.title}>Foami Admin</h1>
-                <p className={styles.sub}>ระบบจัดการหลังบ้าน</p>
+                <div className={styles.logoWrapper}>
+                    <Logo width={160} />
+                </div>
+                <h1 className={styles.title}>Admin Portal</h1>
+                <p className={styles.sub}>Management & Analytics</p>
 
                 <form onSubmit={handleLogin} className={styles.form}>
                     <div className="form-group">
-                        <label className="form-label">อีเมล</label>
+                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>อีเมล</label>
                         <input
                             type="email"
                             className="form-input"
@@ -61,8 +65,8 @@ export default function AdminLoginPage() {
                             required
                         />
                     </div>
-                    <div className="form-group">
-                        <label className="form-label">รหัสผ่าน</label>
+                    <div className="form-group" style={{ marginTop: 8 }}>
+                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>รหัสผ่าน</label>
                         <input
                             type="password"
                             className="form-input"
@@ -72,12 +76,12 @@ export default function AdminLoginPage() {
                             required
                         />
                     </div>
-                    {error && <div className="alert alert-error">{error}</div>}
-                    <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={loading}>
-                        {loading ? <span className="spinner" /> : '🔐 เข้าสู่ระบบ'}
+                    {error && <div className="alert alert-error" style={{ fontSize: '0.85rem' }}>{error}</div>}
+                    <button type="submit" className="btn btn-primary btn-full btn-lg" style={{ marginTop: 12, height: 54, fontWeight: 800 }} disabled={loading}>
+                        {loading ? <span className="spinner" /> : 'เข้าสู่ระบบ'}
                     </button>
                 </form>
-                <p className={styles.hint}>เฉพาะผู้ดูแลระบบเท่านั้น</p>
+                <p className={styles.hint}>Internal access only. Restricted for authorized personnel.</p>
             </div>
         </div>
     )

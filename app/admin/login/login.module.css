@@ -3,46 +3,82 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 50%, var(--primary-light) 100%);
+    background: var(--brand-dominant); /* #315EC3 */
     padding: var(--space-6);
+    position: relative;
+    overflow: hidden;
+}
+
+.page::before {
+    content: '';
+    position: absolute;
+    width: 400px;
+    height: 400px;
+    background: var(--brand-accent); /* #A0D9F6 */
+    filter: blur(120px);
+    border-radius: 50%;
+    top: -150px;
+    right: -150px;
+    opacity: 0.4;
+}
+
+.page::after {
+    content: '';
+    position: absolute;
+    width: 350px;
+    height: 350px;
+    background: var(--brand-highlight); /* #F1BFDB */
+    filter: blur(100px);
+    border-radius: 50%;
+    bottom: -100px;
+    left: -100px;
+    opacity: 0.3;
 }
 
 .card {
     background: var(--surface);
-    border-radius: var(--radius-xl);
-    padding: var(--space-10) var(--space-8);
+    border-radius: 40px;
+    padding: var(--space-12) var(--space-10);
     width: 100%;
-    max-width: 400px;
-    box-shadow: var(--shadow-lg);
+    max-width: 440px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
     text-align: center;
+    position: relative;
+    z-index: 2;
+    border: 1px solid rgba(255,255,255,0.1);
 }
 
-.logo {
-    font-size: 3.5rem;
-    margin-bottom: var(--space-2);
+.logoWrapper {
+    margin-bottom: var(--space-6);
+    display: flex;
+    justify-content: center;
 }
 
 .title {
-    font-size: 1.8rem;
-    font-weight: 800;
+    font-size: 2rem;
+    font-weight: 900;
     color: var(--text-primary);
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
 }
 
 .sub {
     color: var(--text-muted);
-    font-size: 0.9rem;
-    margin-bottom: var(--space-8);
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: var(--space-10);
 }
 
 .form {
     display: flex;
     flex-direction: column;
-    gap: var(--space-5);
+    gap: var(--space-4);
     text-align: left;
 }
 
 .hint {
-    margin-top: var(--space-6);
-    font-size: 0.78rem;
+    margin-top: var(--space-8);
+    font-size: 0.8rem;
     color: var(--text-muted);
+    font-weight: 500;
 }

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import styles from './staff-layout.module.css'
+import Logo from '@/components/Branding/Logo'
 import { 
     Home, 
     Calendar, 
@@ -35,10 +36,12 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
         { href: '/staff/settings', icon: Settings, label: 'ตั้งค่า' },
     ]
 
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+
     const handleLogout = () => {
         localStorage.removeItem('staff_token')
         localStorage.removeItem('staff_data')
-        router.replace('/staff/login')
+        window.location.href = '/staff/login'
     }
 
     return (
@@ -46,22 +49,34 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
             {/* Top Bar */}
             <header className={styles.topbar}>
                 <div className={styles.topbarLeft}>
-                    <img 
-                        src="/logo - lanscape.svg" 
-                        alt="Foami" 
-                        style={{ height: 26, width: 'auto' }} 
-                    />
+                    <Logo width={100} variant="landscape" />
                 </div>
                 
                 <div className={styles.topbarRight}>
                     <div className={styles.topbarGreeting}>
                         <span className={styles.topbarName}>สวัสดี, {staffName || 'พนักงาน'}</span>
                     </div>
-                    <button className={styles.logoutBtn} onClick={handleLogout}>
-                        <LogOut size={18} />
+                    <button className={styles.logoutBtn} onClick={() => setShowLogoutConfirm(true)}>
+                        <LogOut size={18} strokeWidth={2.5} />
                     </button>
                 </div>
             </header>
+
+            {showLogoutConfirm && (
+                <div className={styles.logoutOverlay} onClick={() => setShowLogoutConfirm(false)}>
+                    <div className={styles.logoutModal} onClick={e => e.stopPropagation()}>
+                        <div className={styles.logoutIcon}>
+                            <LogOut size={32} />
+                        </div>
+                        <h3>ยืนยันการออกจากระบบ</h3>
+                        <p>คุณต้องการออกจากระบบใช่หรือไม่?</p>
+                        <div className={styles.logoutActions}>
+                            <button className="btn btn-ghost" onClick={() => setShowLogoutConfirm(false)}>ยกเลิก</button>
+                            <button className="btn btn-danger" onClick={handleLogout}>ออกจากระบบ</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <main className={styles.main}>{children}</main>
 
@@ -76,7 +91,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
                             href={item.href}
                             className={`${styles.bottomNavItem} ${isActive ? styles.active : ''}`}
                         >
-                            <Icon size={22} className={styles.bottomNavIcon} />
+                            <Icon size={22} strokeWidth={isActive ? 2.5 : 2} className={styles.bottomNavIcon} />
                             <span>{item.label}</span>
                         </Link>
                     )

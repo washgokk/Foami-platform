@@ -1,11 +1,71 @@
 .header {
-    margin-bottom: var(--space-5);
+    margin-bottom: var(--space-6);
 }
 
 .title {
-    font-size: 1.4rem;
+    font-size: 1.6rem;
+    font-weight: 900;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+}
+
+.date {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.statPill {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-6) var(--space-4);
+    border-radius: 32px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+    border: 1.5px solid transparent;
+    transition: transform 0.2s cubic-bezier(0.19, 1, 0.22, 1);
+    background: var(--surface);
+}
+
+.statPill:hover {
+    transform: translateY(-4px);
+}
+
+.statN {
+    font-size: 2.2rem;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -0.05em;
+}
+
+.statL {
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.8;
+}
+
+.iconBox {
+    background: white;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    margin-bottom: var(--space-1);
+}
+
+.sectionTitle {
+    font-size: 1.05rem;
     font-weight: 800;
     color: var(--text-primary);
+    margin-bottom: var(--space-4);
 }
 
 .marketList {
@@ -15,153 +75,152 @@
     margin-bottom: var(--space-4);
 }
 
-.date {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    margin-top: 2px;
-}
-
-.statsRow {
-    display: flex;
-    gap: var(--space-3);
-    margin-bottom: var(--space-6);
-}
-
-.statPill {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-4);
-    border-radius: var(--radius-lg);
-}
-
-.statN {
-    font-size: 1.6rem;
-    font-weight: 800;
-    line-height: 1;
-}
-
-.statL {
-    font-size: 0.72rem;
-    font-weight: 500;
-    opacity: 0.8;
-}
-
-.sectionTitle {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin-bottom: var(--space-3);
-}
-
 .jobCard {
     display: flex;
     align-items: center;
     gap: var(--space-4);
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: var(--space-4) var(--space-5);
+    border-radius: 28px;
+    padding: var(--space-5);
     margin-bottom: var(--space-3);
     text-decoration: none;
     color: inherit;
-    transition: box-shadow 0.2s, transform 0.2s;
-    border-left: 4px solid var(--border); /* Default */
-}
-
-.jobCardRecommended {
-    border-left-color: #22c55e !important; /* Green */
-}
-
-.jobCardAvailable {
-    border-left-color: #3b82f6 !important; /* Blue */
+    transition: var(--transition);
+    box-shadow: var(--shadow-sm);
 }
 
 .jobCard:hover {
-    box-shadow: var(--shadow);
-    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+    border-color: var(--brand-subordinate);
+}
+
+.jobCardRecommended {
+    border-left: 6px solid var(--brand-dominant);
+}
+
+.jobCardAvailable {
+    border-left: 6px solid var(--brand-subordinate);
 }
 
 .jobTime {
     text-align: center;
-    min-width: 50px;
-    color: var(--primary);
-    font-weight: 700;
+    min-width: 65px;
+    color: var(--brand-dominant);
+    font-weight: 900;
+    border-right: 1px solid var(--border);
+    padding-right: var(--space-3);
 }
 
 .jobDate {
-    font-size: 0.72rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
     display: block;
+    font-weight: 600;
+    margin-top: 2px;
 }
 
 .jobBody {
     flex: 1;
+    padding-left: var(--space-1);
 }
 
 .jobCustomer {
-    font-weight: 700;
-    font-size: 0.95rem;
+    font-weight: 800;
+    font-size: 1.05rem;
+    color: var(--text-primary);
 }
 
 .jobDetail {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     color: var(--text-muted);
     margin-top: 2px;
+    font-weight: 500;
 }
 
 /* Modal Styles */
 .modalOverlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(4px);
+    inset: 0;
+    background: rgba(15, 23, 42, 0.6); /* Darker, modern slate overlay */
+    backdrop-filter: blur(12px);
     display: flex;
-    align-items: center;
+    align-items: center; /* Center vertically for all screens */
     justify-content: center;
-    z-index: 1000;
-    padding: var(--space-4);
+    z-index: 2000;
+    animation: fadeIn 0.3s ease;
+}
+
+@media (min-width: 768px) {
+    .modalOverlay {
+        padding: var(--space-6);
+    }
 }
 
 .modalContent {
     background: var(--surface);
-    width: 100%;
-    max-width: 320px;
-    border-radius: var(--radius-xl);
-    padding: var(--space-6);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    width: 90%; /* Margin for mobile */
+    max-width: 500px;
+    border-radius: 48px; /* Fully rounded for centered modal */
+    padding: var(--space-10) var(--space-8) calc(var(--space-10) + 20px);
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.15);
     text-align: center;
+    border: none;
+    animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (min-width: 768px) {
+    .modalContent {
+        border-radius: 48px;
+        padding: var(--space-12) var(--space-10);
+        box-shadow: 0 30px 60px rgba(0,0,0,0.25);
+    }
+}
+
+@keyframes modalPop {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
 }
 
 .modalTitle {
-    font-size: 1.1rem;
-    font-weight: 800;
-    margin-bottom: var(--space-2);
+    font-size: 1.35rem;
+    font-weight: 900;
+    margin-bottom: var(--space-3);
+    color: var(--text-primary);
 }
 
 .modalDesc {
-    font-size: 0.88rem;
-    color: var(--text-muted);
-    margin-bottom: var(--space-6);
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-8);
+    line-height: 1.5;
 }
 
 .modalActions {
     display: flex;
-    gap: var(--space-3);
+    gap: var(--space-4);
 }
 
 .dateHeader {
     font-size: 0.85rem;
     font-weight: 800;
-    color: var(--primary);
-    background: var(--primary-ghost);
-    padding: 6px 12px;
-    border-radius: var(--radius-full);
+    color: var(--brand-dominant);
+    background: var(--brand-subordinate-ghost);
+    padding: 8px 16px;
+    border-radius: 12px;
     display: inline-block;
     margin-bottom: var(--space-3);
-    margin-top: var(--space-2);
+    margin-top: var(--space-4);
+    border: 1px solid var(--brand-subordinate);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
 }

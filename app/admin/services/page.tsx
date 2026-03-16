@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Service, ServiceAddon, Branch, VEHICLE_SIZE_LABEL, CCPriceGroup } from '@/lib/types'
 import ImageUpload from '@/components/ImageUpload'
-import { Plus, Trash2, Edit2, Check, X as XIcon, ChevronDown, CheckSquare, Square } from 'lucide-react'
+import { Plus, Trash2, Edit2, Check, X as XIcon, ChevronDown, CheckSquare, Square, Wrench, Package, TrendingUp } from 'lucide-react'
 import styles from './services.module.css'
 
 type Tab = 'services' | 'addons' | 'groups'
@@ -313,7 +313,7 @@ export default function ServicesPage() {
         <div style={{ paddingBottom: 60 }}>
             <div className="page-header animate-fade">
                 <div>
-                    <h1 className="page-title">🛁 บริการ & ราคา</h1>
+                    <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Wrench size={28} color="var(--brand-dominant)" /> บริการ & ราคา</h1>
                     <p className="page-subtitle">จัดการแพ็กเกจ บริการเสริม และส่วนต่างราคาตามสาขา</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => {
@@ -326,9 +326,9 @@ export default function ServicesPage() {
             </div>
 
             <div className={styles.tabs} style={{ marginBottom: 24 }}>
-                <button className={`${styles.tab} ${tab === 'services' ? styles.tabActive : ''}`} onClick={() => setTab('services')}>🛁 แพ็กเกจหลัก</button>
-                <button className={`${styles.tab} ${tab === 'addons' ? styles.tabActive : ''}`} onClick={() => setTab('addons')}>⭐ บริการเสริม</button>
-                <button className={`${styles.tab} ${tab === 'groups' ? styles.tabActive : ''}`} onClick={() => setTab('groups')}>💰 กลุ่มราคาตาม CC</button>
+                <button className={`${styles.tab} ${tab === 'services' ? styles.tabActive : ''}`} onClick={() => setTab('services')}><Package size={18} /> แพ็กเกจหลัก</button>
+                <button className={`${styles.tab} ${tab === 'addons' ? styles.tabActive : ''}`} onClick={() => setTab('addons')}><Plus size={18} /> บริการเสริม</button>
+                <button className={`${styles.tab} ${tab === 'groups' ? styles.tabActive : ''}`} onClick={() => setTab('groups')}><TrendingUp size={18} /> กลุ่มราคาตาม CC</button>
             </div>
 
             {loading ? <div className="empty-state animate-fade"><div className="spinner" /></div> : (
@@ -339,7 +339,7 @@ export default function ServicesPage() {
                                 <thead><tr><th>บริการ</th><th>คำอธิบาย</th><th>ราคาเริ่มต้น</th><th>บริการเสริม</th><th>สถานะ</th><th></th></tr></thead>
                                 <tbody>
                                     {services.length === 0 ? (
-                                        <tr><td colSpan={6}><div className="empty-state"><span className="empty-state-icon">🛁</span><p className="empty-state-title">ยังไม่มีบริการ</p></div></td></tr>
+                                        <tr><td colSpan={6}><div className="empty-state"><Package size={48} color="var(--text-muted)" /><p className="empty-state-title">ยังไม่มีบริการ</p></div></td></tr>
                                     ) : services.map(s => {
                                         const descParts = s.description.split('\n[Addons: ')
                                         const desc = descParts[0]
@@ -361,7 +361,7 @@ export default function ServicesPage() {
                                                 </td>
                                                 <td>
                                                     <div style={{ display: 'flex', gap: 8 }}>
-                                                        <button className="btn btn-outline btn-sm" onClick={() => openSvcModal(s)}>✏️</button>
+                                                        <button className="btn btn-outline btn-sm" onClick={() => openSvcModal(s)}><Edit2 size={16} /></button>
                                                         <button className="btn btn-ghost btn-sm" onClick={() => deleteSvc(s.id)}><Trash2 size={16} /></button>
                                                     </div>
                                                 </td>
@@ -379,7 +379,7 @@ export default function ServicesPage() {
                                 <thead><tr><th>บริการเสริม</th><th>คำอธิบาย</th><th>ราคา</th><th>สถานะ</th><th></th></tr></thead>
                                 <tbody>
                                     {addons.length === 0 ? (
-                                        <tr><td colSpan={5}><div className="empty-state"><span className="empty-state-icon">⭐</span><p className="empty-state-title">ยังไม่มีบริการเสริม</p></div></td></tr>
+                                        <tr><td colSpan={5}><div className="empty-state"><Plus size={48} color="var(--text-muted)" /><p className="empty-state-title">ยังไม่มีบริการเสริม</p></div></td></tr>
                                     ) : addons.map(a => (
                                         <tr key={a.id}>
                                             <td><strong>{a.name}</strong></td>
@@ -396,7 +396,7 @@ export default function ServicesPage() {
                                             </td>
                                             <td>
                                                 <div style={{ display: 'flex', gap: 8 }}>
-                                                    <button className="btn btn-outline btn-sm" onClick={() => openAddonModal(a)}>✏️</button>
+                                                    <button className="btn btn-outline btn-sm" onClick={() => openAddonModal(a)}><Edit2 size={16} /></button>
                                                     <button className="btn btn-ghost btn-sm" onClick={() => deleteAddon(a.id)}><Trash2 size={16} /></button>
                                                 </div>
                                             </td>
@@ -413,7 +413,7 @@ export default function ServicesPage() {
                                 <thead><tr><th>ชื่อกลุ่ม</th><th>สาขาที่ใช้</th><th>แพ็กเกจที่ใช้</th><th>ราคา (S/M/L)</th><th>สถานะ</th><th></th></tr></thead>
                                 <tbody>
                                     {priceGroups.length === 0 ? (
-                                        <tr><td colSpan={5}><div className="empty-state"><span className="empty-state-icon">💰</span><p className="empty-state-title">ยังไม่มีกลุ่มราคา</p></div></td></tr>
+                                        <tr><td colSpan={5}><div className="empty-state"><TrendingUp size={48} color="var(--text-muted)" /><p className="empty-state-title">ยังไม่มีกลุ่มราคา</p></div></td></tr>
                                     ) : priceGroups.map(pg => {
                                         const groupBrs = branches.filter(b => pg.branch_ids?.includes(b.id))
                                         const groupSvcs = services.filter(s => pg.service_ids?.includes(s.id))
@@ -449,7 +449,7 @@ export default function ServicesPage() {
                                                 </td>
                                                 <td>
                                                     <div style={{ display: 'flex', gap: 8 }}>
-                                                        <button className="btn btn-outline btn-sm" onClick={() => openGroupModal(pg)}>✏️</button>
+                                                        <button className="btn btn-outline btn-sm" onClick={() => openGroupModal(pg)}><Edit2 size={16} /></button>
                                                         <button className="btn btn-ghost btn-sm" onClick={() => deleteGroup(pg.id)}><Trash2 size={16} /></button>
                                                     </div>
                                                 </td>

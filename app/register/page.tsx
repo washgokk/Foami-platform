@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { generateScalableId } from '@/lib/id-utils'
 import { useLiff } from '@/components/Providers/LiffProvider'
-import { ChevronLeft, ChevronRight, CheckCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CheckCircle, User, Bike } from 'lucide-react'
+import Logo from '@/components/Branding/Logo'
 import styles from './register.module.css'
 
 const VEHICLE_SIZES = [
@@ -129,18 +130,28 @@ export default function GlobalRegisterPage() {
         <div className={styles.page}>
             <div className={styles.header}>
                 <div className={styles.logo}>
-                    <img src="/logo - lanscape.svg" alt="Foami" />
+                    <Logo width={140} />
                 </div>
                 <h1 className={styles.title}>สมัครใช้บริการ Foami</h1>
                 <p className={styles.sub}>กรอกข้อมูลครั้งเดียว ใช้ได้ตลอด</p>
             </div>
 
             <div className={styles.stepDots}>
-                <div className={`${styles.dot} ${step >= 1 ? styles.active : ''}`} />
+                <div className={`${styles.dot} ${step >= 1 ? styles.active : ''}`}>
+                    <User size={14} />
+                </div>
                 <div className={styles.line} />
-                <div className={`${styles.dot} ${step >= 2 ? styles.active : ''}`} />
+                <div className={`${styles.dot} ${step >= 2 ? styles.active : ''}`}>
+                    <Bike size={14} />
+                </div>
             </div>
-            <p className={styles.stepLabel}>{step === 1 ? '1. ข้อมูลส่วนตัว' : '2. ข้อมูลรถ'}</p>
+            <p className={styles.stepLabel}>
+                {step === 1 ? (
+                    <><User size={14} style={{ marginRight: 4 }} /> 1. ข้อมูลส่วนตัว</>
+                ) : (
+                    <><Bike size={14} style={{ marginRight: 4 }} /> 2. ข้อมูลรถ</>
+                )}
+            </p>
 
             <form onSubmit={handleSubmit} className={styles.form}>
                 {step === 1 ? (

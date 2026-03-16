@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { Zone, Branch } from '@/lib/types'
+import { Map, Plus, Edit2, Trash2, ArrowLeft, CheckCircle, AlertCircle, Save, MousePointer2, MapPin } from 'lucide-react'
 
 // Distinct colors for each zone
 const ZONE_COLORS = ['#3B5FCC', '#16A34A', '#D97706', '#DC2626', '#7C3AED', '#0891B2', '#DB2777', '#059669']
@@ -82,25 +83,31 @@ export default function ZonesPage() {
         <div className="animate-fade">
             <div className="page-header">
                 <div>
-                    <Link href="/admin/branches" style={{ color: 'var(--primary)', fontSize: '0.88rem' }}>← กลับ</Link>
-                    <h1 className="page-title">🗺️ โซนบริการ — {branch?.name}</h1>
+                    <Link href="/admin/branches" style={{ color: 'var(--brand-dominant)', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
+                        <ArrowLeft size={16} /> กลับไปยังสาขา
+                    </Link>
+                    <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <Map size={28} color="var(--brand-dominant)" /> โซนบริการ — {branch?.name}
+                    </h1>
                     <p className="page-subtitle">แต่ละโซนแสดงเป็นสีต่างกันบนแผนที่ · นอกโซน = 10 บาท/กม.</p>
                 </div>
                 {createMode === 'idle' && !redrawZone && (
-                    <button className="btn btn-primary" onClick={() => setCreateMode('naming')}>+ เพิ่มโซน</button>
+                    <button className="btn btn-primary" style={{ borderRadius: 12, gap: 8 }} onClick={() => setCreateMode('naming')}>
+                        <Plus size={18} /> เพิ่มโซน
+                    </button>
                 )}
             </div>
 
             {/* ─── Step 1: Name + Description form (shown before drawing) ─── */}
             {createMode === 'naming' && (
                 <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-6)', border: '2px solid var(--primary)', marginBottom: 'var(--space-6)' }}>
-                    <h3 style={{ fontWeight: 700, marginBottom: 'var(--space-4)', color: 'var(--primary)' }}>
-                        📝 ขั้นตอนที่ 1/2 — ตั้งชื่อโซน
+                    <h3 style={{ fontWeight: 700, marginBottom: 'var(--space-4)', color: 'var(--brand-dominant)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Edit2 size={20} /> ขั้นตอนที่ 1: ตั้งชื่อและคำอธิบาย
                     </h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                        <input className="form-input" placeholder="ชื่อโซน (เช่น หลังมอ, กังสดาล) *" value={newName}
+                        <input className="form-input" style={{ borderRadius: 12 }} placeholder="ชื่อโซน (เช่น หลังมอ, กังสดาล) *" value={newName}
                             onChange={e => setNewName(e.target.value)} autoFocus />
-                        <input className="form-input" placeholder="คำอธิบาย (ไม่บังคับ)" value={newDesc}
+                        <input className="form-input" style={{ borderRadius: 12 }} placeholder="คำอธิบาย (ไม่บังคับ)" value={newDesc}
                             onChange={e => setNewDesc(e.target.value)} />
                     </div>
                     <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
@@ -118,7 +125,7 @@ export default function ZonesPage() {
                     center={branchCenter}
                     zones={zones}
                     editingZoneId={redrawZone?.id}
-                    title={redrawZone ? `✏️ วาดกรอบใหม่: ${redrawZone.name}` : `🖊️ ขั้นตอนที่ 2/2 — วาดกรอบโซน: "${newName}"`}
+                    title={redrawZone ? <><Edit2 size={18} /> วาดกรอบใหม่: {redrawZone.name}</> : <><Map size={18} /> วาดกรอบโซน: "{newName}"</>}
                     accentColor={redrawZone
                         ? (zones.find(z => z.id === redrawZone.id) as any)?.color || ZONE_COLORS[0]
                         : ZONE_COLORS[zones.length % ZONE_COLORS.length]}
@@ -152,8 +159,10 @@ export default function ZonesPage() {
                 <div style={{ marginTop: 'var(--space-6)' }}>
                     {zones.length === 0 ? (
                         <div className="empty-state">
-                            <span className="empty-state-icon">🗺️</span>
-                            <p className="empty-state-title">ยังไม่มีโซน</p>
+                            <div style={{ background: 'var(--surface-2)', width: 64, height: 64, borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: 'var(--text-muted)' }}>
+                                <Map size={32} />
+                            </div>
+                            <p className="empty-state-title" style={{ fontWeight: 800 }}>ยังไม่มีโซน</p>
                             <p className="empty-state-subtitle">กดปุ่ม + เพิ่มโซน เพื่อเริ่มต้น</p>
                         </div>
                     ) : (
@@ -182,23 +191,25 @@ export default function ZonesPage() {
                                                 </td>
                                                 <td>
                                                     {z.polygon_coords?.length >= 3
-                                                        ? <span className="badge badge-completed">{z.polygon_coords.length} จุด ✅</span>
-                                                        : <span className="badge badge-cancelled">ยังไม่มีกรอบ</span>
+                                                        ? <span className="badge" style={{ background: 'var(--success-ghost)', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 4, width: 'fit-content' }}><CheckCircle size={12} /> {z.polygon_coords.length} จุด</span>
+                                                        : <span className="badge" style={{ background: 'var(--danger-ghost)', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 4, width: 'fit-content' }}><AlertCircle size={12} /> ยังไม่มีกรอบ</span>
                                                     }
                                                 </td>
                                                 <td>
                                                     <button onClick={() => toggleActive(z)}
-                                                        className={`badge ${z.is_active ? 'badge-completed' : 'badge-cancelled'}`}
-                                                        style={{ border: 'none', cursor: 'pointer' }}>
-                                                        {z.is_active ? '✅ เปิด' : '⛔ ปิด'}
+                                                        className="badge"
+                                                        style={{ border: 'none', cursor: 'pointer', background: z.is_active ? 'var(--success-ghost)' : 'var(--danger-ghost)', color: z.is_active ? 'var(--success)' : 'var(--danger)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                        {z.is_active ? <><CheckCircle size={12} /> เปิด</> : <><AlertCircle size={12} /> ปิด</>}
                                                     </button>
                                                 </td>
                                                 <td>
                                                     <div style={{ display: 'flex', gap: 6 }}>
-                                                        <button className="btn btn-ghost btn-sm" onClick={() => setRedrawZone(z)}>
-                                                            🖊️ วาดกรอบ
+                                                        <button className="btn btn-ghost btn-sm" style={{ gap: 4 }} onClick={() => setRedrawZone(z)}>
+                                                            <Edit2 size={14} /> วาดกรอบ
                                                         </button>
-                                                        <button className="btn btn-danger btn-sm" onClick={() => deleteZone(z.id)}>🗑️</button>
+                                                        <button className="btn btn-outline btn-sm" style={{ color: 'var(--danger)', border: 'none' }} onClick={() => deleteZone(z.id)}>
+                                                            <Trash2 size={14} />
+                                                        </button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -281,9 +292,11 @@ function ZoneOverviewMap({ center, zones, onRedraw }: {
     }, [zones, mapReady])
 
     return (
-        <div style={{ marginBottom: 'var(--space-6)', borderRadius: 'var(--radius-xl)', overflow: 'hidden', border: '1px solid var(--border)' }}>
-            <div style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface)' }}>
-                <span style={{ fontWeight: 700 }}>🗺️ แผนที่โซนบริการทั้งหมด</span>
+        <div style={{ marginBottom: 'var(--space-6)', borderRadius: 'var(--radius-xl)', overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--surface)' }}>
+            <div style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Map size={18} color="var(--brand-dominant)" /> แผนที่โซนบริการทั้งหมด
+                </span>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {zones.map((z, idx) => (
                         <span key={z.id} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.78rem', fontWeight: 600 }}>
@@ -297,8 +310,8 @@ function ZoneOverviewMap({ center, zones, onRedraw }: {
                 <div ref={mapRef} style={{ width: '100%', height: 340 }} />
             </div>
             {zones.filter(z => !z.polygon_coords?.length || z.polygon_coords.length < 3).length > 0 && (
-                <div style={{ padding: 'var(--space-3) var(--space-5)', background: '#FFFBEB', fontSize: '0.82rem', color: '#92400E', borderTop: '1px solid #FDE68A' }}>
-                    ⚠️ โซนที่ยังไม่มีกรอบ: {zones.filter(z => !z.polygon_coords?.length || z.polygon_coords.length < 3).map(z => z.name).join(', ')} — กด 🖊️ วาดกรอบ ในตารางด้านล่าง
+                <div style={{ padding: 'var(--space-3) var(--space-5)', background: '#FFFBEB', fontSize: '0.82rem', color: '#92400E', borderTop: '1px solid #FDE68A', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <AlertCircle size={14} /> โซนที่ยังไม่มีกรอบ: {zones.filter(z => !z.polygon_coords?.length || z.polygon_coords.length < 3).map(z => z.name).join(', ')} — กด <Edit2 size={12} style={{ display: 'inline' }} /> วาดกรอบ ในตารางด้านล่าง
                 </div>
             )}
         </div>
@@ -308,7 +321,7 @@ function ZoneOverviewMap({ center, zones, onRedraw }: {
 // ─── Draw Map Component ──────────────────────────────────────────────────────
 function ZoneDrawMap({ center, zones, editingZoneId, title, accentColor, existingCoords, saving, onSave, onCancel }: {
     center: [number, number]; zones: Zone[]; editingZoneId?: string
-    title: string; accentColor: string
+    title: React.ReactNode; accentColor: string
     existingCoords: [number, number][]
     saving: boolean
     onSave: (coords: [number, number][]) => void
@@ -392,10 +405,10 @@ function ZoneDrawMap({ center, zones, editingZoneId, title, accentColor, existin
         <div style={{ marginBottom: 'var(--space-6)', borderRadius: 'var(--radius-xl)', overflow: 'hidden', border: `2px solid ${accentColor}` }}>
             <div style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--border)', background: `${accentColor}12`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
                 <span style={{ fontWeight: 700, color: accentColor }}>{title}</span>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                    <span>📌 คลิกซ้าย = เพิ่มจุด</span>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><MapPin size={14} /> คลิกซ้าย = เพิ่มจุด</span>
                     <span>·</span>
-                    <span>🖱️ คลิกขวา = ลบจุดล่าสุด</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><MousePointer2 size={14} /> คลิกขวา = ลบจุดล่าสุด</span>
                     <span style={{ fontWeight: 700, color: accentColor, background: `${accentColor}18`, padding: '2px 10px', borderRadius: 'var(--radius-full)' }}>
                         {points.length} จุด
                     </span>
@@ -405,12 +418,12 @@ function ZoneDrawMap({ center, zones, editingZoneId, title, accentColor, existin
                 <div ref={mapRef} style={{ width: '100%', height: 420, cursor: 'crosshair' }} />
             </div>
             <div style={{ padding: 'var(--space-4)', display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end', background: 'var(--surface-2)', borderTop: '1px solid var(--border)' }}>
-                <button className="btn btn-ghost btn-sm" onClick={clearAll}>🗑️ ล้างจุดทั้งหมด</button>
+                <button className="btn btn-ghost btn-sm" style={{ gap: 4 }} onClick={clearAll}><Trash2 size={14} /> ล้างจุดทั้งหมด</button>
                 <button className="btn btn-ghost btn-sm" onClick={onCancel}>ยกเลิก</button>
-                <button className="btn btn-primary btn-sm" style={{ background: accentColor, borderColor: accentColor }}
+                <button className="btn btn-primary btn-sm" style={{ background: accentColor, borderColor: accentColor, borderRadius: 10, gap: 8 }}
                     disabled={points.length < 3 || saving}
                     onClick={() => onSave(points)}>
-                    {saving ? <span className="spinner" /> : `💾 บันทึกกรอบ (${points.length} จุด)`}
+                    {saving ? <span className="spinner" /> : <><Save size={16} /> บันทึกกรอบ ({points.length} จุด)</>}
                 </button>
             </div>
         </div>

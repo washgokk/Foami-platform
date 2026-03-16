@@ -8,19 +8,20 @@
 
 /* Header */
 .header {
-    background: #f0f7ff;
+    background: linear-gradient(180deg, var(--accent-blue-ghost) 0%, #fff 100%);
     padding: var(--space-8) var(--space-6) var(--space-10);
     position: relative;
     border-radius: 0 0 42px 42px;
-    box-shadow: 0 4px 15px rgba(59, 95, 204, 0.04);
+    box-shadow: 0 4px 20px rgba(49, 94, 195, 0.04);
 }
 
 .brandRow {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
+    justify-content: center;
+    position: relative;
     margin-bottom: var(--space-6);
+    min-height: 44px;
 }
 
 .brandLogo {
@@ -29,19 +30,22 @@
 }
 
 .branchSelector {
+    position: absolute;
+    right: 0;
     background: #fff;
     border: 2.5px solid var(--border);
-    padding: 8px 14px;
-    border-radius: 16px;
-    font-size: 0.75rem;
+    padding: 6px 12px;
+    border-radius: 14px;
+    font-size: 0.7rem;
     font-weight: 700;
     color: var(--primary);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     text-decoration: none;
     box-shadow: var(--shadow-sm);
     transition: all 0.2s ease;
+    white-space: nowrap;
 }
 
 .branchSelector:hover {
@@ -107,8 +111,8 @@
 
 .menuCard:hover {
     transform: translateY(-4px);
-    border-color: var(--primary-light);
-    box-shadow: 0 12px 30px rgba(59, 95, 204, 0.1);
+    border-color: var(--brand-dominant);
+    box-shadow: var(--shadow-md);
 }
 
 .menuIcon {
@@ -122,18 +126,19 @@
 }
 
 .iconBook {
-    background: #eef2ff;
-    color: #4f46e5;
+    background: var(--brand-dominant);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(49, 94, 195, 0.2);
 }
 
 .iconHistory {
-    background: #f0fdf4;
-    color: #16a34a;
+    background: var(--brand-subordinate);
+    color: #fff;
 }
 
 .iconSettings {
-    background: #fff1f2;
-    color: #e11d48;
+    background: var(--brand-accent);
+    color: #fff;
 }
 
 .menuTitle {

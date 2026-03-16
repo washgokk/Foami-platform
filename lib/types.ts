@@ -35,7 +35,7 @@ export const FOAMI_PACKAGES: FoamiPackage[] = [
         name: 'ล้างรถ',
         description: 'ล้างทำความสะอาดภายนอกทั้งคัน ขัดสีเบื้องต้น',
         price: 169,
-        icon: '🚿',
+        icon: 'droplets',
         color: '#3B5FCC',
         availableAddons: ['air', 'fuel'],
     },
@@ -44,7 +44,7 @@ export const FOAMI_PACKAGES: FoamiPackage[] = [
         name: 'ล้าง+เคลือบเงา',
         description: 'ล้างทำความสะอาด พร้อมเคลือบเงาสีให้รถดูใหม่',
         price: 189,
-        icon: '✨',
+        icon: 'sparkles',
         color: '#7C3AED',
         availableAddons: ['air', 'fuel'],
     },
@@ -53,7 +53,7 @@ export const FOAMI_PACKAGES: FoamiPackage[] = [
         name: 'บำรุงรักษา',
         description: 'บริการดูแลรักษารถ เปลี่ยนน้ำมัน ตรวจเช็คระบบ',
         price: 30,
-        icon: '🔧',
+        icon: 'wrench',
         color: '#D97706',
         availableAddons: ['air', 'fuel', 'oil_change', 'brake_fluid', 'gear_oil'],
     },
@@ -340,6 +340,8 @@ export interface Payout {
     status: 'completed'
     notes?: string
     created_at: string
+    // Joins
+    staff?: Staff
 }
 
 export const THAI_BANKS = [

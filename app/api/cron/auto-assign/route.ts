@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
+import { sendPushNotification } from '@/lib/push'
 
 // Cron: Called every 15 min via Vercel Cron or external scheduler
 // Auto-assign staff to bookings that are 2 hours away with no staff
@@ -75,6 +76,15 @@ export async function GET(req: NextRequest) {
                 })
             } catch { /* Non-critical */ }
         }
+
+        // Send Web Push notification
+        try {
+            await sendPushNotification(picked.staff_id, 'staff', {
+                title: '🚨 งานถูกมอบหมายอัตโนมัติ!',
+                body: `ได้รับงานวันที่ ${booking.scheduled_date} เวลา ${booking.scheduled_time} แล้ว\nกดเพื่อดูรายละเอียดงานเลย`,
+                url: `/staff`
+            })
+        } catch { /* Non-critical */ }
 
         assigned++
     }

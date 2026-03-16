@@ -4,6 +4,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase'
 import { Branch, Zone } from '@/lib/types'
+import { Store, Map as MapIcon, List, Plus, MapPin, Copy, Edit3, Pause, Play, Trash2, Globe, Phone, Clock, ArrowRight, Coins, Fuel as GasStation, Wrench, Settings } from 'lucide-react'
 import styles from './branches.module.css'
 
 const BranchMapPicker = dynamic(() => import('./BranchMapPicker'), { ssr: false })
@@ -146,15 +147,31 @@ export default function BranchesPage() {
         <div>
             <div className="page-header animate-fade">
                 <div>
-                    <h1 className="page-title">🏪 จัดการสาขา</h1>
-                    <p className="page-subtitle">สาขาทั้งหมด {branches.length} สาขา</p>
+                    <h2 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <Store size={28} style={{ color: 'var(--brand-dominant)' }} /> จัดการสาขา
+                    </h2>
+                    <p className="page-subtitle">จัดการตำแหน่งและพื้นที่ให้บริการทั้งหมด {branches.length} แห่ง</p>
                 </div>
                 <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-                    <div className="btn-group" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', display: 'flex', overflow: 'hidden' }}>
-                        <button className={`btn btn-sm ${viewMode === 'list' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setViewMode('list')} style={{ borderRadius: 0, padding: '4px 12px' }}>📋 รายการ</button>
-                        <button className={`btn btn-sm ${viewMode === 'map' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setViewMode('map')} style={{ borderRadius: 0, padding: '4px 12px' }}>🗺️ แผนที่โซน</button>
+                    <div className="btn-group" style={{ background: 'var(--surface-2)', padding: 4, borderRadius: '12px', display: 'flex' }}>
+                        <button 
+                            className={`btn btn-sm ${viewMode === 'list' ? 'btn-primary' : 'btn-ghost'}`} 
+                            onClick={() => setViewMode('list')} 
+                            style={{ borderRadius: '8px', padding: '6px 16px', background: viewMode === 'list' ? 'var(--brand-dominant)' : 'transparent', color: viewMode === 'list' ? 'white' : 'var(--text-muted)' }}
+                        >
+                            <List size={16} /> รายการ
+                        </button>
+                        <button 
+                            className={`btn btn-sm ${viewMode === 'map' ? 'btn-primary' : 'btn-ghost'}`} 
+                            onClick={() => setViewMode('map')} 
+                            style={{ borderRadius: '8px', padding: '6px 16px', background: viewMode === 'map' ? 'var(--brand-dominant)' : 'transparent', color: viewMode === 'map' ? 'white' : 'var(--text-muted)' }}
+                        >
+                            <MapIcon size={16} /> แผนที่โซน
+                        </button>
                     </div>
-                    <button className="btn btn-primary" onClick={openAdd}>+ เพิ่มสาขา</button>
+                    <button className="btn btn-primary" style={{ borderRadius: '12px', gap: 8 }} onClick={openAdd}>
+                        <Plus size={20} /> เพิ่มสาขา
+                    </button>
                 </div>
             </div>
 
@@ -168,9 +185,11 @@ export default function BranchesPage() {
                 </div>
             ) : branches.length === 0 ? (
                 <div className="empty-state animate-fade">
-                    <span className="empty-state-icon">🏪</span>
-                    <p className="empty-state-title">ยังไม่มีสาขา</p>
-                    <button className="btn btn-primary" onClick={openAdd}>เพิ่มสาขาแรก</button>
+                    <div style={{ background: 'var(--surface-2)', width: 80, height: 80, borderRadius: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: 'var(--text-muted)' }}>
+                        <Store size={40} />
+                    </div>
+                    <p className="empty-state-title" style={{ fontWeight: 800 }}>ยังไม่มีสาขาที่เปิดให้บริการ</p>
+                    <button className="btn btn-primary" style={{ marginTop: 12, borderRadius: 12 }} onClick={openAdd}>เพิ่มสาขาแรก</button>
                 </div>
             ) : (
                 <div className={`${styles.grid} animate-fade`}>
@@ -179,32 +198,42 @@ export default function BranchesPage() {
                             <div className={styles.cardTop}>
                                 <div>
                                     <h3 className={styles.branchName}>{b.name}</h3>
-                                    <p className={styles.branchAddr}>📍 {b.address}</p>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                                        <code style={{ background: 'var(--surface-2)', padding: '2px 6px', borderRadius: 4, fontSize: '0.75rem' }}>/{b.slug || 'no-slug'}</code>
-                                        <button className="btn btn-ghost btn-xs" onClick={() => {
+                                    <p className={styles.branchAddr}>
+                                        <MapPin size={14} style={{ color: 'var(--brand-dominant)', marginRight: 4, display: 'inline' }} /> {b.address}
+                                    </p>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
+                                        <code style={{ background: 'var(--brand-dominant-ghost)', color: 'var(--brand-dominant)', padding: '4px 8px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 700 }}>/{b.slug || 'no-slug'}</code>
+                                        <button className="btn btn-ghost btn-xs" style={{ borderRadius: 6, gap: 4 }} onClick={() => {
                                             const url = `${window.location.origin}/${b.slug}`;
                                             navigator.clipboard.writeText(url);
                                             alert('คัดลอกลิงก์สาขาแล้ว: ' + url);
-                                        }}>📋 คัดลอกลิงก์แชร์</button>
+                                        }}>
+                                            <Copy size={12} /> คัดลอกลิงก์แชร์
+                                        </button>
                                     </div>
                                     {b.lat && b.lng && (
-                                        <p className={styles.branchCoords} style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                                            🗺️ {b.lat.toFixed(4)}, {b.lng.toFixed(4)}
+                                        <p className={styles.branchCoords} style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                            <MapIcon size={12} /> {b.lat.toFixed(4)}, {b.lng.toFixed(4)}
                                         </p>
                                     )}
                                 </div>
-                                <span className={`badge ${b.is_active ? 'badge-completed' : 'badge-cancelled'}`}>
-                                    {b.is_active ? 'เปิด' : 'ปิด'}
+                                <span className={`badge ${b.is_active ? 'badge-completed' : 'badge-cancelled'}`} style={{ borderRadius: 8, padding: '4px 10px', fontSize: '0.75rem' }}>
+                                    {b.is_active ? 'เปิดให้บริการ' : 'ปิดชั่วคราว'}
                                 </span>
                             </div>
-                            <div className={styles.cardActions}>
-                                <Link href={`/admin/branches/${b.id}/zones`} className="btn btn-ghost btn-sm">🗺️ โซน</Link>
-                                <button className="btn btn-outline btn-sm" onClick={() => openEdit(b)}>✏️ แก้ไข</button>
-                                <button className="btn btn-ghost btn-sm" onClick={() => toggleActive(b)}>
-                                    {b.is_active ? '⏸️ ปิด' : '▶️ เปิด'}
+                            <div className={styles.cardActions} style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+                                <Link href={`/admin/branches/${b.id}/zones`} className="btn btn-ghost btn-sm" style={{ borderRadius: 8, gap: 6 }}>
+                                    <MapIcon size={14} /> โซน
+                                </Link>
+                                <button className="btn btn-outline btn-sm" style={{ borderRadius: 8, gap: 6 }} onClick={() => openEdit(b)}>
+                                    <Edit3 size={14} /> แก้ไข
                                 </button>
-                                <button className="btn btn-danger btn-sm" onClick={() => deleteBranch(b.id)}>🗑️</button>
+                                <button className="btn btn-ghost btn-sm" style={{ borderRadius: 8, gap: 6 }} onClick={() => toggleActive(b)}>
+                                    {b.is_active ? <><Pause size={14} /> ปิด</> : <><Play size={14} /> เปิด</>}
+                                </button>
+                                <button className="btn btn-danger btn-sm" style={{ borderRadius: 8, width: 32, height: 32, padding: 0 }} onClick={() => deleteBranch(b.id)}>
+                                    <Trash2 size={14} />
+                                </button>
                             </div>
                         </div>
                     ))}
@@ -215,8 +244,8 @@ export default function BranchesPage() {
             {showModal && (
                 <div className="overlay" onClick={() => setShowModal(false)}>
                     <div className="modal" style={{ maxWidth: 600, width: '95vw' }} onClick={e => e.stopPropagation()}>
-                        <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 'var(--space-5)' }}>
-                            {editing ? '✏️ แก้ไขสาขา' : '+ เพิ่มสาขา'}
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: 12, color: 'var(--brand-dominant)' }}>
+                            {editing ? <><Edit3 size={24} /> แก้ไขสาขา</> : <><Plus size={24} /> เพิ่มสาขาใหม่</>}
                         </h2>
                         <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                             <div className="form-group">
@@ -239,9 +268,11 @@ export default function BranchesPage() {
 
                             {/* Map picker */}
                             <div className="form-group">
-                                <label className="form-label">📍 ปักหมุดตำแหน่งสาขาบนแผนที่</label>
-                                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 8 }}>
-                                    คลิกบนแผนที่ หรือลากหมุดเพื่อเลือกตำแหน่ง
+                                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <MapPin size={16} /> ตำแหน่งสาขาบนแผนที่ *
+                                </label>
+                                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 12 }}>
+                                    คลิกบนแผนที่ หรือลากหมุดเพื่อเลือกตำแหน่งที่ตั้งของสาขา
                                 </p>
                                 <BranchMapPicker
                                     lat={form.lat} lng={form.lng}
@@ -288,8 +319,10 @@ export default function BranchesPage() {
                             </div>
 
                             {/* Out of Zone Settings */}
-                            <div style={{ background: 'var(--surface-2)', padding: 'var(--space-4)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', marginTop: 'var(--space-2)' }}>
-                                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: 'var(--space-3)' }}>🏍️ การคิดค่าบริการนอกโซน</h3>
+                            <div style={{ background: 'var(--surface-2)', padding: 'var(--space-5)', borderRadius: '16px', border: '1px solid var(--border)', marginTop: 'var(--space-2)' }}>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 10, color: 'var(--brand-dominant)' }}>
+                                    <GasStation size={20} /> การคิดค่าบริการนอกโซน
+                                </h3>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 'var(--space-3)' }}>
                                     <div className="form-group">
                                         <label className="form-label">รูปแบบการคิดเงิน</label>
@@ -305,8 +338,10 @@ export default function BranchesPage() {
                                 </div>
                             </div>
 
-                            <div style={{ background: 'var(--accent-blue-ghost)', padding: 'var(--space-4)', borderRadius: 'var(--radius)', border: '1px solid var(--accent-blue)', marginTop: 'var(--space-2)' }}>
-                                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: 'var(--space-3)', color: 'var(--primary)' }}>💰 ข้อมูลการเงินรายทริป</h3>
+                            <div style={{ background: 'var(--brand-dominant-ghost)', padding: 'var(--space-5)', borderRadius: '16px', border: '1px solid var(--brand-dominant-light)', marginTop: 'var(--space-2)' }}>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 10, color: 'var(--brand-dominant)' }}>
+                                    <Coins size={20} /> ข้อมูลการเงินรายทริป
+                                </h3>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-3)' }}>
                                     <div className="form-group">
                                         <label className="form-label">ค่าแรง (บาท)</label>
@@ -322,7 +357,7 @@ export default function BranchesPage() {
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label">ค่าน้ำมัน (บาท)</label>
-                                        <input type="number" className="form-input" value={form.fuel_cost_per_job} onChange={e => setForm(p => ({ ...p, fuel_cost_per_job: Number(e.target.value) }))} />
+                                        <input type="number" className="form-input" style={{ borderRadius: 10 }} value={form.fuel_cost_per_job} onChange={e => setForm(p => ({ ...p, fuel_cost_per_job: Number(e.target.value) }))} />
                                     </div>
                                 </div>
                             </div>
@@ -330,8 +365,8 @@ export default function BranchesPage() {
                             {error && <div className="alert alert-error">{error}</div>}
                             <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>
                                 <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>ยกเลิก</button>
-                                <button type="submit" className="btn btn-primary" disabled={saving}>
-                                    {saving ? <span className="spinner" /> : '💾 บันทึก'}
+                                <button type="submit" className="btn btn-primary" style={{ borderRadius: 12, padding: '10px 24px', gap: 8 }} disabled={saving}>
+                                    {saving ? <span className="spinner" /> : <><Settings size={18} /> บันทึกข้อมูล</>}
                                 </button>
                             </div>
                         </form>

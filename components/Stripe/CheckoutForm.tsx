@@ -54,15 +54,7 @@ export default function CheckoutForm({ amount, customerEmail, onSuccess, onCance
             }} />
             {errorMessage && <div style={{ color: 'var(--danger)', fontSize: '0.9rem' }}>{errorMessage}</div>}
             
-            <div style={{ display: 'flex', gap: 12 }}>
-                <button 
-                    type="button" 
-                    className="btn btn-ghost btn-full" 
-                    onClick={onCancel}
-                    disabled={isProcessing}
-                >
-                    ยกเลิก
-                </button>
+            <div style={{ display: 'flex' }}>
                 <button 
                     type="submit" 
                     className="btn btn-primary btn-full" 

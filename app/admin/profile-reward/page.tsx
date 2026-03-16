@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import styles from './profile-reward.module.css'
+import { Gift, Save, CheckCircle } from 'lucide-react'
 
 export default function ProfileRewardPage() {
     const [config, setConfig] = useState<any>({
@@ -47,18 +48,23 @@ export default function ProfileRewardPage() {
     return (
         <div className={styles.container}>
             <div className={styles.header}>
-                <div>
-                    <h1 className={styles.title}>🎁 ตั้งค่ากิจกรรมโปรไฟล์</h1>
-                    <p className={styles.subtitle}>จัดการของรางวัลและข้อความเชิญชวนให้ลูกค้ากรอกข้อมูล Demographic</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <div style={{ background: 'var(--brand-dominant)', color: 'white', width: 48, height: 48, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 16px var(--brand-dominant-ghost)' }}>
+                        <Gift size={28} />
+                    </div>
+                    <div>
+                        <h1 className={styles.title}>กิจกรรมโปรไฟล์</h1>
+                        <p className={styles.subtitle}>จัดการของรางวัลและข้อความเชิญชวนให้ลูกค้ากรอกข้อมูล Demographic</p>
+                    </div>
                 </div>
-                <button className={`btn btn-primary ${styles.saveBtn}`} onClick={handleSave} disabled={saving}>
-                    {saving ? 'กำลังบันทึก...' : '💾 บันทึกการตั้งค่า'}
+                <button className={`btn btn-primary ${styles.saveBtn}`} style={{ borderRadius: 12, gap: 8 }} onClick={handleSave} disabled={saving}>
+                    {saving ? <span className="spinner" /> : <><Save size={18} /> บันทึกการตั้งค่า</>}
                 </button>
             </div>
 
             {saved && (
-                <div style={{ background: '#dcfce7', color: '#166534', padding: '12px 20px', borderRadius: 12, marginBottom: 24, fontWeight: 600 }}>
-                    ✅ บันทึกการตั้งค่าเรียบร้อยแล้ว
+                <div style={{ background: 'var(--success-ghost)', color: 'var(--success)', padding: '12px 20px', borderRadius: 12, marginBottom: 24, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, border: '1px solid var(--success-light)' }}>
+                    <CheckCircle size={18} /> บันทึกการตั้งค่าเรียบร้อยแล้ว
                 </div>
             )}
 
@@ -124,12 +130,14 @@ export default function ProfileRewardPage() {
 
             <div className={styles.preview}>
                 <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 12, textTransform: 'uppercase' }}>ตัวอย่างการแสดงผลบนแอปลูกค้า (Preview)</h3>
-                <div style={{ background: 'linear-gradient(135deg, #FFEDD5 0%, #FED7AA 100%)', padding: 20, borderRadius: 16, border: '1px solid #FDBA74', position: 'relative', overflow: 'hidden' }}>
-                    <div style={{ position: 'absolute', top: -10, right: -10, fontSize: '4rem', opacity: 0.1 }}>🎁</div>
+                <div style={{ background: 'var(--brand-dominant-ghost)', padding: 24, borderRadius: 20, border: '1px solid var(--brand-dominant-light)', position: 'relative', overflow: 'hidden' }}>
+                    <div style={{ position: 'absolute', top: -10, right: -10, fontSize: '4rem', opacity: 0.1, color: 'var(--brand-dominant)' }}>
+                        <Gift size={80} />
+                    </div>
                     <div style={{ position: 'relative', zIndex: 1 }}>
-                        <div style={{ fontWeight: 800, color: '#9A3412', fontSize: '1rem', marginBottom: 4 }}>{config.title || 'หัวข้อกิจกรรม'}</div>
-                        <div style={{ fontSize: '0.8rem', color: '#C2410C', marginBottom: 12, lineHeight: 1.4 }}>{config.description || 'คำอธิบายกิจกรรม'}</div>
-                        <button className="btn btn-sm" style={{ background: '#9A3412', color: '#fff', border: 'none', borderRadius: 99, padding: '6px 16px' }}>
+                        <div style={{ fontWeight: 800, color: 'var(--brand-dominant)', fontSize: '1.1rem', marginBottom: 6 }}>{config.title || 'หัวข้อกิจกรรม'}</div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.5 }}>{config.description || 'คำอธิบายกิจกรรม'}</div>
+                        <button className="btn btn-sm" style={{ background: 'var(--brand-dominant)', color: '#fff', border: 'none', borderRadius: 99, padding: '8px 20px', fontWeight: 700 }}>
                             {config.button_text || 'ปุ่มกด'}
                         </button>
                     </div>

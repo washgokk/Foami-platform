@@ -28,6 +28,8 @@ const NAV_ITEMS = [
     { href: '/admin/discounts', icon: Ticket, label: 'โค้ดส่วนลด' },
 ]
 
+import Logo from '@/components/Branding/Logo'
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname()
     const router = useRouter()
@@ -43,8 +45,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (pathname === '/admin/login') return <>{children}</>
 
     const handleLogout = () => {
-        localStorage.removeItem('admin_token')
-        router.replace('/admin/login')
+        if (typeof window !== 'undefined' && window.confirm('ต้องการออกจากระบบใช่หรือไม่?')) {
+            localStorage.removeItem('admin_token')
+            window.location.href = '/admin/login'
+        }
     }
 
     return (
@@ -52,11 +56,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {/* Sidebar */}
             <aside className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''}`}>
                 <div className={styles.brand}>
-                    <img 
-                        src="/logo - lanscape.svg" 
-                        alt="Foami" 
-                        style={{ height: 32, width: 'auto' }} 
-                    />
+                    <Logo width={140} variant="landscape" />
                 </div>
                 <nav className={styles.nav}>
                     {NAV_ITEMS.map(item => {
@@ -68,7 +68,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                                 className={`${styles.navItem} ${pathname.startsWith(item.href) ? styles.navActive : ''}`}
                                 onClick={() => setSidebarOpen(false)}
                             >
-                                <Icon size={20} className={styles.navIcon} />
+                                <Icon size={22} className={styles.navIcon} />
                                 <span>{item.label}</span>
                             </Link>
                         )
@@ -92,9 +92,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <button className={styles.menuBtn} onClick={() => setSidebarOpen(!sidebarOpen)}>
                         <Menu size={24} />
                     </button>
-                    <span className={styles.topbarTitle}>Admin Panel</span>
+                    <span className={styles.topbarTitle}>
+                        {NAV_ITEMS.find(i => pathname.startsWith(i.href))?.label || 'Foami Admin'}
+                    </span>
                     <div className={styles.topbarRight}>
-                        <span className={styles.adminBadge}>Super Admin</span>
+                        <div className={styles.adminBadge}>Super Admin</div>
                     </div>
                 </header>
                 <main className={styles.content}>{children}</main>

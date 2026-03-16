@@ -49,9 +49,9 @@
 }
 
 .weekLabel {
-    font-weight: 600;
+    font-weight: 700;
     font-size: 0.95rem;
-    color: var(--primary);
+    color: var(--brand-dominant);
     min-width: 140px;
     text-align: center;
 }
@@ -110,12 +110,21 @@
 }
 
 .today {
-    color: var(--primary);
-    background: var(--primary-ghost);
+    color: var(--brand-dominant);
+    background: rgba(49, 94, 195, 0.05);
 }
 
 .today .dayNum {
-    color: var(--primary);
+    color: var(--brand-dominant);
+    background: var(--brand-dominant);
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 4px auto 0;
 }
 
 .timeLabel {
@@ -203,15 +212,16 @@
 }
 
 .status-available {
-    background-color: rgba(59, 130, 246, 0.1); /* Semi-transparent blue */
-    color: var(--blue-700);
-    border: 1px solid var(--blue-200);
+    background-color: rgba(49, 94, 195, 0.08); /* Brand dominant tint */
+    color: var(--brand-dominant);
+    border: 1px solid rgba(49, 94, 195, 0.2);
 }
 
 .status-booked {
-    background-color: rgba(107, 114, 128, 0.1); /* Semi-transparent gray */
-    color: var(--gray-700);
-    border: 1px solid var(--gray-300);
+    background-color: rgba(160, 217, 246, 0.15); /* Brand secondary tint */
+    color: var(--brand-dominant);
+    border: 1px solid rgba(160, 217, 246, 0.3);
+    border-style: dashed;
 }
 
 .loadingEmpty {

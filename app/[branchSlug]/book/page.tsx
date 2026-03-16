@@ -20,6 +20,7 @@ import {
     Wrench,
     Droplets,
     CheckCircle,
+    CheckCircle2,
     XCircle,
     Star,
     Home,
@@ -36,12 +37,15 @@ import {
     Wallet,
     Gift,
     Tag,
-    X
+    X,
+    Check,
+    FileText
 } from 'lucide-react'
 import styles from './book.module.css'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements } from '@stripe/react-stripe-js'
 import CheckoutForm from '@/components/Stripe/CheckoutForm'
+import Logo from '@/components/Branding/Logo'
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '')
 
@@ -52,7 +56,13 @@ const MapPicker = dynamic<React.ComponentProps<typeof MapPickerType>>(
 )
 
 // ─── Step names ──────────────────────────────────────────────
-const STEPS = ['แพ็กเกจ', 'ตำแหน่ง', 'เวลา', 'สรุป', 'ชำระ']
+const STEPS = [
+    { name: 'แพ็กเกจ', icon: ClipboardList },
+    { name: 'ตำแหน่ง', icon: MapPin },
+    { name: 'เวลา', icon: Clock },
+    { name: 'สรุป', icon: FileText },
+    { name: 'ชำระ', icon: CreditCard },
+]
 
 // ─── Haversine distance (km) ─────────────────────────────────
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
@@ -197,7 +207,7 @@ export default function BookPage() {
                         price_m: s.price_m,
                         price_l: s.price_l,
                         icon: s.name.includes('เคลือบ') ? 'sparkles' : s.name.includes('บำรุง') ? 'wrench' : 'droplets',
-                        color: color,
+                        color: s.name.includes('เคลือบ') ? 'var(--brand-accent)' : s.name.includes('บำรุง') ? 'var(--brand-subordinate)' : 'var(--brand-dominant)',
                         image_url: s.image_url,
                         availableAddons: addonsStr ? addonsStr.split(',') : [],
                         is_addon_required: s.is_addon_required
@@ -251,13 +261,13 @@ export default function BookPage() {
                 .lte('date', to)
                 .in('zone_id', zoneIds)
 
-            // 2. Fetch Existing Bookings only for THIS branch's zones
+            // 2. Fetch Existing Bookings for the entire branch to ensure capacity is tracked correctly
             const { data: allBookings } = await supabase
                 .from('bookings')
-                .select('scheduled_date, scheduled_time, zone_id, staff_id')
+                .select('scheduled_date, scheduled_time, zone_id, staff_id, branch_id')
                 .gte('scheduled_date', from)
                 .lte('scheduled_date', to)
-                .in('zone_id', zoneIds)
+                .eq('branch_id', branches[0].id)
                 .not('status', 'eq', 'cancelled')
 
             setAllSchedulesData(allSchedules || [])
@@ -285,9 +295,10 @@ export default function BookPage() {
                     const inZoneFreeStaff = daySchedules.filter(s => s.time_slot === slot && s.zone_id === zoneId && !s.is_booked)
                     const otherFreeStaff = daySchedules.filter(s => s.time_slot === slot && !s.is_booked)
 
-                    // Filter pending bookings for this slot that haven't been assigned to a staff yet
+                    // Filter pending bookings (all types: in-zone, other-zone, or null-zone/out-of-zone)
                     const pendingBookingsInZone = dayBookings.filter(b => b.scheduled_time === slot && b.zone_id === zoneId && !b.staff_id)
-                    const pendingBookingsOther = dayBookings.filter(b => b.scheduled_time === slot && b.zone_id !== zoneId && !b.staff_id)
+                    const allPendingInBranch = dayBookings.filter(b => b.scheduled_time === slot && !b.staff_id)
+                    const pendingBookingsOther = allPendingInBranch.filter(b => b.zone_id !== zoneId)
 
                     // Effective Capacity in Zone
                     // For local staff, we subtract pending unassigned bookings in that same zone
@@ -300,19 +311,15 @@ export default function BookPage() {
                             available_staff_ids: inZoneFreeStaff.slice(0, effectiveInZoneCount).map(s => s.staff_id)
                         }
                     } else {
-                        // Check Overflow capacity
-                        // For overflow, we look at ANY other free staff and subtract ALL other pending unassigned bookings
-                        // (This is a conservative estimate to prevent overbooking across the whole branch)
-                        const totalFreeStaff = otherFreeStaff.filter(s => s.zone_id !== zoneId)
-                        const totalPendingOther = pendingBookingsOther.length + (effectiveInZoneCount < 0 ? Math.abs(effectiveInZoneCount) : 0)
-
-                        const effectiveOtherCount = totalFreeStaff.length - totalPendingOther
+                        // Check Overflow capacity across the whole branch
+                        const totalFreeInBranch = daySchedules.filter(s => s.time_slot === slot && !s.is_booked)
+                        const effectiveOtherCount = totalFreeInBranch.length - allPendingInBranch.length
 
                         if (effectiveOtherCount > 0) {
                             // Find nearest serving zone among remaining free staff
                             let nearestZ: any = null
                             let minDist = Infinity
-                            totalFreeStaff.forEach(s => {
+                            totalFreeInBranch.forEach((s: any) => {
                                 const z = zones.find(zn => zn.id === s.zone_id)
                                 const b = branches.find(br => br.id === z?.branch_id)
                                 if (b) {
@@ -321,7 +328,7 @@ export default function BookPage() {
                                 }
                             })
 
-                            const staffInNearest = totalFreeStaff.filter(s => s.zone_id === nearestZ?.id)
+                            const staffInNearest = totalFreeInBranch.filter((s: any) => s.zone_id === nearestZ?.id)
                             return {
                                 time_slot: slot, type: 'overflow',
                                 serving_zone_id: nearestZ?.id,
@@ -819,21 +826,67 @@ export default function BookPage() {
             try {
                 const { data: schedules } = await supabase
                     .from('staff_schedules')
-                    .select('staff(line_user_id)')
+                    .select('staff_id, staff(line_user_id)')
                     .eq('zone_id', zoneId)
                     .eq('date', selectedDate)
                     .eq('time_slot', selectedSlot)
                     .eq('is_booked', false)
 
                 const lineIds = schedules?.map((s: any) => s.staff?.line_user_id).filter(Boolean) || []
+                const staffIds = schedules?.map((s: any) => s.staff_id).filter(Boolean) || []
+
+                // Send Line Notifications
                 if (lineIds.length > 0) {
                     fetch('/api/line/notify-staff', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ line_user_ids: lineIds, booking_id: insertedBooking.id, message: `🔔 มีงานใหม่!\nวันที่: ${selectedDate} เวลา: ${selectedSlot?.slice(0, 5)}\nกรุณาเปิดแอปเพื่อรับงาน` }),
+                        body: JSON.stringify({ 
+                            line_user_ids: lineIds, 
+                            booking_id: insertedBooking.id, 
+                            message: `🔔 มีงานใหม่!\nวันที่: ${selectedDate} เวลา: ${selectedSlot?.slice(0, 5)} น.\nกรุณาเปิดแอปเพื่อรับงาน` 
+                        }),
                     }).catch(() => { })
                 }
-            } catch { }
+
+                // Send Web Push Notifications
+                if (staffIds.length > 0) {
+                    const payload = {
+                        title: '🔔 มีงานใหม่เข้า!',
+                        body: `วันที่: ${selectedDate} เวลา: ${selectedSlot?.slice(0, 5)} น.\nกดเพื่อดูรายละเอียดและรับงานเลย`,
+                        url: '/staff'
+                    }
+                    
+                    if (localStorage.getItem('foami_mock_db_enabled') === 'true') {
+                        // LOCAL BRIDGE for Mock DB Testing:
+                        // Search for staff subscriptions directly in local storage for same-device testing
+                        const localSubs = JSON.parse(localStorage.getItem('foami_mock_db_push_subscriptions') || '[]')
+                        const targetSubs = localSubs.filter((s: any) => staffIds.includes(s.user_id) && s.platform === 'staff')
+                        
+                        targetSubs.forEach((s: any) => {
+                            fetch('/api/push/send-test', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ 
+                                    subscription: s.subscription,
+                                    ...payload 
+                                }),
+                            }).catch(() => {})
+                        })
+                    } else {
+                        // Standard Production Flow
+                        fetch('/api/push/notify-staff', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                staff_ids: staffIds,
+                                payload
+                            })
+                        }).catch(e => console.error('Push notify error:', e))
+                    }
+                }
+            } catch (err) {
+                console.error('Notification error:', err)
+            }
 
             setSubmitting(false)
             router.replace(`/${branchSlug}/my-bookings?success=1`)
@@ -868,23 +921,27 @@ export default function BookPage() {
         <div className={styles.page}>
             {/* Topbar */}
             <div className={styles.topbar}>
-                <Link href={`/${branchSlug}/menu`} className="btn btn-ghost btn-sm btn-icon">←</Link>
-                <span className={styles.topTitle}>จองล้างรถ</span>
-                <div style={{ width: 36 }} />
+                <button onClick={() => step === 0 ? router.back() : setStep(step - 1)} className={styles.exitButton}>
+                    {step === 0 ? <X size={22} /> : <ChevronLeft size={24} />}
+                </button>
+                <div className={styles.topbarCenter}>
+                    <Logo width={110} variant="landscape" />
+                </div>
+                <div style={{ width: 44 }} />
             </div>
 
-            {/* Step progress */}
+            {/* Step Bar */}
             <div className={styles.stepBar}>
                 {STEPS.map((s, i) => (
-                    <div key={s} className={styles.stepItem}>
+                    <div key={i} className={styles.stepItem}>
                         <div className={`${styles.stepDot} ${i === step ? styles.stepCurrent : i < step ? styles.stepDone : ''}`}>
-                            {i < step ? '✓' : i + 1}
+                            <s.icon size={16} />
                         </div>
                         {i < STEPS.length - 1 && <div className={`${styles.stepLine} ${i < step ? styles.stepLineDone : ''}`} />}
                     </div>
                 ))}
             </div>
-            <div className={styles.stepName}>{STEPS[step]}</div>
+            <div className={styles.stepName}>{STEPS[step].name}</div>
 
             {/* ─── Content ─── */}
             <div className={styles.content}>
@@ -1028,7 +1085,7 @@ export default function BookPage() {
                                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                         flexShrink: 0, transition: 'all 0.2s',
                                                     }}>
-                                                        {addons[addon] && <span style={{ color: '#fff', fontSize: '0.7rem', fontWeight: 700 }}>✓</span>}
+                                                        {addons[addon] && <Check size={14} color="#fff" strokeWidth={3} />}
                                                     </div>
                                                     <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
                                                         {dbA?.image_url && !addons[addon] && (
@@ -1262,8 +1319,8 @@ export default function BookPage() {
                                             <img src={URL.createObjectURL(f)} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                             <button
                                                 onClick={() => setVehicleFiles(prev => prev.filter((_, idx) => idx !== i))}
-                                                style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: '#fff', border: 'none', borderRadius: '50%', width: 18, height: 18, fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                            >✕</button>
+                                                style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.5)', color: '#fff', border: 'none', borderRadius: '50%', width: 22, height: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                            ><X size={14} /></button>
                                         </div>
                                     ))}
                                     {vehicleFiles.length < 3 && (
@@ -1315,7 +1372,7 @@ export default function BookPage() {
                             </button>
                         ) : (
                             <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-4)', border: '1px solid var(--border)', marginBottom: 'var(--space-4)', position: 'relative' }}>
-                                <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setShowDelivery(false)} style={{ position: 'absolute', top: 12, right: 12, color: 'var(--text-muted)' }}>✕</button>
+                                <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setShowDelivery(false)} style={{ position: 'absolute', top: 12, right: 12, color: 'var(--text-muted)' }}><X size={20} /></button>
                                 <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#16A34A', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 'var(--space-3)' }}>
                                     <MapPin size={20} /> ข้อมูลจุดส่งรถ
                                 </h3>
@@ -1523,12 +1580,15 @@ export default function BookPage() {
                             </div>
                             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                                 {[
-                                    { label: '📅 วันที่', val: `${selectedDate} เวลา ${selectedSlot?.slice(0, 5)} น.` },
-                                    { label: '📍 รับรถ', val: `${pickupAddressDetail} ${pickupNote ? `(${pickupNote})` : ''}` },
-                                    { label: '🏠 ส่งรถ', val: showDelivery ? `${deliveryAddressDetail} ${deliveryNote ? `(${deliveryNote})` : ''}` : '(ที่เดียวกับจุดรับรถ)' },
+                                    { label: 'วันที่', val: `${selectedDate} เวลา ${selectedSlot?.slice(0, 5)} น.`, icon: <Calendar size={14} /> },
+                                    { label: 'รับรถ', val: `${pickupAddressDetail} ${pickupNote ? `(${pickupNote})` : ''}`, icon: <MapPin size={14} /> },
+                                    { label: 'ส่งรถ', val: showDelivery ? `${deliveryAddressDetail} ${deliveryNote ? `(${deliveryNote})` : ''}` : '(ที่เดียวกับจุดรับรถ)', icon: <Home size={14} /> },
                                 ].map(row => (
                                     <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', gap: 8 }}>
-                                        <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>{row.label}</span>
+                                        <span style={{ color: 'var(--text-muted)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            {row.icon}
+                                            {row.label}
+                                        </span>
                                         <span style={{ fontWeight: 600, textAlign: 'right' }}>{row.val}</span>
                                     </div>
                                 ))}

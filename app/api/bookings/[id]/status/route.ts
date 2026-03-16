@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
+import { sendPushNotification } from '@/lib/push'
 
 export async function PATCH(
     req: NextRequest,
@@ -13,7 +14,7 @@ export async function PATCH(
         .from('bookings')
         .update({ status, updated_at: new Date().toISOString() })
         .eq('id', id)
-        .select('*, customers(full_name, line_user_id), staff(full_name)')
+        .select('*, customers(full_name, line_user_id), branches(slug), staff(full_name)')
         .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
@@ -37,6 +38,17 @@ export async function PATCH(
                     message: NOTIFY_STATUSES[status],
                     booking_id: id,
                 }),
+            })
+        } catch { /* Non-critical */ }
+    }
+
+    // Send Web Push notification to customer
+    if (NOTIFY_STATUSES[status]) {
+        try {
+            await sendPushNotification(data.customer_id, 'customer', {
+                title: 'Foami Service Update',
+                body: NOTIFY_STATUSES[status],
+                url: `/${data.branches?.slug || 'menu'}/my-bookings`
             })
         } catch { /* Non-critical */ }
     }

@@ -46,9 +46,9 @@
 }
 
 .tabActive {
-    background: var(--surface);
-    color: var(--primary);
-    box-shadow: var(--shadow-sm);
+    background: var(--brand-dominant) !important;
+    color: white !important;
+    box-shadow: 0 4px 12px rgba(49, 94, 195, 0.2);
     font-weight: 700;
 }
 
@@ -154,15 +154,15 @@
     letter-spacing: 0.02em;
 }
 
-.tag-vip { background: #FEF3C7; color: #92400E; border-color: #F59E0B; }
-.tag-loyal { background: #DCFCE7; color: #166534; border-color: #22C55E; }
-.tag-new { background: #DBEAFE; color: #1E40AF; border-color: #3B82F6; }
-.tag-churn-risk { background: #FEE2E2; color: #991B1B; border-color: #EF4444; }
-.tag-inactive { background: #F3F4F6; color: #374151; border-color: #9CA3AF; opacity: 0.7; }
-.tag-regular { background: #F3F4F6; color: #4B5563; border-color: #D1D5DB; }
-.tag-lost-customer { background: #111827; color: white; border-color: black; }
-.tag-promising { background: #F5F3FF; color: #5B21B6; border-color: #8B5CF6; }
-.tag-big-ticket-rare { background: #FFF7ED; color: #9A3412; border-color: #F97316; }
+.tag-vip { background: #fee2e2; color: #991b1b; border-color: #f87171; }
+.tag-loyal { background: #dcfce7; color: #166534; border-color: #4ade80; }
+.tag-new { background: #dbeafe; color: #1e40af; border-color: #60a5fa; }
+.tag-churn-risk { background: #fff7ed; color: #9a3412; border-color: #fb923c; }
+.tag-inactive { background: #f3f4f6; color: #374151; border-color: #9ca3af; opacity: 0.7; }
+.tag-regular { background: #f3f4f6; color: #4b5563; border-color: #d1d5db; }
+.tag-lost-customer { background: #111827; color: white; border-color: #374151; }
+.tag-promising { background: #f5f3ff; color: #5b21b6; border-color: #a78bfa; }
+.tag-big-ticket-rare { background: #fff1f2; color: #be123c; border-color: #fb7185; }
 
 /* Configurable Segments UI */
 .configGroup {
@@ -232,9 +232,9 @@
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(10, 15, 30, 0.7); /* Deeper dark */
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     z-index: 99999;
     display: flex;
     align-items: center;

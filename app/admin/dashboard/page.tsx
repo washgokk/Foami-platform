@@ -35,7 +35,7 @@ import {
     parseISO
 } from 'date-fns'
 import { th } from 'date-fns/locale'
-import { Calendar, TrendingUp, Users, ShoppingBag, MapPin, CheckCircle } from 'lucide-react'
+import { Calendar, TrendingUp, Users, ShoppingBag, MapPin, CheckCircle, ClipboardList } from 'lucide-react'
 
 export default function AdminDashboardPage() {
     const [stats, setStats] = useState<Stats>(INITIAL_STATS)
@@ -164,19 +164,19 @@ export default function AdminDashboardPage() {
     }, [timeFilter, filterDate])
 
     const STAT_CARDS = [
-        { label: 'งาน', value: stats.total_bookings, icon: <ShoppingBag />, color: '#3B5FCC' },
-        { label: 'รายได้', value: `฿${stats.total_revenue.toLocaleString()}`, icon: <TrendingUp />, color: '#22C55E' },
-        { label: 'งานรอดำเนินการ', value: stats.pending_bookings, icon: <Calendar />, color: '#F59E0B' },
-        { label: 'งานเสร็จสิ้น', value: stats.completed_bookings, icon: <CheckCircle />, color: '#22C55E' },
-        { label: 'บริการยอดนิยม', value: topService.name, sub: `${topService.count} งานที่เสร็จแล้ว`, icon: <ShoppingBag />, color: '#8B5CF6', isWide: true },
-        { label: 'สาขายอดนิยม', value: topBranch.name, sub: `${topBranch.count} งานที่เสร็จแล้ว (฿${topBranch.revenue.toLocaleString()})`, icon: <MapPin />, color: '#06B6D4', isWide: true },
+        { label: 'ยอดจองทั้งหมด', value: stats.total_bookings, icon: <ShoppingBag />, color: 'var(--brand-dominant)' },
+        { label: 'รายได้รวม', value: `฿${stats.total_revenue.toLocaleString()}`, icon: <TrendingUp />, color: 'var(--brand-dominant)' },
+        { label: 'รอดำเนินการ', value: stats.pending_bookings, icon: <Calendar />, color: 'var(--brand-subordinate)' },
+        { label: 'เสร็จสิ้น', value: stats.completed_bookings, icon: <CheckCircle />, color: 'var(--brand-accent)' },
+        { label: 'บริการยอดนิยม', value: topService.name, sub: `${topService.count} งานที่เสร็จแล้ว`, icon: <ShoppingBag />, color: 'var(--brand-dominant)', isWide: true },
+        { label: 'สาขายอดนิยม', value: topBranch.name, sub: `${topBranch.count} งานที่เสร็จแล้ว (฿${topBranch.revenue.toLocaleString()})`, icon: <MapPin />, color: 'var(--brand-subordinate)', isWide: true },
     ]
 
     return (
         <div className="animate-fade">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">📊 ภาพรวมระบบ</h1>
+                    <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>ภาพรวมระบบ</h1>
                     <p className="page-subtitle">สถิติ {timeFilter === 'day' ? 'รายวัน' : timeFilter === 'month' ? 'รายเดือน' : 'รายปี'}</p>
                 </div>
                 
@@ -242,7 +242,16 @@ export default function AdminDashboardPage() {
                         </thead>
                         <tbody>
                             {recentBookings.length === 0 ? (
-                                <tr><td colSpan={5}><div className="empty-state"><span className="empty-state-icon">📋</span><p className="empty-state-title">ยังไม่มีการจอง</p></div></td></tr>
+                                <tr>
+                                    <td colSpan={6}>
+                                        <div className="empty-state" style={{ padding: 'var(--space-12)' }}>
+                                            <div style={{ background: 'var(--surface-2)', width: 64, height: 64, borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: 'var(--text-muted)' }}>
+                                                <ClipboardList size={32} />
+                                            </div>
+                                            <p className="empty-state-title" style={{ fontWeight: 800 }}>ยังไม่มีการจอง</p>
+                                        </div>
+                                    </td>
+                                </tr>
                             ) : recentBookings.map((b: any) => (
                                 <tr key={b.id}>
                                     <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>

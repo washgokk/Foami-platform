@@ -23,14 +23,20 @@ export default function BranchMapPicker({ lat, lng, onChange }: Props) {
                 document.head.appendChild(link)
             }
 
-            // Define red marker icon
-            const redIcon = new L.Icon({
-                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                iconSize: [25, 41],
-                iconAnchor: [12, 41],
-                popupAnchor: [1, -34],
-                shadowSize: [41, 41]
+            // Define premium branded marker icon
+            const brandColor = '#0066FF'
+            const svg = `
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M20 38C20 38 34 26 34 16C34 8.26801 27.732 2 20 2C12.268 2 6 8.26801 6 16C6 26 20 38 20 38Z" fill="${brandColor}" stroke="white" stroke-width="2.5"/>
+                    <circle cx="20" cy="16" r="6" fill="white"/>
+                    <rect x="17" y="15" width="6" height="6" fill="${brandColor}" rx="1"/>
+                </svg>
+            `
+            const brandedIcon = L.divIcon({
+                html: svg,
+                className: 'custom-map-marker',
+                iconSize: [40, 40],
+                iconAnchor: [20, 38],
             })
 
             const map = L.map(mapRef.current!, { center: [lat, lng], zoom: 15 })
@@ -38,8 +44,8 @@ export default function BranchMapPicker({ lat, lng, onChange }: Props) {
                 attribution: '© OpenStreetMap', maxZoom: 19,
             }).addTo(map)
 
-            // Use red marker icon
-            markerRef.current = L.marker([lat, lng], { icon: redIcon, draggable: true }).addTo(map)
+            // Use branded marker icon
+            markerRef.current = L.marker([lat, lng], { icon: brandedIcon, draggable: true }).addTo(map)
             markerRef.current.on('dragend', (e: any) => {
                 const { lat: la, lng: lo } = e.target.getLatLng()
                 onChange(la, lo)

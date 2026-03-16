@@ -1,13 +1,16 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import MockDbToggle from '@/components/MockDbToggle'
 import { LiffProvider } from '@/components/Providers/LiffProvider'
+
+export const viewport: Viewport = {
+  themeColor: '#ffffff',
+}
 
 export const metadata: Metadata = {
   title: 'Foami Wash & Delivery',
   description: 'บริการล้างมอเตอร์ไซค์ รับ-ส่งถึงบ้าน',
   manifest: '/manifest.json',
-  themeColor: '#10b981',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

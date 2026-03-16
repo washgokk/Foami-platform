@@ -92,24 +92,53 @@ export default function MapPicker({ lat, lng, mode, onChange }: Props) {
     // Update marker icon and position when props change
     useEffect(() => {
         if (!mapInstanceRef.current || !markerRef.current) return
-        const { L, map } = mapInstanceRef.current
+        const { L } = mapInstanceRef.current
 
-        const iconUrl = mode === 'pickup'
-            ? 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png'
-            : 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png'
+        // Custom Branded Marker using DivIcon
+        const color = mode === 'pickup' ? '#315EC3' : '#F1BFDB'
+        
+        const html = `
+            <div style="
+                width: 40px; 
+                height: 48px; 
+                display: flex; 
+                flex-direction: column; 
+                align-items: center; 
+                filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2));
+            ">
+                <div style="
+                    width: 36px; 
+                    height: 36px; 
+                    background: ${color}; 
+                    border: 3px solid white; 
+                    border-radius: 50%; 
+                    display: flex; 
+                    align-items: center; 
+                    justify-content: center;
+                    color: white;
+                ">
+                    ${mode === 'pickup' ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>' : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>'}
+                </div>
+                <div style="
+                    width: 0; 
+                    height: 0; 
+                    border-left: 6px solid transparent; 
+                    border-right: 6px solid transparent; 
+                    border-top: 8px solid white; 
+                    margin-top: -3px;
+                "></div>
+            </div>
+        `
 
-        const icon = new L.Icon({
-            iconUrl,
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41]
+        const customIcon = L.divIcon({
+            html,
+            className: '',
+            iconSize: [40, 48],
+            iconAnchor: [20, 48],
         })
 
-        markerRef.current.setIcon(icon)
+        markerRef.current.setIcon(customIcon)
         markerRef.current.setLatLng([lat, lng])
-        // Optional: map.panTo([lat, lng]) // Maybe too jarring? Let's leave for now
     }, [lat, lng, mode])
 
     const getCurrentLocation = () => {

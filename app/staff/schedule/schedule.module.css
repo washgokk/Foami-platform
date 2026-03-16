@@ -23,11 +23,12 @@
     grid-template-columns: 56px repeat(7, 1fr);
     gap: 3px;
     margin-bottom: var(--space-4);
-    overflow: hidden; /* Changed to hidden to clip highlights */
+    overflow: hidden;
     position: relative;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     background: var(--surface);
+    padding-bottom: 20px;
 }
 
 @media (max-width: 767px) {
@@ -135,20 +136,23 @@
 }
 
 .available {
-    background: rgba(59, 130, 246, 0.1);
-    border: 1.5px solid var(--accent-blue);
+    background: var(--brand-subordinate-ghost);
+    border: 1.5px solid var(--brand-subordinate);
 }
 
 .booked {
-    background: rgba(16, 185, 129, 0.1);
-    border: 1.5px solid var(--success);
+    background: var(--brand-dominant);
+    border: 1.5px solid var(--brand-dominant);
     cursor: not-allowed;
-    opacity: 0.8;
+}
+
+.booked span {
+    color: white !important;
 }
 
 .pending {
-    background: rgba(244, 184, 200, 0.2);
-    border: 1.5px solid var(--accent-pink);
+    background: var(--brand-accent-ghost);
+    border: 1.5px solid var(--brand-accent);
 }
 
 .past {

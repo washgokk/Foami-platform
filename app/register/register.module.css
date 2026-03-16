@@ -41,16 +41,21 @@
 }
 
 .dot {
-    width: 10px;
-    height: 10px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     background: var(--border);
-    transition: all 0.3s;
+    transition: all var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
 }
 
 .active {
-    background: var(--primary);
-    transform: scale(1.2);
+    background: var(--brand-dominant);
+    color: #fff;
+    transform: scale(1.1);
 }
 
 .line {
@@ -88,8 +93,9 @@
 }
 
 .sizeSelected {
-    border-color: var(--primary);
+    border-color: var(--brand-dominant);
     background: var(--primary-ghost) !important;
+    box-shadow: 0 4px 12px rgba(49, 94, 195, 0.1);
 }
 
 .sizeTitle {

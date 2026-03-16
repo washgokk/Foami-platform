@@ -5,6 +5,32 @@ import styles from './crm.module.css'
 import { getRFMScore, segmentCustomer, DEFAULT_CRM_CONFIG } from '@/lib/crm-utils'
 import { generateScalableId } from '@/lib/id-utils'
 import { VEHICLE_SIZE_LABEL, BOOKING_STATUS_LABEL, BOOKING_STATUS_CSS, BookingStatus } from '@/lib/types'
+import { 
+    Users, 
+    Settings, 
+    Edit3, 
+    User, 
+    Car, 
+    FileText, 
+    CreditCard, 
+    ShieldCheck, 
+    MapPin, 
+    Star, 
+    Flag, 
+    Info, 
+    Target, 
+    ChevronRight, 
+    Plus, 
+    Trash2, 
+    ClipboardList, 
+    CheckCircle, 
+    Calendar,
+    ArrowRight,
+    Map,
+    Sparkles,
+    BarChart3,
+    History
+} from 'lucide-react'
 
 /* 
 This CRM Page groups customer data into 4 tabs:
@@ -328,22 +354,42 @@ export default function CRMPage() {
         <>
         <div className={`animate-fade ${styles.page}`}>
             <div className={styles.header}>
-                <h1 className={styles.title}>👥 CRM & ฐานลูกค้า</h1>
-                <button className="btn btn-sm btn-ghost" onClick={runIdMigration} style={{ opacity: 0.6, fontSize: '0.7rem' }}>⚙️ อัปเกรด ID ระบบ</button>
+                <h1 className={styles.title} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <Users size={28} color="var(--brand-dominant)" /> ลูกค้า & CRM
+                </h1>
+                <button className="btn btn-sm btn-ghost" onClick={runIdMigration} style={{ opacity: 0.6, fontSize: '0.7rem', gap: 4 }}>
+                    <Settings size={14} /> อัปเกรด ID ระบบ
+                </button>
             </div>
 
-            <div className={styles.tabs}>
-                <button className={`${styles.tabBtn} ${activeTab === 'profiles' ? styles.tabActive : ''}`} onClick={() => setActiveTab('profiles')}>
-                    โปรไฟล์ลูกค้า
+            <div className={styles.tabs} style={{ background: 'var(--surface-2)', padding: 6, borderRadius: '20px' }}>
+                <button 
+                    className={`${styles.tabBtn} ${activeTab === 'profiles' ? styles.tabActive : ''}`} 
+                    style={{ borderRadius: '14px', background: activeTab === 'profiles' ? 'var(--brand-dominant)' : 'transparent', color: activeTab === 'profiles' ? 'white' : 'var(--text-muted)' }}
+                    onClick={() => setActiveTab('profiles')}
+                >
+                    <User size={18} style={{ marginRight: 8, display: 'inline' }} /> โปรไฟล์ลูกค้า
                 </button>
-                <button className={`${styles.tabBtn} ${activeTab === 'transactions' ? styles.tabActive : ''}`} onClick={() => setActiveTab('transactions')}>
-                    ประวัติธุรกรรม (Transactions)
+                <button 
+                    className={`${styles.tabBtn} ${activeTab === 'transactions' ? styles.tabActive : ''}`} 
+                    style={{ borderRadius: '14px', background: activeTab === 'transactions' ? 'var(--brand-dominant)' : 'transparent', color: activeTab === 'transactions' ? 'white' : 'var(--text-muted)' }}
+                    onClick={() => setActiveTab('transactions')}
+                >
+                    <ClipboardList size={18} style={{ marginRight: 8, display: 'inline' }} /> ประวัติธุรกรรม
                 </button>
-                <button className={`${styles.tabBtn} ${activeTab === 'analytics' ? styles.tabActive : ''}`} onClick={() => setActiveTab('analytics')}>
-                    วิเคราะห์พฤติกรรม (RFM)
+                <button 
+                    className={`${styles.tabBtn} ${activeTab === 'analytics' ? styles.tabActive : ''}`} 
+                    style={{ borderRadius: '14px', background: activeTab === 'analytics' ? 'var(--brand-dominant)' : 'transparent', color: activeTab === 'analytics' ? 'white' : 'var(--text-muted)' }}
+                    onClick={() => setActiveTab('analytics')}
+                >
+                    <ShieldCheck size={18} style={{ marginRight: 8, display: 'inline' }} /> วิเคราะห์พฤติกรรม (RFM)
                 </button>
-                <button className={`${styles.tabBtn} ${activeTab === 'segments' ? styles.tabActive : ''}`} onClick={() => setActiveTab('segments')}>
-                    เครื่องมือสร้าง Segments
+                <button 
+                    className={`${styles.tabBtn} ${activeTab === 'segments' ? styles.tabActive : ''}`} 
+                    style={{ borderRadius: '14px', background: activeTab === 'segments' ? 'var(--brand-dominant)' : 'transparent', color: activeTab === 'segments' ? 'white' : 'var(--text-muted)' }}
+                    onClick={() => setActiveTab('segments')}
+                >
+                    <Target size={18} style={{ marginRight: 8, display: 'inline' }} /> เครื่องมือสร้าง Segments
                 </button>
             </div>
 
@@ -351,7 +397,9 @@ export default function CRMPage() {
             {activeTab === 'profiles' && (
                 <div className={styles.card}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-                        <h2 className={styles.tableTitle}>ฐานข้อมูลลูกค้า (Profiles)</h2>
+                        <h2 className={styles.tableTitle} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <User size={20} color="var(--primary)" /> ฐานข้อมูลลูกค้า (Profiles)
+                        </h2>
                         <input className="form-input" style={{ width: 250 }} placeholder="ค้นหาชื่อ, เบอร์, ทะเบียน..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                     </div>
 
@@ -387,11 +435,11 @@ export default function CRMPage() {
                                         </td>
                                         <td style={{ fontSize: '0.85rem' }}>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                                <span style={{ color: 'var(--primary)', fontWeight: 600 }}>
-                                                    🚗 {c.vehicleCount} คัน
+                                                <span style={{ color: 'var(--brand-dominant)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                    <Car size={12} /> {c.vehicleCount} คัน
                                                 </span>
-                                                <span style={{ color: 'var(--text-secondary)' }}>
-                                                    📍 {Array.isArray(c.saved_locations) ? c.saved_locations.length : 0} แห่ง
+                                                <span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                    <MapPin size={12} /> {Array.isArray(c.saved_locations) ? c.saved_locations.length : 0} แห่ง
                                                 </span>
                                             </div>
                                         </td>
@@ -408,14 +456,24 @@ export default function CRMPage() {
                                         <td>
                                             <button 
                                                 className="btn btn-sm btn-ghost" 
+                                                style={{ borderRadius: '10px' }}
                                                 title="ดูรายละเอียดแบบเต็ม"
                                                 onClick={() => setSelectedCustomer(c)}
-                                            >🖊️</button>
+                                            ><Edit3 size={16} /></button>
                                         </td>
                                     </tr>
                                 ))}
                                 {filteredStats.length === 0 && (
-                                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>ไม่พบข้อมูลลูกค้า</td></tr>
+                                    <tr>
+                                        <td colSpan={12}>
+                                            <div className="empty-state" style={{ padding: 'var(--space-12)' }}>
+                                                <div style={{ background: 'var(--surface-2)', width: 64, height: 64, borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: 'var(--text-muted)' }}>
+                                                    <Users size={32} />
+                                                </div>
+                                                <p className="empty-state-title" style={{ fontWeight: 800 }}>ยังไม่มีข้อมูลลูกค้า</p>
+                                            </div>
+                                        </td>
+                                    </tr>
                                 )}
                             </tbody>
                         </table>
@@ -494,12 +552,12 @@ export default function CRMPage() {
                                     <thead>
                                         {/* Category Grouping Row */}
                                         <tr>
-                                            <th colSpan={3} className={styles.bgGroupCustomer} style={{ textAlign: 'center', borderBottom: 'none' }}>👤 ข้อมูลลูกค้า</th>
-                                            <th colSpan={3} className={styles.bgGroupVehicle} style={{ textAlign: 'center', borderBottom: 'none' }}>🚗 ข้อมูลรถ</th>
-                                            <th colSpan={4} className={styles.bgGroupDetail} style={{ textAlign: 'center', borderBottom: 'none' }}>📝 รายละเอียดงาน</th>
-                                            <th colSpan={6} className={styles.bgGroupPricing} style={{ textAlign: 'center', borderBottom: 'none' }}>💰 การเงิน & ส่วนลด</th>
-                                            <th colSpan={3} className={styles.bgGroupStatus} style={{ textAlign: 'center', borderBottom: 'none' }}>🛡️ สถานะ & รีวิว</th>
-                                            <th colSpan={2} style={{ textAlign: 'center', borderBottom: 'none' }}>📍 รับ/ส่ง</th>
+                                            <th colSpan={3} className={styles.bgGroupCustomer} style={{ textAlign: 'center', borderBottom: 'none' }}>ข้อมูลลูกค้า</th>
+                                            <th colSpan={3} className={styles.bgGroupVehicle} style={{ textAlign: 'center', borderBottom: 'none' }}>ข้อมูลรถ</th>
+                                            <th colSpan={4} className={styles.bgGroupDetail} style={{ textAlign: 'center', borderBottom: 'none' }}>รายละเอียดงาน</th>
+                                            <th colSpan={6} className={styles.bgGroupPricing} style={{ textAlign: 'center', borderBottom: 'none' }}>การเงิน & ส่วนลด</th>
+                                            <th colSpan={3} className={styles.bgGroupStatus} style={{ textAlign: 'center', borderBottom: 'none' }}>สถานะ & รีวิว</th>
+                                            <th colSpan={2} style={{ textAlign: 'center', borderBottom: 'none' }}>รับ/ส่ง</th>
                                         </tr>
                                         <tr>
                                             {/* Customer */}
@@ -595,8 +653,8 @@ export default function CRMPage() {
                                                     <td style={{ color: 'var(--warning)' }}>
                                                         <div>
                                                             {b.slip_url ? (
-                                                                <a href={b.slip_url} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline', color: 'var(--warning)', fontWeight: 600 }} title="กดเพื่อดูสลิป">
-                                                                    ฿{b.additional_price?.toLocaleString() || 0} 📄
+                                                                <a href={b.slip_url} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline', color: 'var(--warning)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }} title="กดเพื่อดูสลิป">
+                                                                    ฿{b.additional_price?.toLocaleString() || 0} <FileText size={12} />
                                                                 </a>
                                                             ) : (
                                                                 <span style={{ fontWeight: 700 }}>฿{b.additional_price?.toLocaleString() || 0}</span>
@@ -625,12 +683,22 @@ export default function CRMPage() {
                                                     </td>
                                                     <td>
                                                         {b.rating ? (
-                                                            <div style={{ fontWeight: 700, color: 'var(--warning)', whiteSpace: 'nowrap' }}>⭐ {b.rating}</div>
+                                                            <div style={{ fontWeight: 700, color: 'var(--warning)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                                <Star size={12} fill="currentColor" /> {b.rating}
+                                                            </div>
                                                         ) : '-'}
                                                     </td>
                                                     {/* Location */}
-                                                    <td style={{ fontSize: '0.8rem' }} title={b.pickup_address}>📍 {formatLocation(b.pickup_address)}</td>
-                                                    <td style={{ fontSize: '0.8rem' }} title={b.delivery_address}>🏁 {formatLocation(b.delivery_address)}</td>
+                                                    <td style={{ fontSize: '0.8rem' }} title={b.pickup_address}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                            <MapPin size={12} style={{ color: 'var(--brand-dominant)' }} /> {formatLocation(b.pickup_address)}
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ fontSize: '0.8rem' }} title={b.delivery_address}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                            <Flag size={12} style={{ color: 'var(--brand-secondary)' }} /> {formatLocation(b.delivery_address)}
+                                                        </div>
+                                                    </td>
                                                 </tr>
                                             )
                                         })}
@@ -646,15 +714,20 @@ export default function CRMPage() {
             {/* TAB 3: ANALYTICS (RFM) */}
             {activeTab === 'analytics' && (
                 <div className={styles.card}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                        <div>
-                            <h2 className={styles.tableTitle}>วิเคราะห์พฤติกรรม (Behavior & RFM)</h2>
-                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                                ระบบคำนวณจาก: ช่วงเวลาที่หายไป (Recency), ความถี่เข้าล้าง (Frequency), และมูลค่ารวมที่จ่าย (Monetary)
-                            </p>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, gap: 16 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <div style={{ background: 'var(--brand-dominant)', color: 'white', width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <ShieldCheck size={24} />
+                                </div>
+                                <div>
+                                    <h2 className={styles.tableTitle} style={{ margin: 0 }}>วิเคราะห์พฤติกรรม (Behavior & RFM)</h2>
+                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>ระบบคำนวณจาก Recency, Frequency, และ Monetary</p>
+                                </div>
+                            </div>
+                            <button className="btn btn-sm btn-ghost" style={{ background: 'var(--surface-2)', borderRadius: '10px', gap: 8 }} onClick={() => setShowLegend(true)}>
+                                <Info size={16} /> ดูความหมายแท็ก
+                            </button>
                         </div>
-                        <button className="btn btn-sm btn-outline" onClick={() => setShowLegend(true)}>ℹ️ ดูความหมายแท็ก</button>
-                    </div>
 
 
                     <div className={styles.tableContainer}>
@@ -699,10 +772,15 @@ export default function CRMPage() {
             {/* TAB 4: SEGMENT BUILDER */}
             {activeTab === 'segments' && (
                 <div className={styles.card}>
-                    <h2 className={styles.tableTitle}>เครื่องมือสร้างกลุ่มเป้าหมาย (Segment Builder) 🎯</h2>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 24 }}>
-                        กำหนดเงื่อนไขเพื่อดึงรายชื่อลูกค้าเป้าหมาย แล้วบันทึกเป็น Segment นำไปใช้ผูกกับคูปองส่วนลด
-                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                        <div style={{ background: 'var(--brand-secondary)', color: 'white', width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Target size={24} />
+                        </div>
+                        <div>
+                            <h2 className={styles.tableTitle} style={{ margin: 0 }}>เครื่องมือสร้างกลุ่มเป้าหมาย (Segment Builder)</h2>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>กำหนดเงื่อนไขเพื่อดึงรายชื่อลูกค้าเป้าหมาย</p>
+                        </div>
+                    </div>
 
                     <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                         {/* Builder Form */}
@@ -714,13 +792,13 @@ export default function CRMPage() {
 
                             <div style={{ marginTop: 24 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                                    <label style={{ fontWeight: 700 }}>เงื่อนไข (Conditions)</label>
+                                    <h3 style={{ fontWeight: 800, fontSize: '0.9rem', margin: 0 }}>เงื่อนไข (Conditions)</h3>
                                     <button 
-                                        className="btn btn-sm btn-outline" 
-                                        style={{ height: 28, fontSize: '0.75rem' }}
+                                        className="btn btn-sm btn-primary" 
+                                        style={{ height: 32, fontSize: '0.75rem', borderRadius: 8, gap: 4 }}
                                         onClick={() => setConditions([...conditions, { id: Date.now(), metric: 'totalVisits', operator: '>=', value: '1' }])}
                                     >
-                                        + เพิ่มเงื่อนไข
+                                        <Plus size={14} /> เพิ่มเงื่อนไข
                                     </button>
                                 </div>
                                 
@@ -978,10 +1056,10 @@ export default function CRMPage() {
                                             
                                             <button 
                                                 className="btn btn-sm btn-ghost" 
-                                                style={{ color: 'var(--danger)', padding: 0 }}
+                                                style={{ color: 'var(--danger)', padding: 0, width: 32, height: 32, borderRadius: 8 }}
                                                 onClick={() => setConditions(conditions.filter(c => c.id !== cond.id))}
                                             >
-                                                🗑️
+                                                <Trash2 size={16} />
                                             </button>
                                         </div>
                                     ))}
@@ -1041,7 +1119,9 @@ export default function CRMPage() {
                         <div style={{ flex: '2 1 400px', display: 'flex', flexDirection: 'column', gap: 24 }}>
                             {/* List of Saved Segments */}
                             <div>
-                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12 }}>รายการที่บันทึกไว้ ({savedSegments.length})</h3>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <ClipboardList size={18} color="var(--primary)" /> รายการที่บันทึกไว้ ({savedSegments.length})
+                                </h3>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                                     {savedSegments.map(seg => (
                                         <div key={seg.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', padding: '10px 16px', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12, boxShadow: 'var(--shadow-sm)' }}>
@@ -1061,18 +1141,18 @@ export default function CRMPage() {
                                                 }).length} คน</div>
                                             </div>
                                             <div style={{ display: 'flex', gap: 4 }}>
-                                                <button className="btn btn-xs btn-ghost" onClick={() => {
+                                                <button className="btn btn-xs btn-ghost" style={{ borderRadius: 6 }} onClick={() => {
                                                     setEditingSegmentId(seg.id);
                                                     setSegmentName(seg.name);
                                                     setConditions(seg.conditions);
-                                                }}>🖊️</button>
-                                                <button className="btn btn-xs btn-ghost" style={{ color: 'var(--danger)' }} onClick={() => {
+                                                }}><Edit3 size={14} /></button>
+                                                <button className="btn btn-xs btn-ghost" style={{ color: 'var(--danger)', borderRadius: 6 }} onClick={() => {
                                                     if (confirm(`ยืนยันลบ Segment "${seg.name}"?`)) {
                                                         const updated = savedSegments.filter(s => s.id !== seg.id);
                                                         localStorage.setItem('crm_custom_segments', JSON.stringify(updated));
                                                         setSavedSegments(updated);
                                                     }
-                                                }}>🗑️</button>
+                                                }}><Trash2 size={14} /></button>
                                             </div>
                                         </div>
                                     ))}
@@ -1083,7 +1163,9 @@ export default function CRMPage() {
                             </div>
 
                             <div>
-                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12 }}>ตัวอย่างลูกค้าที่เข้าเงื่อนไขปัจจุบัน ({matchedUsersCount} คน)</h3>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <CheckCircle size={18} color="var(--success)" /> ตัวอย่างลูกค้าที่เข้าเงื่อนไขปัจจุบัน ({matchedUsersCount} คน)
+                                </h3>
                                 <div className={styles.tableContainer} style={{ maxHeight: 300, overflowY: 'auto' }}>
                                     <table>
                                         <thead>
@@ -1126,9 +1208,14 @@ export default function CRMPage() {
             <div className={styles.fullscreenOverlay} onClick={() => setShowLegend(false)}>
                 <div className={styles.fullscreenModal} onClick={e => e.stopPropagation()}>
                     <div className={styles.modalHeader}>
-                        <div>
-                            <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--primary)' }}>⚙️ ตั้งค่าเกณฑ์แบ่งกลุ่ม (CRM Config)</h2>
-                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>ปรับจูนเกณฑ์การให้คะแนนและตรรกะการจัดกลุ่มลูกค้าให้เหมาะสมกับธุรกิจคุณ</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                            <div style={{ background: 'var(--brand-dominant)', color: 'white', width: 56, height: 56, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Settings size={32} />
+                            </div>
+                            <div>
+                                <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--brand-dominant)', margin: 0 }}>ตั้งค่าเกณฑ์แบ่งกลุ่ม (CRM Config)</h2>
+                                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>ปรับจูนเกณฑ์การให้คะแนนและตรรกะการจัดกลุ่มลูกค้า</p>
+                            </div>
                         </div>
                         <div style={{ display: 'flex', gap: 12 }}>
                             <button className="btn btn-outline" onClick={() => {
@@ -1279,19 +1366,26 @@ export default function CRMPage() {
         {selectedCustomer && (
             <div className={styles.fullscreenOverlay} onClick={() => setSelectedCustomer(null)}>
                 <div className={styles.fullscreenModal} style={{ maxWidth: 800 }} onClick={e => e.stopPropagation()}>
-                    <div className={styles.modalHeader}>
-                        <div>
-                            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary)' }}>👤 รายละเอียดลูกค้าแบบเต็ม</h2>
-                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>ข้อมูล Demo/Demographic และทรัพย์สินระบุชื่อ</p>
+                    <div className={styles.modalHeader} style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                            <div style={{ background: 'var(--brand-dominant)', color: 'white', width: 48, height: 48, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <User size={28} />
+                            </div>
+                            <div>
+                                <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--brand-dominant)', margin: 0 }}>โปรไฟล์ลูกค้า</h2>
+                                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>ข้อมูลเชิงลึกและรายละเอียดทรัพย์สิน</p>
+                            </div>
                         </div>
-                        <button className="btn btn-outline" onClick={() => setSelectedCustomer(null)}>ปิด</button>
+                        <button className="btn btn-sm btn-ghost" style={{ background: 'var(--surface-2)', borderRadius: 10, width: 40, height: 40, padding: 0 }} onClick={() => setSelectedCustomer(null)}>✕</button>
                     </div>
                     
                     <div className={styles.modalBody} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
                         {/* Column 1: Personal Info & Interests */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                             <section>
-                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12, borderBottom: '2px solid var(--primary-ghost)', paddingBottom: 4 }}>📌 ข้อมูลส่วนตัว</h3>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12, borderBottom: '2px solid var(--primary-ghost)', paddingBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <User size={18} color="var(--primary)" /> ข้อมูลส่วนตัว
+                                </h3>
                                 <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 8, fontSize: '0.9rem' }}>
                                     <span style={{ color: 'var(--text-muted)' }}>ชื่อ-นามสกุล:</span> <span style={{ fontWeight: 600 }}>{selectedCustomer.full_name}</span>
                                     <span style={{ color: 'var(--text-muted)' }}>เบอร์โทรศัพท์:</span> <span>{selectedCustomer.phone}</span>
@@ -1302,7 +1396,9 @@ export default function CRMPage() {
                             </section>
 
                             <section>
-                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12, borderBottom: '2px solid var(--primary-ghost)', paddingBottom: 4 }}>✨ สิ่งที่สนใจ</h3>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12, borderBottom: '2px solid var(--primary-ghost)', paddingBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <Sparkles size={18} color="var(--warning)" /> สิ่งที่สนใจ
+                                </h3>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                                     {Array.isArray(selectedCustomer.interests) && selectedCustomer.interests.map((i: string) => (
                                         <span key={i} style={{ fontSize: '0.8rem', padding: '4px 10px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 20 }}>{i}</span>
@@ -1312,7 +1408,9 @@ export default function CRMPage() {
                             </section>
 
                             <section>
-                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12, borderBottom: '2px solid var(--primary-ghost)', paddingBottom: 4 }}>📊 สถิติล้างรถ</h3>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12, borderBottom: '2px solid var(--primary-ghost)', paddingBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <BarChart3 size={18} color="var(--info)" /> สถิติล้างรถ
+                                </h3>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                                     <div className={styles.thresholdCard} style={{ padding: 12 }}>
                                         <div className={styles.thresholdLabel}>จำนวนครั้ง</div>
@@ -1329,7 +1427,9 @@ export default function CRMPage() {
                         {/* Column 2: Vehicles & Locations */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                             <section>
-                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12, borderBottom: '2px solid var(--primary-ghost)', paddingBottom: 4 }}>🚗 ยานพาหนะที่บันทึกไว้ ({selectedCustomer.saved_vehicles?.length || 0})</h3>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12, borderBottom: '2px solid var(--primary-ghost)', paddingBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <Car size={18} color="var(--primary)" /> ยานพาหนะที่บันทึกไว้ ({selectedCustomer.saved_vehicles?.length || 0})
+                                </h3>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                     {Array.isArray(selectedCustomer.saved_vehicles) && selectedCustomer.saved_vehicles.map((v: any, idx: number) => (
                                         <div key={idx} style={{ padding: 10, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)', fontSize: '0.85rem' }}>
@@ -1342,7 +1442,9 @@ export default function CRMPage() {
                             </section>
 
                             <section>
-                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12, borderBottom: '2px solid var(--primary-ghost)', paddingBottom: 4 }}>📍 ที่อยู่ที่บันทึกไว้ ({selectedCustomer.saved_locations?.length || 0})</h3>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: 12, borderBottom: '2px solid var(--primary-ghost)', paddingBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <MapPin size={18} color="var(--danger)" /> ที่อยู่ที่บันทึกไว้ ({selectedCustomer.saved_locations?.length || 0})
+                                </h3>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                     {Array.isArray(selectedCustomer.saved_locations) && selectedCustomer.saved_locations.map((l: any, idx: number) => (
                                         <div key={idx} style={{ padding: 10, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)', fontSize: '0.85rem' }}>

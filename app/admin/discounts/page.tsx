@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import styles from './discounts.module.css'
+import { Ticket, Sparkles, Edit2, CheckCircle, AlertCircle, Trash2, Calendar, ClipboardList, Clock } from 'lucide-react'
 
 export default function AdvancedDiscountsPage() {
     const [codes, setCodes] = useState<any[]>([])
@@ -109,7 +110,9 @@ export default function AdvancedDiscountsPage() {
         <div className={styles.page}>
             <div className="page-header animate-fade">
                 <div>
-                    <h1 className="page-title">🎫 จัดการโค้ดส่วนลด (Advanced)</h1>
+                    <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <Ticket size={28} color="var(--brand-dominant)" /> จัดการโค้ดส่วนลด
+                    </h1>
                     <p className="page-subtitle">จัดการส่วนลด กำหนดกลุ่มเป้าหมาย และสิทธิ์การใช้งาน</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => { resetForm(); setShowModal(true) }}>+ เพิ่มโค้ด</button>
@@ -143,8 +146,8 @@ export default function AdvancedDiscountsPage() {
                                         ใช้ไป {c.used_count || 0} / {c.max_uses || '∞'} สิทธิ์
                                     </div>
                                     {c.expires_at && (
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--danger)', marginTop: 2, fontWeight: 600 }}>
-                                            ⏳ หมดอายุ: {new Date(c.expires_at).toLocaleDateString('th-TH', { 
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--danger)', marginTop: 2, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                            <Clock size={12} /> หมดอายุ: {new Date(c.expires_at).toLocaleDateString('th-TH', { 
                                                 year: 'numeric', month: 'short', day: 'numeric', 
                                                 hour: '2-digit', minute: '2-digit' 
                                             })}
@@ -154,14 +157,14 @@ export default function AdvancedDiscountsPage() {
 
                                 <div className={styles.codeItemRight}>
                                     <div className={`${styles.codeStatus} ${c.is_active ? styles.statusActive : styles.statusInactive}`}>
-                                        {c.is_active ? '✅ ใช้งานอยู่' : '⛔ ปิดใช้งาน'}
+                                        {c.is_active ? <><CheckCircle size={14} style={{ marginRight: 4 }} /> ใช้งานอยู่</> : <><AlertCircle size={14} style={{ marginRight: 4 }} /> ปิดใช้งาน</>}
                                     </div>
                                     <div className={styles.codeActions}>
                                         <button className="btn btn-outline btn-sm" style={{ padding: '4px 8px' }} onClick={() => toggleStatus(c.id, c.is_active)}>
                                             {c.is_active ? 'ปิด' : 'เปิด'}
                                         </button>
                                         <button className="btn btn-outline btn-sm" style={{ padding: '4px 8px' }} onClick={() => handleEdit(c)}>
-                                            ✏️
+                                            <Edit2 size={14} />
                                         </button>
                                     </div>
                                 </div>
@@ -175,8 +178,8 @@ export default function AdvancedDiscountsPage() {
             {showModal && (
                 <div className="overlay" onClick={() => setShowModal(false)} style={{ zIndex: 999 }}>
                     <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
-                        <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 'var(--space-4)' }}>
-                            {editingId ? '✏️ แก้ไขโค้ดส่วนลด' : '✨ สร้างโค้ดส่วนลด'}
+                        <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                                {editingId ? <><Edit2 size={20} color="var(--brand-dominant)" /> แก้ไขโค้ดส่วนลด</> : <><Sparkles size={20} color="var(--brand-dominant)" /> สร้างโค้ดส่วนลด</>}
                         </h2>
 
                         <form onSubmit={handleSave}>

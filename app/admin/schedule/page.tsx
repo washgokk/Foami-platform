@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { TIME_SLOTS } from '@/lib/types'
 import { addDays, format, startOfWeek } from 'date-fns'
 import { th } from 'date-fns/locale'
+import { Calendar, ChevronLeft, ChevronRight, MapPin, Layers } from 'lucide-react'
 import styles from './schedule.module.css'
 
 export default function AdminSchedulePage() {
@@ -91,13 +92,17 @@ export default function AdminSchedulePage() {
     return (
         <div className="animate-fade">
             <div className={styles.header}>
-                <h1 className={styles.title}>📅 ตารางงานพนักงาน</h1>
+                <h1 className={styles.title}>
+                    <Calendar size={28} style={{ color: 'var(--brand-dominant)' }} /> ตารางงานพนักงาน
+                </h1>
             </div>
 
             <div className={styles.filters}>
                 <div className={styles.filterGroup}>
-                    <span className={styles.filterLabel}>สาขา:</span>
-                    <select className="form-input" style={{ width: 160, padding: '6px 10px' }} value={selectedBranchId} onChange={e => setSelectedBranchId(e.target.value)}>
+                    <span className={styles.filterLabel} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <MapPin size={14} /> สาขา:
+                    </span>
+                    <select className="form-input" style={{ width: 160, padding: '6px 12px', borderRadius: '10px' }} value={selectedBranchId} onChange={e => setSelectedBranchId(e.target.value)}>
                         {branches.map(b => (
                             <option key={b.id} value={b.id}>{b.name}</option>
                         ))}
@@ -105,8 +110,10 @@ export default function AdminSchedulePage() {
                 </div>
 
                 <div className={styles.filterGroup}>
-                    <span className={styles.filterLabel}>โซน:</span>
-                    <select className="form-input" style={{ width: 160, padding: '6px 10px' }} value={selectedZoneId} onChange={e => setSelectedZoneId(e.target.value)}>
+                    <span className={styles.filterLabel} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Layers size={14} /> โซน:
+                    </span>
+                    <select className="form-input" style={{ width: 160, padding: '6px 12px', borderRadius: '10px' }} value={selectedZoneId} onChange={e => setSelectedZoneId(e.target.value)}>
                         <option value="">ทุกโซนในสาขา</option>
                         {zones.filter(z => z.branch_id === selectedBranchId).map(z => (
                             <option key={z.id} value={z.id}>{z.name}</option>
@@ -117,11 +124,15 @@ export default function AdminSchedulePage() {
                 <div style={{ flex: 1 }} />
 
                 <div className={styles.weekControl}>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setWeekStart(d => addDays(d, -7))}>‹ ก่อนหน้า</button>
+                    <button className="btn btn-ghost btn-sm" style={{ borderRadius: 8 }} onClick={() => setWeekStart(d => addDays(d, -7))}>
+                        <ChevronLeft size={18} />
+                    </button>
                     <div className={styles.weekLabel}>
                         {format(weekStart, 'd MMM', { locale: th })} – {format(addDays(weekStart, 6), 'd MMM yy', { locale: th })}
                     </div>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setWeekStart(d => addDays(d, 7))}>ถัดไป ›</button>
+                    <button className="btn btn-ghost btn-sm" style={{ borderRadius: 8 }} onClick={() => setWeekStart(d => addDays(d, 7))}>
+                        <ChevronRight size={18} />
+                    </button>
                 </div>
             </div>
 

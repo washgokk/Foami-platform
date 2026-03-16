@@ -38,6 +38,9 @@ import {
     Search
 } from 'lucide-react'
 import styles from './settings.module.css'
+import Logo from '@/components/Branding/Logo'
+import { usePushNotifications } from '@/lib/hooks/usePushNotifications'
+import { Bell, BellOff, Send } from 'lucide-react'
 
 import type MapPickerType from '../book/MapPicker'
 const MapPicker = dynamic<React.ComponentProps<typeof MapPickerType>>(
@@ -57,6 +60,14 @@ export default function SettingsPage() {
 
     const [loading, setLoading] = useState(true)
     const [showLocModal, setShowLocModal] = useState(false)
+
+    const { 
+        subscribe, 
+        unsubscribe, 
+        sendTest, 
+        isSubscribed, 
+        loading: pushLoading 
+    } = usePushNotifications(form?.id, 'customer')
     const [locForm, setLocForm] = useState<Partial<SavedLocation>>({ lat: 16.4419, lng: 102.8360 })
 
     // Modal state for adding a new vehicle
@@ -131,7 +142,7 @@ export default function SettingsPage() {
                     if (isSaved) continue
 
                     unique[detail] = {
-                        name: `🏠 ${detail}`, lat: b.pickup_lat, lng: b.pickup_lng,
+                        name: `${detail}`, lat: b.pickup_lat, lng: b.pickup_lng,
                         address: b.pickup_address, detail: detail,
                         note: b.pickup_address.includes('(') ? b.pickup_address.split('(')[1].split(')')[0] : '',
                         isHistory: true
@@ -395,9 +406,9 @@ export default function SettingsPage() {
     return (
         <div className={styles.page}>
             <div className={styles.topbar}>
-                <Link href={`/${branchSlug}/menu`} className="btn btn-ghost btn-sm btn-icon"><ChevronLeft size={20} /></Link>
-                <div className={styles.title}>ตั้งค่าบัญชี</div>
-                <div style={{ width: 36 }} />
+                <Link href={`/${branchSlug}/menu`} className="btn btn-ghost btn-sm btn-icon"><ChevronLeft size={24} /></Link>
+                <Logo width={110} variant="landscape" />
+                <div style={{ width: 44 }} />
             </div>
 
             <form onSubmit={handleSave} className={styles.form}>
@@ -405,7 +416,7 @@ export default function SettingsPage() {
                 <div className={styles.section}>
                     <div className={styles.sectionTitle}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <User size={18} /> ข้อมูลส่วนตัว {!form.is_profile_complete && '(กรอกครบเพื่อรับส่วนลด)'}
+                            <User size={18} /> ข้อมูลส่วนตัว
                         </div>
                     </div>
                     {field('ชื่อ-นามสกุล', 'full_name')}
@@ -622,6 +633,65 @@ export default function SettingsPage() {
                     <button type="button" className="btn btn-outline btn-full" onClick={() => setShowLocModal(true)} style={{ gap: 8 }}>
                         <Plus size={18} /> เพิ่มสถานที่ใหม่
                     </button>
+                </div>
+
+                {/* Section: Notifications */}
+                <div className={styles.card}>
+                    <h2 className={styles.sectionTitle} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Bell size={20} /> การแจ้งเตือน (Push Notifications)
+                    </h2>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 20 }}>
+                        รับแจ้งเตือนเมื่อพนักงานรับงาน, เริ่มล้าง และล้างรถเสร็จแล้ว
+                    </p>
+                    <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        padding: '16px',
+                        background: 'var(--surface-2)',
+                        borderRadius: '16px',
+                        border: '1px solid var(--border)'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div style={{ 
+                                width: 40, 
+                                height: 40, 
+                                borderRadius: '12px',
+                                background: isSubscribed ? 'var(--accent-green-ghost)' : 'var(--surface-3)',
+                                color: isSubscribed ? 'var(--accent-green-dark)' : 'var(--text-muted)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}>
+                                {isSubscribed ? <Bell size={20} /> : <BellOff size={20} />}
+                            </div>
+                            <div>
+                                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                                    {isSubscribed ? 'เปิดการแจ้งเตือนแล้ว' : 'ปิดการแจ้งเตือนอยู่'}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                    {isSubscribed ? 'ระบบจะแจ้งสถานะงานให้ทราบ' : 'กดเปิดเพื่อไม่พลาดสถานะงาน'}
+                                </div>
+                            </div>
+                        </div>
+                        <button 
+                            type="button"
+                            className={`btn ${isSubscribed ? 'btn-ghost' : 'btn-primary'}`}
+                            style={{ 
+                                height: 40, 
+                                padding: '0 16px', 
+                                fontSize: '0.85rem',
+                                borderRadius: '12px',
+                                border: isSubscribed ? '1px solid var(--border)' : 'none'
+                            }}
+                            onClick={() => isSubscribed ? unsubscribe() : subscribe()}
+                            disabled={pushLoading}
+                        >
+                            {pushLoading ? <span className="spinner" style={{ width: 16, height: 16 }} /> : 
+                             (isSubscribed ? 'ปิดใช้งาน' : 'เปิดใช้งาน')}
+                        </button>
+                    </div>
+
                 </div>
 
                 {saved && <div className="alert alert-success" style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-lg)', gap: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

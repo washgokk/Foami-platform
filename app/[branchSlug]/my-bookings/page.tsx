@@ -8,6 +8,7 @@ import {
     ChevronLeft, 
     Clock, 
     CheckCircle, 
+    CheckCircle2,
     Bike, 
     Droplets, 
     Truck, 
@@ -29,6 +30,8 @@ import styles from './my-bookings.module.css'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements } from '@stripe/react-stripe-js'
 import CheckoutForm from '@/components/Stripe/CheckoutForm'
+import Logo from '@/components/Branding/Logo'
+import ImageZoom from '@/components/Global/ImageZoom'
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '')
 
@@ -58,6 +61,7 @@ export default function MyBookingsPage() {
     const [comment, setComment] = useState('')
     const [submitting, setSubmitting] = useState(false)
     const [clientSecret, setClientSecret] = useState('')
+    const [zoomConfig, setZoomConfig] = useState<{ images: { src: string; alt?: string }[]; initialIndex: number } | null>(null)
 
     useEffect(() => {
         const customer = localStorage.getItem('liff_customer')
@@ -201,19 +205,44 @@ export default function MyBookingsPage() {
     return (
         <div className={styles.page}>
             <div className={styles.topbar}>
-                <Link href={`/${branchSlug}/menu`} className="btn btn-ghost btn-sm btn-icon"><ChevronLeft size={20} /></Link>
-                <div className={styles.title}>การจองของฉัน</div>
-                <div style={{ width: 36 }} />
+                <Link href={`/${branchSlug}/menu`} className="btn btn-ghost btn-sm btn-icon"><ChevronLeft size={24} /></Link>
+                <Logo width={110} variant="landscape" />
+                <div style={{ width: 44 }} />
             </div>
 
             {success === '1' && (
-                <div style={{ margin: 'var(--space-4)' }}>
-                    <div className="alert alert-success" style={{ animation: 'fadeIn 0.3s ease', borderRadius: '18px', padding: '16px', display: 'flex', gap: 12 }}>
-                        <div style={{ background: 'white', borderRadius: '10px', padding: 8, color: 'var(--success)' }}><CheckCircle size={20} /></div>
-                        <div style={{ fontSize: '0.9rem', lineHeight: 1.4, fontWeight: 700 }}>
-                            จองสำเร็จแล้ว! <br/>
-                            <span style={{ fontWeight: 500, opacity: 0.9 }}>เราจะแจ้งเตือนคุณผ่าน Line เมื่อพนักงานรับงาน</span>
+                <div style={{ margin: 'var(--space-4)', animation: 'slideDown 0.5s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+                    <div style={{ 
+                        background: 'linear-gradient(135deg, var(--brand-dominant) 0%, var(--brand-subordinate) 100%)', 
+                        borderRadius: '32px', 
+                        padding: 'var(--space-8) var(--space-6)', 
+                        color: 'white',
+                        textAlign: 'center',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        boxShadow: '0 20px 40px rgba(49, 94, 195, 0.25)'
+                    }}>
+                        {/* Decorative background element */}
+                        <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, background: 'rgba(255,255,255,0.1)', borderRadius: '50%', filter: 'blur(30px)' }} />
+                        
+                        <div style={{ 
+                            background: 'rgba(255,255,255,0.2)', 
+                            width: 64, 
+                            height: 64, 
+                            borderRadius: '20px', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            margin: '0 auto var(--space-4)',
+                            backdropFilter: 'blur(10px)'
+                        }}>
+                            <PartyPopper size={32} />
                         </div>
+                        <h2 style={{ fontSize: '1.4rem', fontWeight: 900, marginBottom: 8, letterSpacing: '-0.02em' }}>จองสำเร็จแล้ว!</h2>
+                        <p style={{ fontSize: '0.9rem', opacity: 0.9, lineHeight: 1.5, fontWeight: 500, maxWidth: '240px', margin: '0 auto' }}>
+                            ขอบคุณที่ร่วมเป็นส่วนหนึ่งกับเรา<br/>
+                            เราจะแจ้งเตือนคุณเมื่อพนักงานรับงาน
+                        </p>
                     </div>
                 </div>
             )}
@@ -262,21 +291,21 @@ export default function MyBookingsPage() {
                                 })}
                             </div>
 
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem' }}>
+                            <div className={styles.cardFooter}>
                                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                                     {b.additional_price > 0 && !b.is_additional_paid ? (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#fffbeb', color: '#b45309', padding: '2px 8px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 800, border: '1px solid #fcd34d' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--danger-ghost)', color: 'var(--danger)', padding: '2px 8px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 800 }}>
                                             <AlertCircle size={12} /> มียอดค้างชำระ
                                         </div>
                                     ) : b.rating ? (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--warning-ghost)', color: 'var(--warning)', padding: '2px 8px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 800 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--brand-accent-ghost)', color: 'var(--brand-accent)', padding: '2px 8px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 800 }}>
                                             <Star size={12} fill="currentColor" /> {b.rating}
                                         </div>
                                     ) : b.status === 'completed' ? (
-                                        <div style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '0.8rem' }}>ให้คะแนนบริการนี้</div>
+                                        <div style={{ color: 'var(--brand-dominant)', fontWeight: 700, fontSize: '0.8rem' }}>ให้คะแนนบริการนี้</div>
                                     ) : <div />}
                                 </div>
-                                <div style={{ fontWeight: 900, fontSize: '1.1rem', color: 'var(--primary)' }}>฿{b.total_price?.toLocaleString()}</div>
+                                <div className={styles.price}>฿{b.total_price?.toLocaleString()}</div>
                             </div>
                         </div>
                     ))}
@@ -480,28 +509,30 @@ export default function MyBookingsPage() {
                                     )}
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                         {/* Multi-Slip Display */}
-                                        {(Array.isArray(selectedBooking.additional_price_slips) && selectedBooking.additional_price_slips.length > 0) || selectedBooking.additional_price_slip ? (
-                                            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-                                                {[...(selectedBooking.additional_price_slips || []), selectedBooking.additional_price_slip].filter(Boolean).map((url, i) => (
-                                                    <img 
-                                                        key={i} src={url} alt={`receipt-${i}`} 
-                                                        style={{ height: 80, width: 80, borderRadius: 12, objectFit: 'cover', flexShrink: 0, border: '1px solid #fcd34d' }} 
-                                                        onClick={() => window.open(url, '_blank')}
-                                                    />
-                                                ))}
-                                            </div>
-                                        ) : null}
+                                                {(() => {
+                                                    const allSlips = [...(selectedBooking.additional_price_slips || []), selectedBooking.additional_price_slip].filter(Boolean) as string[]
+                                                    return allSlips.map((url, i) => (
+                                                        <img 
+                                                            key={i} src={url} alt={`receipt-${i}`} 
+                                                            style={{ height: 80, width: 80, borderRadius: 12, objectFit: 'cover', flexShrink: 0, border: '1px solid #fcd34d', cursor: 'zoom-in' }} 
+                                                            onClick={() => setZoomConfig({ 
+                                                                images: allSlips.map(s => ({ src: s, alt: 'หลักฐานค่าใช้จ่ายเพิ่มเติม' })), 
+                                                                initialIndex: i 
+                                                            })}
+                                                        />
+                                                    ))
+                                                })()}
 
                                         <div style={{ display: 'flex', gap: 8 }}>
                                             {!selectedBooking.is_additional_paid ? (
                                                 !clientSecret ? (
-                                                    <button className="btn btn-primary btn-sm" style={{ flex: 2, borderRadius: '12px', background: '#b45309', border: 'none' }} onClick={handlePayAdditional} disabled={submitting}>
-                                                        {submitting ? <div className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff' }} /> : '💰 ชำระเงินส่วนนี้'}
+                                                    <button className="btn btn-primary btn-sm" style={{ flex: 2, borderRadius: '14px', background: 'var(--brand-dominant)', border: 'none' }} onClick={handlePayAdditional} disabled={submitting}>
+                                                        {submitting ? <div className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff' }} /> : 'ชำระเงินส่วนนี้'}
                                                     </button>
                                                 ) : null
                                             ) : (
-                                                <div style={{ flex: 2, background: 'var(--success)', color: 'white', borderRadius: '12px', height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700 }}>
-                                                    ✅ ชำระแล้ว
+                                                <div style={{ flex: 2, background: 'var(--success)', color: 'white', borderRadius: '12px', height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700, gap: 4 }}>
+                                                    <CheckCircle2 size={16} /> ชำระแล้ว
                                                 </div>
                                             )}
                                         </div>
@@ -525,18 +556,38 @@ export default function MyBookingsPage() {
                             {/* Before/After photos if completed */}
                             {selectedBooking.status === 'completed' && photos[selectedBooking.id] && (
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                                    {photos[selectedBooking.id].before?.[0] && (
-                                        <div>
-                                            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textAlign: 'center' }}>ก่อนล้าง</div>
-                                            <img src={photos[selectedBooking.id].before[0]} alt="before" style={{ width: '100%', borderRadius: 16, objectFit: 'cover', aspectRatio: '4/3', border: '2px solid var(--surface-2)' }} />
-                                        </div>
-                                    )}
-                                    {photos[selectedBooking.id].after?.[0] && (
-                                        <div>
-                                            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textAlign: 'center' }}>หลังล้าง</div>
-                                            <img src={photos[selectedBooking.id].after[0]} alt="after" style={{ width: '100%', borderRadius: 16, objectFit: 'cover', aspectRatio: '4/3', border: '2px solid var(--surface-2)' }} />
-                                        </div>
-                                    )}
+                                    {(() => {
+                                        const jobPhotos = [
+                                            ...(photos[selectedBooking.id].before || []).map((url: string) => ({ src: url, alt: 'รูปภาพงาน (ก่อนล้าง)' })),
+                                            ...(photos[selectedBooking.id].after || []).map((url: string) => ({ src: url, alt: 'รูปภาพงาน (หลังล้าง)' }))
+                                        ]
+                                        return (
+                                            <>
+                                                {photos[selectedBooking.id].before?.[0] && (
+                                                    <div>
+                                                        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textAlign: 'center' }}>ก่อนล้าง</div>
+                                                        <img 
+                                                            src={photos[selectedBooking.id].before[0]} 
+                                                            alt="before" 
+                                                            style={{ width: '100%', borderRadius: 16, objectFit: 'cover', aspectRatio: '4/3', border: '2px solid var(--surface-2)', cursor: 'zoom-in' }} 
+                                                            onClick={() => setZoomConfig({ images: jobPhotos, initialIndex: 0 })}
+                                                        />
+                                                    </div>
+                                                )}
+                                                {photos[selectedBooking.id].after?.[0] && (
+                                                    <div>
+                                                        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textAlign: 'center' }}>หลังล้าง</div>
+                                                        <img 
+                                                            src={photos[selectedBooking.id].after[0]} 
+                                                            alt="after" 
+                                                            style={{ width: '100%', borderRadius: 16, objectFit: 'cover', aspectRatio: '4/3', border: '2px solid var(--surface-2)', cursor: 'zoom-in' }} 
+                                                            onClick={() => setZoomConfig({ images: jobPhotos, initialIndex: photos[selectedBooking.id].before?.length || 0 })}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </>
+                                        )
+                                    })()}
                                 </div>
                             )}
 
@@ -552,9 +603,9 @@ export default function MyBookingsPage() {
                                                 key={s} 
                                                 disabled={!!selectedBooking.rating}
                                                 onClick={() => setRating(s)}
-                                                style={{ background: 'none', border: 'none', fontSize: '2rem', cursor: selectedBooking.rating ? 'default' : 'pointer', color: s <= rating ? '#fbbf24' : '#d1d5db' }}
+                                                style={{ background: 'none', border: 'none', fontSize: '2rem', cursor: selectedBooking.rating ? 'default' : 'pointer', color: s <= rating ? 'var(--brand-accent)' : 'var(--surface-2)' }}
                                             >
-                                                <Star size={32} fill={s <= rating ? '#fbbf24' : 'none'} color={s <= rating ? '#fbbf24' : '#d1d5db'} />
+                                                <Star size={32} fill={s <= rating ? 'var(--brand-accent)' : 'none'} color={s <= rating ? 'var(--brand-accent)' : 'var(--border)'} />
                                             </button>
                                         ))}
                                     </div>
@@ -587,6 +638,13 @@ export default function MyBookingsPage() {
                         </div>
                     </div>
                 </div>
+            )}
+            {zoomConfig && (
+                <ImageZoom 
+                    images={zoomConfig.images}
+                    initialIndex={zoomConfig.initialIndex}
+                    onClose={() => setZoomConfig(null)} 
+                />
             )}
         </div>
     )
