@@ -71,7 +71,7 @@ export default function SettingsPage() {
         sendTest, 
         isSubscribed, 
         loading: pushLoading 
-    } = usePushNotifications(form?.id, 'customer')
+    } = usePushNotifications(form?.id, 'customer', '/')
     const [locForm, setLocForm] = useState<Partial<SavedLocation>>({ lat: 16.4419, lng: 102.8360 })
 
     // Modal state for adding a new vehicle

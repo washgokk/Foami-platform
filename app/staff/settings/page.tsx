@@ -29,7 +29,7 @@ export default function StaffSettingsPage() {
         sendTest, 
         isSubscribed, 
         loading: pushLoading 
-    } = usePushNotifications(staff?.id, 'staff')
+    } = usePushNotifications(staff?.id, 'staff', '/staff/')
 
     const [form, setForm] = useState({
         full_name: '',

@@ -3,7 +3,11 @@ import { useState, useEffect } from 'react'
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
 
-export function usePushNotifications(userId: string | undefined, platform: 'customer' | 'staff' | 'admin') {
+export function usePushNotifications(
+    userId: string | undefined, 
+    platform: 'customer' | 'staff' | 'admin',
+    scope: string = '/'
+) {
     const [subscription, setSubscription] = useState<PushSubscription | null>(null)
     const [isSubscribed, setIsSubscribed] = useState(false)
     const [loading, setLoading] = useState(true)
@@ -23,7 +27,7 @@ export function usePushNotifications(userId: string | undefined, platform: 'cust
                 let registration = await navigator.serviceWorker.getRegistration()
                 if (!registration) {
                     console.log('Registering SW manually...')
-                    registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                    registration = await navigator.serviceWorker.register('/sw.js', { scope })
                 }
 
                 // Wait for SW to be active if it's not
@@ -86,7 +90,7 @@ export function usePushNotifications(userId: string | undefined, platform: 'cust
             // If no registration, try to register it now
             if (!registration) {
                 console.log('No SW registration found during subscribe - registering now...')
-                registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                registration = await navigator.serviceWorker.register('/sw.js', { scope })
             }
 
             // Ensure it's ready

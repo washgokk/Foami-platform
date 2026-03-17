@@ -183,8 +183,8 @@ export default function StaffSchedulePage() {
                                             return (
                                                 <div key={dz.id} style={{
                                                     fontSize: '0.65rem', lineHeight: 1.2, padding: '2px 4px', borderRadius: 4,
-                                                    backgroundColor: dz.status === 'booked' ? 'var(--gray-200)' : dz.status === 'pending' ? 'var(--orange-100)' : 'var(--blue-100)',
-                                                    color: dz.status === 'booked' ? 'var(--gray-600)' : dz.status === 'pending' ? 'var(--orange-700)' : 'var(--blue-700)',
+                                                    backgroundColor: dz.status === 'booked' ? 'rgba(255,255,255,0.2)' : dz.status === 'pending' ? 'var(--brand-accent-ghost)' : 'var(--brand-subordinate-ghost)',
+                                                    color: dz.status === 'booked' ? 'white' : dz.status === 'pending' ? 'var(--brand-accent)' : 'var(--brand-subordinate)',
                                                     display: 'flex', alignItems: 'center', gap: 2,
                                                     maxWidth: '100%',
                                                     overflow: 'hidden',

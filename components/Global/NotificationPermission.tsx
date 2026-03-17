@@ -6,7 +6,8 @@ export default function NotificationPermission() {
     const [userId, setUserId] = useState<string | undefined>(undefined);
     const [platform, setPlatform] = useState<'customer' | 'staff' | 'admin'>('customer');
 
-    const { subscribe } = usePushNotifications(userId, platform);
+    const scope = platform === 'admin' ? '/admin/' : platform === 'staff' ? '/staff/' : '/';
+    const { subscribe } = usePushNotifications(userId, platform, scope);
 
     useEffect(() => {
         // Detect userId and platform from localStorage

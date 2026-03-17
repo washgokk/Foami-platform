@@ -200,16 +200,16 @@
 }
 
 .dot.available {
-    background: var(--accent-blue-ghost);
-    border: 1.5px solid var(--accent-blue);
+    background: var(--brand-subordinate-ghost);
+    border: 1.5px solid var(--brand-subordinate);
 }
 
 .dot.booked {
-    background: var(--success-light);
-    border: 1.5px solid var(--success);
+    background: var(--brand-dominant);
+    border: 1.5px solid var(--brand-dominant);
 }
 
 .dot.pending {
-    background: var(--accent-pink-ghost);
-    border: 1.5px solid var(--accent-pink);
-}
+    background: var(--brand-accent-ghost);
+    border: 1.5px solid var(--brand-accent);
+}
