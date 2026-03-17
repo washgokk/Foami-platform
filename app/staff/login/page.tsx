@@ -16,7 +16,8 @@ export default function StaffLoginPage() {
         setLoading(true)
         setError('')
         try {
-            if (localStorage.getItem('foami_mock_db_enabled') === 'true') {
+            const isMockForced = localStorage.getItem('foami_mock_db_enabled') === 'true' && process.env.NODE_ENV !== 'production'
+            if (isMockForced) {
                 const staffs = JSON.parse(localStorage.getItem('foami_mock_db_staff') || '[]')
                 const staff = staffs.find((s: any) => s.email === email)
                 if (staff) {

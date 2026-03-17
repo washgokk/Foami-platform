@@ -66,7 +66,15 @@ export default function GlobalLogin() {
         const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID
 
         // ─── Development Mock Mode ───
+        const isProd = process.env.NODE_ENV === 'production'
+        const isMockForced = typeof window !== 'undefined' && localStorage.getItem('foami_mock_db_enabled') === 'true'
+
         if (!liffId || liffId === 'your_liff_id' || liffId === '') {
+            if (isProd && !isMockForced) {
+                setError('ระบบขัดข้อง: ไม่พบการตั้งค่า LINE Login กรุณาติดต่อผู้ดูแลระบบ')
+                setLoading(false)
+                return
+            }
             console.log('LIFF ID not found. Using Mock Login...')
             // Simulate delay
             await new Promise(r => setTimeout(r, 800))

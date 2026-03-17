@@ -314,8 +314,12 @@ let _supabase: SupabaseClient | null = null
 function getSupabase(): SupabaseClient {
   if (!_supabase) {
     const isMockDbEnabled = typeof window !== 'undefined' && localStorage.getItem('foami_mock_db_enabled') === 'true'
+    const isProduction = process.env.NODE_ENV === 'production'
 
     if (isMockDbEnabled) {
+      if (isProduction) {
+        console.warn('⚠️ MOCK DB is ENABLED in PRODUCTION. This uses localStorage instead of Supabase.')
+      }
       _supabase = createMockSupabaseClient(true)
     } else {
       // DEFAULT: Use real client if URL is valid. 

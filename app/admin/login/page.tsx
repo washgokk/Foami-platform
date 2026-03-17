@@ -18,7 +18,8 @@ export default function AdminLoginPage() {
         setError('')
 
         try {
-            if (localStorage.getItem('foami_mock_db_enabled') === 'true') {
+            const isMockForced = localStorage.getItem('foami_mock_db_enabled') === 'true' && process.env.NODE_ENV !== 'production'
+            if (isMockForced) {
                 if (email === 'admin@foami.th' && password === 'admin123') {
                     localStorage.setItem('admin_token', 'mock_admin_token')
                     router.replace('/admin/dashboard')
