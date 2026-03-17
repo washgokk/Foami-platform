@@ -11,6 +11,7 @@ import {
     Settings, 
     LogOut 
 } from 'lucide-react'
+import ConfirmModal from '@/components/Global/ConfirmModal'
 
 export default function StaffLayoutClient({ children }: { children: React.ReactNode }) {
     const pathname = usePathname()
@@ -62,21 +63,15 @@ export default function StaffLayoutClient({ children }: { children: React.ReactN
                 </div>
             </header>
 
-            {showLogoutConfirm && (
-                <div className={styles.logoutOverlay} onClick={() => setShowLogoutConfirm(false)}>
-                    <div className={styles.logoutModal} onClick={e => e.stopPropagation()}>
-                        <div className={styles.logoutIcon}>
-                            <LogOut size={32} />
-                        </div>
-                        <h3>ยืนยันการออกจากระบบ</h3>
-                        <p>คุณต้องการออกจากระบบใช่หรือไม่?</p>
-                        <div className={styles.logoutActions}>
-                            <button className="btn btn-ghost" onClick={() => setShowLogoutConfirm(false)}>ยกเลิก</button>
-                            <button className="btn btn-danger" onClick={handleLogout}>ออกจากระบบ</button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ConfirmModal 
+                isOpen={showLogoutConfirm}
+                onClose={() => setShowLogoutConfirm(false)}
+                onConfirm={handleLogout}
+                title="ออกจากระบบ"
+                message="คุณต้องการออกจากระบบ Foami ใช่หรือไม่?"
+                confirmText="ออกจากระบบ"
+                variant="warning"
+            />
 
             <main className={styles.main}>{children}</main>
 

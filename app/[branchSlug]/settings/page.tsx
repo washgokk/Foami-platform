@@ -41,6 +41,7 @@ import styles from './settings.module.css'
 import Logo from '@/components/Branding/Logo'
 import { usePushNotifications } from '@/lib/hooks/usePushNotifications'
 import { Bell, BellOff, Send } from 'lucide-react'
+import ConfirmModal from '@/components/Global/ConfirmModal'
 
 import type MapPickerType from '../book/MapPicker'
 const MapPicker = dynamic<React.ComponentProps<typeof MapPickerType>>(

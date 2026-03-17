@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { LiffProvider } from '@/components/Providers/LiffProvider'
+import NotificationPermission from '@/components/Global/NotificationPermission'
 
 export const viewport: Viewport = {
   themeColor: '#ffffff',
@@ -32,6 +33,7 @@ export default function RootLayout({
     <html lang="th" suppressHydrationWarning>
       <body suppressHydrationWarning>
         <LiffProvider liffId={liffId}>
+          <NotificationPermission />
           {children}
         </LiffProvider>
       </body>

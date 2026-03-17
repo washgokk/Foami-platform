@@ -267,7 +267,6 @@ export default function StaffPage() {
                 const bAddi = b.additional_price || 0
                 const smlAdj = bTotal - bBase - addonsTotal - bExtra - bAddi + bDisc
                 
-                // [UPDATE Phase 16] Exclude smlAdj from labor total as requested
                 groups[b.staff_id].laborTotal += (bData?.labor_cost_per_job || 0)
                 groups[b.staff_id].rentalTotal += bData?.vehicle_rental_per_job || 0
                 groups[b.staff_id].fuelTotal += bData?.fuel_cost_per_job || 0
@@ -343,7 +342,6 @@ export default function StaffPage() {
                     if (!res.ok) throw new Error(data.error)
                 }
                 
-                // [AUDIT Phase 17] Update staff
                 await trackAuditLog({
                     action_type: 'UPDATE',
                     entity_type: 'staff',
@@ -373,10 +371,9 @@ export default function StaffPage() {
                     })
                     const data = await res.json()
                     if (!res.ok) throw new Error(data.error)
-                    newStaffId = data.id || data.data?.id
+                    newStaffId = data.id || data.user_id || data.data?.id || data.data?.user_id
                 }
                 
-                // [AUDIT Phase 17] Create staff
                 if (newStaffId) {
                     await trackAuditLog({
                         action_type: 'CREATE',
@@ -400,7 +397,6 @@ export default function StaffPage() {
         const nextState = !s.is_active
         await supabase.from('staff').update({ is_active: nextState }).eq('id', s.id)
         
-        // [AUDIT Phase 17] Toggle status
         await trackAuditLog({
             action_type: 'TOGGLE_STATUS',
             entity_type: 'staff',
@@ -442,7 +438,6 @@ export default function StaffPage() {
                 return
             }
             
-            // [AUDIT Phase 19] Delete staff
             await trackAuditLog({
                 action_type: 'DELETE',
                 entity_type: 'staff',
@@ -631,7 +626,6 @@ export default function StaffPage() {
                 </div>
             ) : (
                 <div className="animate-fade">
-
                     <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h2 style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--brand-dominant)', display: 'flex', alignItems: 'center', gap: 10 }}>
                             <Wallet size={24} /> รายการงานรอการชำระเงิน ({filteredBookings.length})
@@ -709,29 +703,9 @@ export default function StaffPage() {
                                             <td style={{ textAlign: 'center', fontWeight: 700 }}>{(bData?.vehicle_rental_per_job || 0).toLocaleString()}</td>
                                             <td style={{ textAlign: 'center', fontWeight: 700 }}>{(bData?.fuel_cost_per_job || 0).toLocaleString()}</td>
                                             <td style={{ textAlign: 'center' }}>
-                                                {(() => {
-                                                    let addonsTotal = 0
-                                                    if (Array.isArray(b.addon_ids)) {
-                                                        b.addon_ids.forEach((addon: any) => {
-                                                            let price = 0
-                                                            if (typeof addon !== 'string') {
-                                                                if (addon.isFree) price = 0
-                                                                else if (addon.selectedPrice !== undefined) price = addon.selectedPrice
-                                                                else if (addon.price !== undefined) price = addon.price
-                                                                else if (addon.variableState?.customAmount) price = Number(addon.variableState.customAmount)
-                                                            }
-                                                            addonsTotal += price
-                                                        })
-                                                    }
-                                                    const sml = (b.total_price || 0) - (b.base_price || 0) - addonsTotal - (b.extra_fee || 0) - (b.additional_price || 0) + (b.discount_amount || 0)
-                                                    return (
-                                                        <>
-                                                            {b.additional_price ? (
-                                                                <div style={{ color: 'var(--brand-dominant)', fontWeight: 800 }}>Extra: +{b.additional_price.toLocaleString()} ฿</div>
-                                                            ) : '-'}
-                                                        </>
-                                                    )
-                                                })()}
+                                                {b.additional_price ? (
+                                                    <div style={{ color: 'var(--brand-dominant)', fontWeight: 800 }}>Extra: +{b.additional_price.toLocaleString()} ฿</div>
+                                                ) : '-'}
                                                 {b.additional_price_note && <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{b.additional_price_note}</div>}
                                             </td>
                                         </tr>
@@ -837,12 +811,6 @@ export default function StaffPage() {
                                     )
                                 })}
                             </div>
-
-                            <div style={{ display: 'flex', justifyContent: 'center', gap: 16, alignItems: 'center', borderTop: '1.5px solid var(--brand-dominant-light)', paddingTop: 24 }}>
-                                <div style={{ fontSize: '0.95rem', color: 'var(--brand-dominant)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <Shield size={18} /> บันทึกการจ่ายเงินและอัพโหลดสลิปรายบุคคลเพื่อความถูกต้อง
-                                </div>
-                            </div>
                         </div>
                     )}
 
@@ -918,7 +886,6 @@ export default function StaffPage() {
                             </div>
                             <button className="btn btn-ghost btn-sm" style={{ borderRadius: 10 }} onClick={() => setShowHistoryDetail(null)}><X size={20} /></button>
                         </div>
-
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 24 }}>
                             <div>
                                 <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: 16 }}> งานที่รวมในฐานกองนี้ ({historyDetailBookings.length} รายการ)</h3>
@@ -1090,25 +1057,6 @@ export default function StaffPage() {
                 message={confirmConfig.message}
                 isLoading={saving}
             />
-
-            {previewImage && (
-                <div className="overlay" onClick={() => setPreviewImage(null)} style={{ zIndex: 99999 }}>
-                    <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
-                        <img 
-                            src={previewImage} 
-                            alt="Preview" 
-                            style={{ maxWidth: '100%', maxHeight: '90vh', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-xl)', border: '4px solid white' }} 
-                        />
-                        <button 
-                            className="btn btn-ghost" 
-                            onClick={() => setPreviewImage(null)}
-                            style={{ position: 'absolute', top: -10, right: -10, background: 'var(--danger)', color: 'white', border: '2px solid white', borderRadius: '50%', width: 40, height: 40, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        >
-                            <X size={20} />
-                        </button>
-                    </div>
-                </div>
-            )}
 
             {zoomConfig && (
                 <ImageZoom 

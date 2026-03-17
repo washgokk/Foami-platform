@@ -158,11 +158,13 @@ export default function GlobalLogin() {
                     disabled={loading}
                 >
                     {loading ? (
-                        <div className="spinner" style={{ width: 24, height: 24, borderTopColor: '#fff', opacity: 0.8 }} />
+                        <div className="spinner-white" style={{ width: 24, height: 24 }} />
                     ) : (
                         <>
-                            <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg" alt="LINE" className={styles.lineIcon} />
-                            เข้าสู่ระบบด้วย LINE
+                            <div className={styles.lineIconWrapper}>
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg" alt="LINE" className={styles.lineIcon} />
+                            </div>
+                            <span>เข้าสู่ระบบด้วย LINE</span>
                         </>
                     )}
                 </button>

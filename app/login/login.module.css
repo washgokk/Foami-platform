@@ -74,39 +74,65 @@
 
 .lineBtn {
     width: 100%;
-    height: 60px;
+    height: 64px;
     background: #06C755;
     color: white;
     border: none;
-    border-radius: var(--radius-full);
+    border-radius: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 12px;
-    font-size: 1.1rem;
-    font-weight: 700;
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: 0 12px 24px rgba(6, 199, 85, 0.2);
+    gap: 16px;
+    font-size: 1.15rem;
+    font-weight: 800;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 12px 30px rgba(6, 199, 85, 0.25);
+    position: relative;
+    overflow: hidden;
 }
 
 .lineBtn:hover:not(:disabled) {
     background: #05b44d;
-    transform: translateY(-2px);
-    box-shadow: 0 16px 32px rgba(6, 199, 85, 0.3);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 20px 40px rgba(6, 199, 85, 0.35);
 }
 
 .lineBtn:active:not(:disabled) {
-    transform: translateY(0);
+    transform: translateY(-1px) scale(1.01);
 }
 
-.lineBtn:disabled {
-    opacity: 0.7;
-    cursor: wait;
+.lineBtn::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+}
+
+.lineBtn:hover::after {
+    opacity: 1;
+}
+
+.lineIconWrapper {
+    width: 32px;
+    height: 32px;
+    background: white;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
 }
 
 .lineIcon {
-    width: 26px;
-    height: 26px;
+    width: 100%;
+    height: 100%;
 }
 
 .footerHint {

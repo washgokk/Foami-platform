@@ -14,7 +14,8 @@ export async function POST(req: NextRequest) {
     if (authErr) return NextResponse.json({ error: authErr.message }, { status: 400 })
 
     // Store the profile data in the staff table
-    await supabase.from('staff').update({ 
+    const { error: staffErr } = await supabase.from('staff').insert({ 
+        id: authData.user.id,
         email, 
         password, 
         full_name, 
@@ -23,7 +24,8 @@ export async function POST(req: NextRequest) {
         role, 
         image_url,
         is_active: true 
-    }).eq('id', authData.user.id)
+    })
+    if (staffErr) return NextResponse.json({ error: staffErr.message }, { status: 400 })
 
-    return NextResponse.json({ user_id: authData.user.id })
+    return NextResponse.json({ id: authData.user.id })
 }

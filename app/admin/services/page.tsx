@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Service, ServiceAddon, Branch, VEHICLE_SIZE_LABEL, CCPriceGroup } from '@/lib/types'
 import ImageUpload from '@/components/ImageUpload'
-import { Plus, Trash2, Edit2, Check, X as XIcon, ChevronDown, CheckSquare, Square, Wrench, Package, TrendingUp } from 'lucide-react'
+import { Plus, Trash2, Edit2, Check, X as XIcon, ChevronDown, CheckSquare, Square, Wrench, Package, TrendingUp, Building2 } from 'lucide-react'
 import ConfirmModal from '@/components/Global/ConfirmModal'
 import styles from './services.module.css'
 import { trackAuditLog } from '@/lib/audit'
@@ -662,38 +662,44 @@ export default function ServicesPage() {
             {/* Price Group Modal */}
             {showGroupModal && (
                 <div className="overlay" onClick={() => setShowGroupModal(false)}>
-                    <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 800, maxWidth: '95vw' }}>
-                        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: 24 }}>{editingGroup ? '✏️ แก้ไขกลุ่มราคา' : '💰 สร้างกลุ่มราคาใหม่'}</h2>
+                    <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 840, maxWidth: '95vw', borderRadius: 24 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+                            <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--brand-dominant)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <TrendingUp size={28} /> {editingGroup ? 'แก้ไขกลุ่มราคา' : 'สร้างกลุ่มราคาใหม่'}
+                            </h2>
+                            <button className="btn btn-ghost" onClick={() => setShowGroupModal(false)}><XIcon size={20} /></button>
+                        </div>
+
                         <form onSubmit={saveGroup}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 24 }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 300px', gap: 32 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                                     <div className="form-group">
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <label className="form-label">ชื่อกลุ่มราคา</label>
-                                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                            <label className="form-label" style={{ fontWeight: 700, margin: 0 }}>ชื่อกลุ่มราคา</label>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem', fontWeight: 700, color: groupForm.is_active ? 'var(--brand-dominant)' : 'var(--text-muted)' }}>
                                                 <input type="checkbox" checked={groupForm.is_active} onChange={e => setGroupForm(p => ({ ...p, is_active: e.target.checked }))} />
-                                                เปิดใช้งานกลุ่มราคานี้
+                                                เปิดใช้งาน
                                             </label>
                                         </div>
-                                        <input className="form-input" value={groupForm.name} onChange={e => setGroupForm(p => ({ ...p, name: e.target.value }))} required placeholder="เช่น ราคามาตรฐาน, โปรโมชั่นสาขา A" />
+                                        <input className="form-input" style={{ borderRadius: 12 }} value={groupForm.name} onChange={e => setGroupForm(p => ({ ...p, name: e.target.value }))} required placeholder="เช่น ราคามาตรฐาน, โปรโมชั่นพิเศษ" />
                                     </div>
                                     
-                                    <div style={{ border: '2px solid var(--border)', borderRadius: 16, overflow: 'hidden' }}>
-                                        <div style={{ background: 'var(--surface-2)', padding: '12px 16px', fontWeight: 800, borderBottom: '2px solid var(--border)' }}>
-                                            📈 กำหนดราคากลางตามขนาดรถ (CC)
+                                    <div style={{ border: '1px solid var(--border)', borderRadius: 20, overflow: 'hidden', background: 'var(--surface)' }}>
+                                        <div style={{ background: 'var(--surface-2)', padding: '16px 20px', fontWeight: 900, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, color: 'var(--brand-dominant)' }}>
+                                            <TrendingUp size={18} /> กำหนดราคากลางตามขนาดรถ (CC)
                                         </div>
-                                        <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
                                             {(['S', 'M', 'L'] as const).map((cc, idx, arr) => (
-                                                <div key={cc} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', alignItems: 'center', gap: 16 }}>
-                                                    <div style={{ fontWeight: 700 }}>{cc} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>({VEHICLE_SIZE_LABEL[cc]?.split(' ')[0]})</span></div>
+                                                <div key={cc} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', alignItems: 'center', gap: 20 }}>
+                                                    <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>
+                                                        Size {cc} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500, display: 'block' }}>({VEHICLE_SIZE_LABEL[cc]?.split(' ')[0]})</span>
+                                                    </div>
                                                     <div style={{ position: 'relative' }}>
-                                                        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--text-muted)', fontSize: '0.9rem' }}>฿</span>
-                                                        <input type="number" className="form-input" style={{ paddingLeft: 32 }} value={groupForm.prices[cc]} 
+                                                        <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontWeight: 900, color: 'var(--brand-dominant)', fontSize: '1rem' }}>฿</span>
+                                                        <input type="number" className="form-input" style={{ paddingLeft: 40, borderRadius: 12, fontWeight: 700 }} value={groupForm.prices[cc]} 
                                                             onChange={e => {
                                                                 const val = e.target.value
                                                                 const nextPrices = { ...groupForm.prices, [cc]: val }
-                                                                
-                                                                // Apply +30 step logic for higher CCs if they aren't manually set yet or just to be helpful
                                                                 if (val && !isNaN(Number(val))) {
                                                                     let currentVal = Number(val)
                                                                     for (let i = idx + 1; i < arr.length; i++) {
@@ -702,12 +708,11 @@ export default function ServicesPage() {
                                                                         nextPrices[nextCC] = currentVal.toString()
                                                                     }
                                                                 }
-                                                                
                                                                 setGroupForm(p => ({ ...p, prices: nextPrices }))
                                                             }} 
                                                         />
                                                         {idx > 0 && Number(groupForm.prices[cc]) === Number(groupForm.prices[arr[idx-1]]) + 30 && (
-                                                            <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: 'var(--success)', fontWeight: 700 }}>+30</span>
+                                                            <span style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', fontSize: '0.7rem', background: 'var(--success-ghost)', color: 'var(--success)', padding: '2px 8px', borderRadius: 8, fontWeight: 800 }}>+30 Step</span>
                                                         )}
                                                     </div>
                                                 </div>
@@ -716,45 +721,50 @@ export default function ServicesPage() {
                                     </div>
 
                                     <div className="form-group">
-                                        <label className="form-label">🚿 แพ็กเกจที่ใช้ราคานี้</label>
-                                        <div style={{ background: 'var(--surface-2)', padding: 12, borderRadius: 16, border: '2px solid var(--border)', maxHeight: 200, overflowY: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                                        <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
+                                            <Package size={16} color="var(--brand-dominant)" /> แพ็กเกจที่ใช้ราคานี้
+                                        </label>
+                                        <div style={{ background: 'var(--surface-2)', padding: 16, borderRadius: 16, border: '1px solid var(--border)', maxHeight: 200, overflowY: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                                             {services.map(s => (
-                                                <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0', cursor: 'pointer' }}>
+                                                <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', cursor: 'pointer', background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', transition: 'all 0.2s' }}>
                                                     <input type="checkbox" checked={groupForm.service_ids.includes(s.id)} onChange={e => {
                                                         const checked = e.target.checked
                                                         setGroupForm(p => ({ ...p, service_ids: checked ? [...p.service_ids, s.id] : p.service_ids.filter(id => id !== s.id) }))
                                                     }} />
-                                                    <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{s.name}</span>
+                                                    <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{s.name}</span>
                                                 </label>
                                             ))}
-                                            {services.length === 0 && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>ยังไม่มีข้อมูลแพ็กเกจ</div>}
+                                            {services.length === 0 && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', gridColumn: 'span 2', padding: 12 }}>ยังไม่มีข้อมูลแพ็กเกจ</div>}
                                         </div>
                                     </div>
                                 </div>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                                    <div className="form-group">
-                                        <label className="form-label">🏢 สาขาที่ใช้ราคานี้</label>
-                                        <div style={{ background: 'var(--surface-2)', padding: 12, borderRadius: 16, border: '2px solid var(--border)', maxHeight: 400, overflowY: 'auto' }}>
+                                    <div className="form-group" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                                        <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
+                                            <Building2 size={16} color="var(--brand-dominant)" /> เลือกสาขาที่ใช้ราคานี้
+                                        </label>
+                                        <div style={{ flex: 1, background: 'var(--surface-2)', padding: 16, borderRadius: 16, border: '1px solid var(--border)', overflowY: 'auto' }}>
                                             {branches.map(b => (
-                                                <label key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', cursor: 'pointer' }}>
+                                                <label key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', cursor: 'pointer', background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', marginBottom: 8, transition: 'all 0.2s' }}>
                                                     <input type="checkbox" checked={groupForm.branch_ids.includes(b.id)} onChange={e => {
                                                         const checked = e.target.checked
                                                         setGroupForm(p => ({ ...p, branch_ids: checked ? [...p.branch_ids, b.id] : p.branch_ids.filter(id => id !== b.id) }))
                                                     }} />
-                                                    <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>{b.name}</span>
+                                                    <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{b.name}</span>
                                                 </label>
                                             ))}
-                                            {branches.length === 0 && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>ยังไม่มีข้อมูลสาขา</div>}
+                                            {branches.length === 0 && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: 12 }}>ยังไม่มีข้อมูลสาขา</div>}
                                         </div>
+                                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 8 }}>* 1 สาขาสามารถสังกัดได้ 1 กลุ่มราคาเท่านั้น</p>
                                     </div>
                                 </div>
                             </div>
 
-                            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 32, borderTop: '2px solid var(--border)', paddingTop: 20 }}>
-                                <button type="button" className="btn btn-ghost" onClick={() => setShowGroupModal(false)}>ยกเลิก</button>
-                                <button type="submit" className="btn btn-primary" disabled={saving || groupForm.branch_ids.length === 0}>
-                                    {saving ? <span className="spinner" /> : '💾 บันทึกกลุ่มราคา'}
+                            <div style={{ display: 'flex', gap: 16, justifyContent: 'flex-end', marginTop: 32, borderTop: '1px solid var(--border)', paddingTop: 24 }}>
+                                <button type="button" className="btn btn-ghost" style={{ borderRadius: 12, padding: '10px 24px' }} onClick={() => setShowGroupModal(false)}>ยกเลิก</button>
+                                <button type="submit" className="btn btn-primary" style={{ borderRadius: 12, padding: '10px 32px', fontWeight: 800, boxShadow: '0 4px 12px rgba(49, 94, 195, 0.2)' }} disabled={saving || groupForm.branch_ids.length === 0}>
+                                    {saving ? <span className="spinner" /> : (editingGroup ? 'บันทึกการแก้ไข' : 'สร้างกลุ่มราคา')}
                                 </button>
                             </div>
                         </form>
