@@ -13,8 +13,10 @@ import Logo from '@/components/Branding/Logo'
 export default function GlobalLogin() {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
+    const [syncLoading, setSyncLoading] = useState(false)
     const [error, setError] = useState('')
     const [isBridgeSuccess, setIsBridgeSuccess] = useState(false)
+    const [debugInfo, setDebugInfo] = useState('')
 
     // Detect standalone mode (PWA)
     const isStandalone = typeof window !== 'undefined' && 
@@ -65,17 +67,28 @@ export default function GlobalLogin() {
                     // IF returned with bridgeId, sync to backend and show success
                     if (activeSafariBridgeId) {
                         try {
+                            console.log('Syncing for Bridge ID:', activeSafariBridgeId)
+                            setSyncLoading(true)
                             const res = await fetch('/api/auth/bridge/sync', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ bridgeId: activeSafariBridgeId, customerData })
                             })
                             if (res.ok) {
+                                console.log('Sync Successful!')
                                 setIsBridgeSuccess(true)
-                                // Only clear it once synced successfully
                                 localStorage.removeItem('safari_bridge_id')
+                            } else {
+                                const errData = await res.json()
+                                console.error('Sync Failed:', errData)
+                                setError(`การเชื่อมต่อล้มเหลว: ${errData.error || 'Unknown error'}`)
                             }
-                        } catch (e) { console.error('Bridge sync error:', e) }
+                        } catch (e: any) { 
+                            console.error('Bridge sync exception:', e)
+                            setError(`เกิดข้อผิดพลาดในการเชื่อมต่อ: ${e.message}`)
+                        } finally {
+                            setSyncLoading(false)
+                        }
                     }
 
                     if (data) {
@@ -242,6 +255,12 @@ export default function GlobalLogin() {
                             <h2 style={{ color: 'var(--text-primary)', fontSize: '1.5rem', marginBottom: 10 }}>เข้าสู่ระบบสำเร็จ!</h2>
                             <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem' }}>กรุณากลับไปที่แอป Foami เพื่อใช้งานต่อครับ</p>
                             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: 20 }}>คุณสามารถปิดหน้านี้ได้ทันที</p>
+                        </div>
+                    ) : syncLoading ? (
+                        <div className={styles.syncBox}>
+                            <div className="spinner-blue" style={{ width: 40, height: 40, margin: '0 auto 15px' }} />
+                            <h2 style={{ color: 'var(--text-primary)', fontSize: '1.3rem', marginBottom: 10 }}>กำลังซิงค์ข้อมูลกับแอป...</h2>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>กรุณารอสักครู่ครับ</p>
                         </div>
                     ) : (typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id'))) ? (
                          <div className={styles.waitingBox}>
