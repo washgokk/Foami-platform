@@ -23,7 +23,7 @@ export function usePushNotifications(userId: string | undefined, platform: 'cust
                 let registration = await navigator.serviceWorker.getRegistration()
                 if (!registration) {
                     console.log('Registering SW manually...')
-                    registration = await navigator.serviceWorker.register('/sw.js')
+                    registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' })
                 }
 
                 // Wait for SW to be active if it's not
@@ -34,6 +34,9 @@ export function usePushNotifications(userId: string | undefined, platform: 'cust
                             if (registration?.active) {
                                 console.log('SW is now active!')
                                 resolve()
+                            } else if (registration?.waiting) {
+                                registration.waiting.postMessage({ type: 'SKIP_WAITING' })
+                                setTimeout(checkActive, 500)
                             } else {
                                 setTimeout(checkActive, 500)
                             }
@@ -69,12 +72,65 @@ export function usePushNotifications(userId: string | undefined, platform: 'cust
         setError(null)
 
         try {
-            // Safety timeout for ready
-            const registrationPromise = navigator.serviceWorker.ready
-            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Service Worker not ready after 5s')), 5000))
-            const registration = await Promise.race([registrationPromise, timeoutPromise]) as ServiceWorkerRegistration
+            console.log('Starting push subscription flow...')
+            if (!('serviceWorker' in navigator)) {
+                throw new Error('เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน (No ServiceWorker support)')
+            }
+
+            // Get registration first
+            let registration = await navigator.serviceWorker.getRegistration()
             
-            // Convert VAPID public key to correct format
+            // If no registration, try to register it now
+            if (!registration) {
+                console.log('No SW registration found during subscribe - registering now...')
+                registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' })
+            }
+
+            // Robust check for active state
+            if (!registration.active) {
+                console.log('SW not active yet, waiting...')
+                
+                // Helper to wait for active
+                const waitForActive = (reg: ServiceWorkerRegistration) => {
+                    return new Promise<ServiceWorkerRegistration | null>((resolve) => {
+                        const check = () => {
+                            if (reg.active) {
+                                console.log('SW is now active!')
+                                resolve(reg)
+                            } else if (reg.waiting) {
+                                console.log('SW in waiting state - sending SKIP_WAITING')
+                                reg.waiting.postMessage({ type: 'SKIP_WAITING' })
+                                setTimeout(check, 500)
+                            } else if (reg.installing) {
+                                console.log('SW still installing...')
+                                setTimeout(check, 500)
+                            } else {
+                                resolve(null) // Should not happen easily
+                            }
+                        }
+                        check()
+                        // Final safety timeout
+                        setTimeout(() => resolve(null), 8000)
+                    })
+                }
+
+                const activeReg = await waitForActive(registration)
+                if (activeReg) registration = activeReg
+            }
+
+            // If still not active, try the standard ready promise as last resort
+            if (!registration.active) {
+                console.log('Trying navigator.serviceWorker.ready fallback...')
+                const registrationPromise = navigator.serviceWorker.ready
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('ระบบ Service Worker ไม่ตอบสนอง (Timeout 10s)')), 10000))
+                registration = await Promise.race([registrationPromise, timeoutPromise]) as ServiceWorkerRegistration
+            }
+            
+            if (!registration || !registration.active) {
+                throw new Error('ไม่สามารถเปิดใช้งาน Service Worker ได้ โปรดรีเฟรชหน้าเว็บและลองอีกครั้ง')
+            }
+
+            // Convert VAPID public key
             const base64String = VAPID_PUBLIC_KEY
             if (!base64String) throw new Error('VAPID public key is missing')
 

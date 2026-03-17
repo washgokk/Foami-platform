@@ -143,7 +143,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
                 title="ยืนยันการออกจากระบบ"
                 message="คุณต้องการออกจากระบบ Foami Admin ใช่หรือไม่?"
                 confirmText="ออกจากระบบ"
-                variant="warning"
+                variant="danger"
             />
         </div>
     )

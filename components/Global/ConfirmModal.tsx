@@ -37,7 +37,7 @@ export default function ConfirmModal({
 
     const getBrandColor = () => {
         switch (variant) {
-            case 'danger': return '#ef4444'
+            case 'danger': return '#e11d48' // Rose 600
             case 'warning': return '#f59e0b'
             default: return 'var(--brand-dominant)'
         }
@@ -45,7 +45,7 @@ export default function ConfirmModal({
 
     const getBgColor = () => {
         switch (variant) {
-            case 'danger': return '#fef2f2'
+            case 'danger': return '#fff1f2' // Rose 50
             case 'warning': return '#fffbeb'
             default: return 'var(--brand-dominant-ghost)'
         }

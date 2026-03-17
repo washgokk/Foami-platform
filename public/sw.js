@@ -6,6 +6,12 @@ self.addEventListener('activate', (event) => {
     event.waitUntil(clients.claim());
 });
 
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
+});
+
 self.addEventListener('fetch', (event) => {
     // Standard fetch handler to satisfy PWA requirements
     // For now, just pass through to network

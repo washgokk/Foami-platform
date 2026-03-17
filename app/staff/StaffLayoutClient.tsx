@@ -17,6 +17,7 @@ export default function StaffLayoutClient({ children }: { children: React.ReactN
     const pathname = usePathname()
     const router = useRouter()
     const [staffName, setStaffName] = useState('')
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
     useEffect(() => {
         const token = localStorage.getItem('staff_token')
@@ -36,8 +37,6 @@ export default function StaffLayoutClient({ children }: { children: React.ReactN
         { href: '/staff/jobs', icon: Wrench, label: 'งาน' },
         { href: '/staff/settings', icon: Settings, label: 'ตั้งค่า' },
     ]
-
-    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
     const handleLogout = () => {
         localStorage.removeItem('staff_token')
@@ -70,7 +69,7 @@ export default function StaffLayoutClient({ children }: { children: React.ReactN
                 title="ออกจากระบบ"
                 message="คุณต้องการออกจากระบบ Foami ใช่หรือไม่?"
                 confirmText="ออกจากระบบ"
-                variant="warning"
+                variant="danger"
             />
 
             <main className={styles.main}>{children}</main>

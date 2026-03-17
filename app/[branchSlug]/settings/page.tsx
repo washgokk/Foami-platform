@@ -58,6 +58,7 @@ export default function SettingsPage() {
     const [saving, setSaving] = useState(false)
     const [saved, setSaved] = useState(false)
     const [showSuccessModal, setShowSuccessModal] = useState(false)
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
     const [loading, setLoading] = useState(true)
     const [showLocModal, setShowLocModal] = useState(false)
@@ -713,25 +714,7 @@ export default function SettingsPage() {
                     <button 
                         type="button" 
                         className="btn btn-ghost btn-full" 
-                        onClick={async () => {
-                            if (confirm('ยืนยันออกจากระบบ? ข้อมูลที่ไม่ได้บันทึกจะหายไป')) {
-                                localStorage.removeItem('liff_customer');
-                                localStorage.removeItem('liff_line_user_id');
-                                localStorage.removeItem('liff_display_name');
-                                
-                                // Explicitly logout from LIFF to prevent auto-login
-                                try {
-                                    const { default: liff } = await import('@line/liff');
-                                    if (typeof liff !== 'undefined' && liff.logout) {
-                                        liff.logout();
-                                    }
-                                } catch (e) {
-                                    console.error('Logout error:', e);
-                                }
-
-                                router.replace('/login');
-                            }
-                        }}
+                        onClick={() => setShowLogoutConfirm(true)}
                         style={{ 
                             gap: 10, 
                             borderRadius: 'var(--radius-xl)', 
@@ -870,6 +853,32 @@ export default function SettingsPage() {
                     </div>
                 </div>
             )}
+
+            <ConfirmModal 
+                isOpen={showLogoutConfirm}
+                onClose={() => setShowLogoutConfirm(false)}
+                onConfirm={async () => {
+                    localStorage.removeItem('liff_customer');
+                    localStorage.removeItem('liff_line_user_id');
+                    localStorage.removeItem('liff_display_name');
+                    
+                    try {
+                        const { default: liff } = await import('@line/liff');
+                        if (typeof liff !== 'undefined' && liff.logout) {
+                            liff.logout();
+                        }
+                    } catch (e) {
+                        console.error('Logout error:', e);
+                    }
+
+                    router.replace('/login');
+                }}
+                title="ยืนยันการออกจากระบบ"
+                message="คุณแน่ใจหรือไม่ว่าต้องการออกจากระบบ? ข้อมูลที่ยังไม่ได้บันทึกอาจจะสูญหาย"
+                variant="danger"
+                confirmText="ออกจากระบบ"
+                cancelText="ยกเลิก"
+            />
         </div>
     )
 }
