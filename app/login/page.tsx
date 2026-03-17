@@ -74,10 +74,21 @@ export default function GlobalLogin() {
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ bridgeId: activeSafariBridgeId, customerData })
                             })
+                            
                             if (res.ok) {
                                 console.log('Sync Successful!')
                                 setIsBridgeSuccess(true)
                                 localStorage.removeItem('safari_bridge_id')
+                                
+                                // --- AUTO-JUMP LOGIC ---
+                                // 1. Attempt to close window (works if it was opened via window.open)
+                                // 2. Otherwise redirect to root to trigger iOS App Banner
+                                setTimeout(() => {
+                                    try {
+                                        window.close();
+                                    } catch (e) {}
+                                    window.location.href = '/';
+                                }, 1500); 
                             } else {
                                 const errData = await res.json()
                                 console.error('Sync Failed:', errData)
@@ -261,12 +272,19 @@ export default function GlobalLogin() {
                             <div className="spinner-blue" style={{ width: 40, height: 40, margin: '0 auto 15px' }} />
                             <h2 style={{ color: 'var(--text-primary)', fontSize: '1.3rem', marginBottom: 10 }}>กำลังซิงค์ข้อมูลกับแอป...</h2>
                             <p style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>กรุณารอสักครู่ครับ</p>
+                            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem', marginTop: 15 }}>
+                                [Debug ID: {typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('bridgeId') || localStorage.getItem('safari_bridge_id')) : ''}]
+                            </p>
                         </div>
                     ) : (typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id'))) ? (
                          <div className={styles.waitingBox}>
                             <div className="spinner-blue" style={{ width: 40, height: 40, margin: '0 auto 15px' }} />
                             <p style={{ color: 'var(--text-primary)', fontSize: '1.1rem', fontWeight: 600 }}>กำลังรอการเข้าสู่ระบบ...</p>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: 10 }}>กรุณาเข้าสู่ระบบใน Safari ที่เปิดขึ้นมา</p>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', marginBottom: 20 }}>กรุณาเข้าสู่ระบบใน Safari ที่เปิดขึ้นมา</p>
+                            
+                            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem', marginBottom: 15 }}>
+                                [Session ID: {typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id')) : ''}]
+                            </p>
                             <button 
                                 className={styles.retryBtn} 
                                 onClick={() => {

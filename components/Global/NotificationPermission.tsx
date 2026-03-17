@@ -1,8 +1,10 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { usePushNotifications } from '@/lib/hooks/usePushNotifications'
 
 export default function NotificationPermission() {
+    const pathname = usePathname();
     const [userId, setUserId] = useState<string | undefined>(undefined);
     const [platform, setPlatform] = useState<'customer' | 'staff' | 'admin'>('customer');
 
@@ -16,7 +18,7 @@ export default function NotificationPermission() {
         const customer = localStorage.getItem('liff_customer');
 
         if (admin) {
-            setUserId('admin_user'); // Admin might need a specific ID strategy
+            setUserId('admin_user');
             setPlatform('admin');
         } else if (staff) {
             try {
@@ -30,8 +32,10 @@ export default function NotificationPermission() {
                 setUserId(c.id);
                 setPlatform('customer');
             } catch (e) {}
+        } else {
+            setUserId(undefined);
         }
-    }, []);
+    }, [pathname]); // Re-run whenever pathname changes (login/logout navigation)
 
     useEffect(() => {
         // Only run in client-side

@@ -6,19 +6,24 @@ export async function POST(req: NextRequest) {
         const { user_id, subscription, platform } = await req.json()
         const supabase = createServiceClient()
 
+        // Extract endpoint for unique identification of this specific device/browser
+        const endpoint = subscription?.endpoint
+        if (!endpoint) {
+            return NextResponse.json({ error: 'Missing subscription endpoint' }, { status: 400 })
+        }
+
         // Store or update subscription
-        // We use upsert to handle multiple devices/sessions for the same user-platform pair
-        // Note: In high-scale apps, you'd store many subscriptions per user. 
-        // For Foami, we maintain one primary subscription per platform for simplicity.
+        // We now allow multiple devices per user by using the endpoint as the conflict target
         const { error } = await supabase
             .from('push_subscriptions')
             .upsert({
                 user_id,
                 subscription,
                 platform,
+                endpoint,
                 created_at: new Date().toISOString()
             }, {
-                onConflict: 'user_id, platform'
+                onConflict: 'endpoint'
             })
 
         if (error) throw error

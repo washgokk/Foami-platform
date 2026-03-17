@@ -11,6 +11,8 @@ export async function POST(req: NextRequest) {
 
         const supabase = createServiceClient()
 
+        console.log(`[Bridge Sync] Attempting to sync ID: ${bridgeId} for user: ${customerData.line_user_id}`)
+
         // Upsert the data into the bridge table
         const { error } = await supabase
             .from('pwa_auth_bridges')
@@ -20,7 +22,12 @@ export async function POST(req: NextRequest) {
                 created_at: new Date().toISOString()
             })
 
-        if (error) throw error
+        if (error) {
+            console.error('[Bridge Sync] Supabase Error:', error)
+            throw error
+        }
+
+        console.log(`[Bridge Sync] Success for ID: ${bridgeId}`)
 
         return NextResponse.json({ success: true })
     } catch (err: any) {

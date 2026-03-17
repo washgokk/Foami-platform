@@ -1,8 +1,10 @@
+// SW Version: 2026-03-18-v3-Robust
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
+    console.log('Foami Service Worker v3 Activated');
     event.waitUntil(clients.claim());
 });
 
