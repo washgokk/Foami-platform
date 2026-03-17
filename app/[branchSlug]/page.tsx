@@ -61,7 +61,7 @@ export default function LiffEntry() {
             <img 
                 src="/logo - lanscape.svg" 
                 alt="Foami Logo" 
-                style={{ width: '100%', maxWidth: '240px', height: 'auto' }}
+                style={{ width: '100%', maxWidth: '240px', height: 'auto', filter: 'brightness(0) invert(1)' }}
             />
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                 <div className="spinner" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)', width: 32, height: 32 }} />

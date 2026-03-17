@@ -82,7 +82,9 @@ export default function AdminSchedulePage() {
     const gridData = useMemo(() => {
         const map: Record<string, any[]> = {}
         for (const s of schedules) {
-            const key = `${s.date}_${s.time_slot}`
+            // Postgres TIME might be 09:00:00, slice to 09:00 to match slot format
+            const timeKey = s.time_slot?.slice(0, 5) || s.time_slot
+            const key = `${s.date}_${timeKey}`
             if (!map[key]) map[key] = []
             map[key].push(s)
         }

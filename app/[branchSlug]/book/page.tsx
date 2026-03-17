@@ -292,12 +292,12 @@ export default function BookPage() {
                     // 2. AND there are no pending unassigned bookings consuming that staff
 
                     // Filter staff who are assigned to this slot and NOT yet booked
-                    const inZoneFreeStaff = daySchedules.filter(s => s.time_slot === slot && s.zone_id === zoneId && !s.is_booked)
-                    const otherFreeStaff = daySchedules.filter(s => s.time_slot === slot && !s.is_booked)
+                    const inZoneFreeStaff = daySchedules.filter(s => (s.time_slot === slot || s.time_slot?.startsWith(slot)) && s.zone_id === zoneId && !s.is_booked)
+                    const otherFreeStaff = daySchedules.filter(s => (s.time_slot === slot || s.time_slot?.startsWith(slot)) && !s.is_booked)
 
                     // Filter pending bookings (all types: in-zone, other-zone, or null-zone/out-of-zone)
-                    const pendingBookingsInZone = dayBookings.filter(b => b.scheduled_time === slot && b.zone_id === zoneId && !b.staff_id)
-                    const allPendingInBranch = dayBookings.filter(b => b.scheduled_time === slot && !b.staff_id)
+                    const pendingBookingsInZone = dayBookings.filter(b => (b.scheduled_time === slot || b.scheduled_time?.startsWith(slot)) && b.zone_id === zoneId && !b.staff_id)
+                    const allPendingInBranch = dayBookings.filter(b => (b.scheduled_time === slot || b.scheduled_time?.startsWith(slot)) && !b.staff_id)
                     const pendingBookingsOther = allPendingInBranch.filter(b => b.zone_id !== zoneId)
 
                     // Effective Capacity in Zone
@@ -312,7 +312,7 @@ export default function BookPage() {
                         }
                     } else {
                         // Check Overflow capacity across the whole branch
-                        const totalFreeInBranch = daySchedules.filter(s => s.time_slot === slot && !s.is_booked)
+                        const totalFreeInBranch = daySchedules.filter(s => (s.time_slot === slot || s.time_slot?.startsWith(slot)) && !s.is_booked)
                         const effectiveOtherCount = totalFreeInBranch.length - allPendingInBranch.length
 
                         if (effectiveOtherCount > 0) {
@@ -335,7 +335,7 @@ export default function BookPage() {
                                 available_staff_ids: staffInNearest.slice(0, effectiveOtherCount).map(s => s.staff_id)
                             }
                         } else {
-                            const hasStaff = daySchedules.some(s => s.time_slot === slot)
+                            const hasStaff = daySchedules.some(s => (s.time_slot === slot || s.time_slot?.startsWith(slot)))
                             return hasStaff ? { time_slot: slot, type: 'full' } : null
                         }
                     }

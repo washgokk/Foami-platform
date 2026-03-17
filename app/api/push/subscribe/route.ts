@@ -25,7 +25,15 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ success: true })
     } catch (error: any) {
-        console.error('Push subscribe error:', error)
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        console.error('Push subscribe error details:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code,
+            hint: error.hint
+        })
+        return NextResponse.json({ 
+            error: `Database error: ${error.message}`,
+            details: error.hint || 'No additional hints'
+        }, { status: 500 })
     }
 }

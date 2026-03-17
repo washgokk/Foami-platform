@@ -17,8 +17,8 @@ export const metadata: Metadata = {
     title: 'Foami',
   },
   icons: {
-    icon: '/icon.svg',
-    apple: '/icon.svg',
+    icon: '/icon-192x192_user.png',
+    apple: '/icon-512x512_user.png',
   },
 }
 

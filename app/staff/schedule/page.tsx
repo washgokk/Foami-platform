@@ -47,7 +47,7 @@ export default function StaffSchedulePage() {
 
     const getSchedules = (date: Date, slot: string) => {
         const d = format(date, 'yyyy-MM-dd')
-        return schedules.filter(s => s.date === d && s.time_slot === slot)
+        return schedules.filter(s => s.date === d && (s.time_slot === slot || s.time_slot?.startsWith(slot)))
     }
 
     const isPending = (date: Date, slot: string) => (pendingSlots[`${format(date, 'yyyy-MM-dd')}_${slot}`] || []).includes(selectedZone)
@@ -92,11 +92,17 @@ export default function StaffSchedulePage() {
         if (localStorage.getItem('foami_mock_db_enabled') === 'true') {
             await supabase.from('staff_schedules').upsert(slots)
         } else {
-            await fetch('/api/schedules', {
+            const res = await fetch('/api/schedules', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ staff_id: staffId, slots }),
             })
+            if (!res.ok) {
+                const err = await res.json()
+                alert(`ไม่สามารถบันทึกได้: ${err.error || 'Unknown error'}`)
+                setSaving(false)
+                return
+            }
         }
 
         setPendingSlots({})

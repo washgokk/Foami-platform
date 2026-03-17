@@ -35,7 +35,10 @@ export async function POST(req: NextRequest) {
         .from('staff_schedules')
         .upsert(rows, { onConflict: 'staff_id,date,time_slot,zone_id' })
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (error) {
+        console.error('Schedule POST error:', error)
+        return NextResponse.json({ error: error.message, details: error.hint }, { status: 400 })
+    }
     return NextResponse.json({ saved: rows.length })
 }
 
