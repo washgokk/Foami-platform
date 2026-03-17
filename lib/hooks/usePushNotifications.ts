@@ -132,20 +132,50 @@ export function usePushNotifications(
             }
 
             const base64String = VAPID_PUBLIC_KEY
-            if (!base64String) throw new Error('VAPID public key is missing')
+            if (!base64String) throw new Error('VAPID public key is missing (NEXT_PUBLIC_VAPID_PUBLIC_KEY)')
 
-            const padding = '='.repeat((4 - base64String.length % 4) % 4)
-            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
-            const rawData = window.atob(base64)
-            const outputArray = new Uint8Array(rawData.length)
-            for (let i = 0; i < rawData.length; ++i) {
-                outputArray[i] = rawData.charCodeAt(i)
+            // Helper to convert VAPID key
+            const urlBase64ToUint8Array = (base64String: string) => {
+                const padding = '='.repeat((4 - base64String.length % 4) % 4)
+                const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+                const rawData = window.atob(base64)
+                const outputArray = new Uint8Array(rawData.length)
+                for (let i = 0; i < rawData.length; ++i) {
+                    outputArray[i] = rawData.charCodeAt(i)
+                }
+                return outputArray
             }
 
-            const newSubscription = await registration.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: outputArray
-            })
+            let newSubscription;
+            try {
+                newSubscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(base64String)
+                })
+            } catch (pSubErr: any) {
+                console.error('Initial push subscribe attempt failed:', pSubErr)
+                
+                // If it's a push service error, try self-healing once
+                if (pSubErr.message?.toLowerCase().includes('push service error') || pSubErr.name === 'AbortError') {
+                    console.warn('Push service error detected. Attempting to reset Service Worker and retry...')
+                    const regs = await navigator.serviceWorker.getRegistrations()
+                    for (const r of regs) await r.unregister()
+                    
+                    // Re-register
+                    const newReg = await navigator.serviceWorker.register('/sw.js', { scope })
+                    await navigator.serviceWorker.ready
+                    
+                    // Retry subscribe
+                    newSubscription = await newReg.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(base64String)
+                    })
+                } else {
+                    throw pSubErr
+                }
+            }
+
+            if (!newSubscription) throw new Error('Could not create push subscription')
 
             // Save to server
             const res = await fetch('/api/push/subscribe', {
@@ -168,9 +198,14 @@ export function usePushNotifications(
             if (onSuccess) onSuccess()
             return true
         } catch (err: any) {
-            console.error('Error subscribing to push:', err)
+            console.error('Critical push subscription error:', err)
             setError(err.message)
-            alert('ไม่สามารถเปิดแจ้งเตือนได้: ' + (err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ Service Worker'))
+            // Display a more helpful message to the user
+            let userMsg = err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ'
+            if (userMsg.includes('push service error')) {
+                userMsg = 'Browser ไม่สามารถเชื่อมต่อกับบริการแจ้งเตือนได้ (Push Service Error) กรุณารีเฟรชหน้าเว็บหรือลองใช้เบราว์เซอร์อื่นครับ'
+            }
+            alert('ไม่สามารถเปิดแจ้งเตือนได้: ' + userMsg)
             return false
         } finally {
             setLoading(false)

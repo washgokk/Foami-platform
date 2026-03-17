@@ -16,6 +16,10 @@ export default function GlobalLogin() {
     const [error, setError] = useState('')
     const [isBridgeSuccess, setIsBridgeSuccess] = useState(false)
 
+    // Detect standalone mode (PWA)
+    const isStandalone = typeof window !== 'undefined' && 
+        ((window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches);
+
     // ─── Phase 1: Check existing session ───
     useEffect(() => {
         const stored = localStorage.getItem('liff_customer')
@@ -26,6 +30,14 @@ export default function GlobalLogin() {
 
         const searchParams = new URLSearchParams(window.location.search)
         const bridgeIdParam = searchParams.get('bridgeId')
+        
+        // --- Persistence for Safari-side bridge ---
+        // If we are in Safari (not PWA) and entered with a bridgeId, save it.
+        // This is crucial because LINE might strip URL params during redirect.
+        if (bridgeIdParam && !isStandalone) {
+            localStorage.setItem('safari_bridge_id', bridgeIdParam)
+        }
+        const activeSafariBridgeId = bridgeIdParam || localStorage.getItem('safari_bridge_id')
 
         // ─── Phase 2: Auto-init LIFF to handle returning from redirect ───
         const autoInit = async () => {
@@ -51,14 +63,18 @@ export default function GlobalLogin() {
                     const customerData = data || { line_user_id: profile.userId, full_name: profile.displayName };
 
                     // IF returned with bridgeId, sync to backend and show success
-                    if (bridgeIdParam) {
+                    if (activeSafariBridgeId) {
                         try {
-                            await fetch('/api/auth/bridge/sync', {
+                            const res = await fetch('/api/auth/bridge/sync', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ bridgeId: bridgeIdParam, customerData })
+                                body: JSON.stringify({ bridgeId: activeSafariBridgeId, customerData })
                             })
-                            setIsBridgeSuccess(true)
+                            if (res.ok) {
+                                setIsBridgeSuccess(true)
+                                // Only clear it once synced successfully
+                                localStorage.removeItem('safari_bridge_id')
+                            }
                         } catch (e) { console.error('Bridge sync error:', e) }
                     }
 
@@ -149,7 +165,6 @@ export default function GlobalLogin() {
         // Detect iOS PWA session isolation
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        const isStandalone = (window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches;
         
         if (isIOS && isStandalone) {
             console.log('iOS PWA detected. Using Bridge Login...')
