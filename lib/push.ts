@@ -44,12 +44,16 @@ export async function sendPushNotification(
     
     const notificationPromises = subs.map(async (s, idx) => {
         try {
-            console.log(`[Push] Sending to device ${idx + 1}...`)
+            console.log(`[Push] Sending to device ${idx + 1} (Endpoint: ${(s.subscription as any)?.endpoint?.substring(0, 30)}...)`)
             const response = await webpush.sendNotification(
                 s.subscription as any,
-                JSON.stringify(payload)
+                JSON.stringify({
+                    title: payload.title,
+                    body: payload.body,
+                    url: payload.url || '/'
+                })
             )
-            console.log(`[Push] Device ${idx + 1} success:`, response.statusCode)
+            console.log(`[Push] Device ${idx + 1} Success! Status:`, response.statusCode)
             return true
         } catch (err: any) {
             console.error(`[Push] Device ${idx + 1} error:`, {
