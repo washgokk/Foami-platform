@@ -158,7 +158,10 @@ export function usePushNotifications(userId: string | undefined, platform: 'cust
                 })
             })
 
-            if (!res.ok) throw new Error('Failed to save subscription on server')
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}))
+                throw new Error(errorData.error || `Server error: ${res.status} ${res.statusText}`)
+            }
 
             setSubscription(newSubscription)
             setIsSubscribed(true)

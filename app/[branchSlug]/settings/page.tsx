@@ -80,6 +80,21 @@ export default function SettingsPage() {
     const [showAllInterests, setShowAllInterests] = useState(false)
     const [occType, setOccType] = useState('') // 'standard' or 'other'
 
+    const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null)
+    const [editingLocationId, setEditingLocationId] = useState<string | null>(null)
+
+    const openEditVehicle = (v: SavedVehicle) => {
+        setVForm(v)
+        setEditingVehicleId(v.id)
+        setShowVModal(true)
+    }
+
+    const openEditLocation = (loc: SavedLocation) => {
+        setLocForm(loc)
+        setEditingLocationId(loc.id)
+        setShowLocModal(true)
+    }
+
     const STANDARD_OCCUPATIONS = ['พนักงานบริษัท', 'เจ้าของธุรกิจ / ค้าขาย', 'ข้าราชการ / รัฐวิสาหกิจ', 'นักเรียน / นักศึกษา', 'ฟรีแลนซ์', 'พ่อบ้าน / แม่บ้าน', 'เกษียณอายุ']
     const INTERESTS_LIST = [
         { label: 'อาหารและเครื่องดื่ม', icon: Utensils },
@@ -230,29 +245,28 @@ export default function SettingsPage() {
         setSaving(false)
     }
 
-    const handleAddLocation = async () => {
-        const id = Math.random().toString(36).substring(2, 9)
-        const newLoc = { ...locForm, id } as SavedLocation
-        const updated = [...savedLocations, newLoc]
+    const handleSaveLocation = async () => {
+        let updated: SavedLocation[]
+        if (editingLocationId) {
+            updated = savedLocations.map(loc => loc.id === editingLocationId ? { ...locForm, id: editingLocationId } as SavedLocation : loc)
+        } else {
+            const id = Math.random().toString(36).substring(2, 9)
+            const newLoc = { ...locForm, id } as SavedLocation
+            updated = [...savedLocations, newLoc]
+        }
         
-        // Update local state first for syncProfile to pick up
         setSavedLocations(updated)
         setShowLocModal(false)
+        setEditingLocationId(null)
         setLocForm({ lat: 16.4419, lng: 102.8360 })
 
-        // Trigger sync with explicit payload (DO NOT SPREAD FORM)
         setSaving(true)
         const birthdays = form.birthdate || null
         const isComplete = !!(form.full_name && form.phone && form.gender && birthdays && form.occupation && (form.interests && form.interests.length > 0))
         const payload = {
-            full_name: form.full_name,
-            phone: form.phone,
-            gender: form.gender,
+            ...form,
             birthdate: birthdays,
-            occupation: form.occupation,
-            interests: form.interests || [],
             saved_locations: updated,
-            saved_vehicles: savedVehicles,
             is_profile_complete: isComplete
         }
         const { data, error } = await supabase.from('customers').update(payload).eq('id', form.id).select().single()
@@ -264,8 +278,6 @@ export default function SettingsPage() {
             setForm(data)
             setSaved(true)
             setTimeout(() => setSaved(false), 3000)
-        } else {
-            alert('ไม่พบข้อมูลลูกค้าเพื่ออัปเดต (ID mismatch)')
         }
         setSaving(false)
     }
@@ -301,36 +313,48 @@ export default function SettingsPage() {
         setSaving(false)
     }
 
-    const handleAddVehicle = async () => {
-        const id = Math.random().toString(36).substring(2, 9)
-        const newV = { ...vForm, id } as SavedVehicle
-        const updated = [...savedVehicles, newV]
+    const handleSaveVehicle = async () => {
+        let updated: SavedVehicle[]
+        if (editingVehicleId) {
+            updated = savedVehicles.map(v => v.id === editingVehicleId ? { ...vForm, id: editingVehicleId } as SavedVehicle : v)
+        } else {
+            const id = Math.random().toString(36).substring(2, 9)
+            const newV = { ...vForm, id } as SavedVehicle
+            updated = [...savedVehicles, newV]
+        }
         
         setSavedVehicles(updated)
         setShowVModal(false)
+        setEditingVehicleId(null)
         setVForm({ vehicle_size: 'M' })
 
         setSaving(true)
         const birthdays = form.birthdate || null
         const isComplete = !!(form.full_name && form.phone && form.gender && birthdays && form.occupation && (form.interests && form.interests.length > 0))
-        const payload = {
-            full_name: form.full_name,
-            phone: form.phone,
-            gender: form.gender,
+        
+        const isUpdatingPrimary = editingVehicleId && (
+            form.license_plate === savedVehicles.find(v => v.id === editingVehicleId)?.license_plate
+        );
+
+        const payload: any = {
+            ...form,
             birthdate: birthdays,
-            occupation: form.occupation,
-            interests: form.interests || [],
-            saved_locations: savedLocations,
             saved_vehicles: updated,
             is_profile_complete: isComplete,
-            ...(updated.length === 1 && {
-                vehicle_brand: newV.vehicle_brand,
-                vehicle_model: newV.vehicle_model,
-                vehicle_color: newV.vehicle_color,
-                license_plate: newV.license_plate,
-                vehicle_size: newV.vehicle_size
-            })
         }
+
+        // If it's the first vehicle or editing the primary vehicle, update root profile too
+        if (updated.length === 1 || isUpdatingPrimary) {
+            const v = updated.find(v => v.id === (editingVehicleId || updated[0].id))
+            if (v) {
+                payload.vehicle_brand = v.vehicle_brand;
+                payload.vehicle_model = v.vehicle_model;
+                payload.vehicle_color = v.vehicle_color;
+                payload.license_plate = v.license_plate;
+                payload.vehicle_size = v.vehicle_size;
+            }
+        }
+
         const { data, error } = await supabase.from('customers').update(payload).eq('id', form.id).select().single()
 
         if (error) {
@@ -340,8 +364,6 @@ export default function SettingsPage() {
             setForm(data)
             setSaved(true)
             setTimeout(() => setSaved(false), 3000)
-        } else {
-            alert('ไม่พบข้อมูลลูกค้าเพื่ออัปเดต (ID mismatch)')
         }
         setSaving(false)
     }
@@ -557,11 +579,20 @@ export default function SettingsPage() {
                                             <button 
                                                 type="button" 
                                                 className="btn btn-ghost btn-sm btn-icon" 
-                                                style={{ color: 'var(--danger)' }} 
-                                                onClick={() => handleRemoveVehicle(v.id)}
+                                                onClick={() => openEditVehicle(v)}
                                             >
-                                                <Trash2 size={16} />
+                                                <Wrench size={16} />
                                             </button>
+                                            {savedVehicles.length > 1 && (
+                                                <button 
+                                                    type="button" 
+                                                    className="btn btn-ghost btn-sm btn-icon" 
+                                                    style={{ color: 'var(--danger)' }} 
+                                                    onClick={() => handleRemoveVehicle(v.id)}
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 )
@@ -571,7 +602,7 @@ export default function SettingsPage() {
                         <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>ยังไม่มีข้อมูลยานพาหนะ</p>
                     )}
 
-                    <button type="button" className="btn btn-outline btn-full" onClick={() => setShowVModal(true)} style={{ gap: 8, marginTop: savedVehicles.length > 0 ? 8 : 0 }}>
+                    <button type="button" className="btn btn-outline btn-full" onClick={() => { setVForm({ vehicle_size: 'S' }); setEditingVehicleId(null); setShowVModal(true); }} style={{ gap: 8, marginTop: savedVehicles.length > 0 ? 8 : 0 }}>
                         <Plus size={18} /> เพิ่มยานพาหนะใหม่
                     </button>
                 </div>
@@ -587,16 +618,21 @@ export default function SettingsPage() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                             {savedLocations.map((loc: any) => (
                                 <div key={loc.id} className={styles.itemCard}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
                                         <div className={styles.iconBox}><Star size={16} fill="currentColor" /></div>
                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{loc.name}</div>
+                                            <div style={{ fontWeight: 700, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{loc.name}</div>
                                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{loc.address}</div>
                                         </div>
                                     </div>
-                                    <button type="button" className="btn btn-ghost btn-sm btn-icon" style={{ color: 'var(--danger)' }} onClick={() => handleRemoveLocation(loc.id)}>
-                                        <Trash2 size={16} />
-                                    </button>
+                                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                                        <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={() => openEditLocation(loc)}>
+                                            <Wrench size={16} />
+                                        </button>
+                                        <button type="button" className="btn btn-ghost btn-sm btn-icon" style={{ color: 'var(--danger)' }} onClick={() => handleRemoveLocation(loc.id)}>
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -611,8 +647,8 @@ export default function SettingsPage() {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                 {recentLocations.map((loc, idx) => (
                                     <div key={`recent-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(59, 95, 204, 0.03)', padding: 'var(--space-3)', border: '1px dashed var(--border)', borderRadius: '20px' }}>
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{loc.name}</div>
+                                        <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
+                                            <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{loc.name}</div>
                                             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{loc.address}</div>
                                         </div>
                                         <button 
@@ -620,9 +656,10 @@ export default function SettingsPage() {
                                             className="btn btn-ghost btn-sm" 
                                             onClick={() => {
                                                 setLocForm({ ...loc, name: loc.name.replace(/^🏠\s*/, '').replace(/^🏁\s*/, '') });
+                                                setEditingLocationId(null);
                                                 setShowLocModal(true);
                                             }}
-                                            style={{ fontSize: '0.72rem', color: 'var(--primary)', fontWeight: 700 }}
+                                            style={{ fontSize: '0.72rem', color: 'var(--primary)', fontWeight: 700, flexShrink: 0 }}
                                         >
                                             บันทึก
                                         </button>
@@ -632,7 +669,7 @@ export default function SettingsPage() {
                         </div>
                     )}
 
-                    <button type="button" className="btn btn-outline btn-full" onClick={() => setShowLocModal(true)} style={{ gap: 8 }}>
+                    <button type="button" className="btn btn-outline btn-full" onClick={() => { setLocForm({ lat: 16.4419, lng: 102.8360 }); setEditingLocationId(null); setShowLocModal(true); }} style={{ gap: 8 }}>
                         <Plus size={18} /> เพิ่มสถานที่ใหม่
                     </button>
                 </div>
@@ -759,8 +796,8 @@ export default function SettingsPage() {
                                     onChange={(lat, lng, addr) => setLocForm(p => ({ ...p, lat, lng, address: addr }))}
                                 />
                             </div>
-                            <button className="btn btn-primary btn-full" onClick={handleAddLocation} disabled={!locForm.name || !locForm.detail || !locForm.address} style={{ borderRadius: 'var(--radius-xl)' }}>
-                                บันทึกสถานที่
+                            <button className="btn btn-primary btn-full" onClick={handleSaveLocation} disabled={!locForm.name || !locForm.detail || !locForm.address} style={{ borderRadius: 'var(--radius-xl)' }}>
+                                {editingLocationId ? 'อัปเดตสถานที่' : 'บันทึกสถานที่'}
                             </button>
                         </div>
                     </div>
@@ -816,11 +853,11 @@ export default function SettingsPage() {
                             </div>
                             <button
                                 className="btn btn-primary btn-full"
-                                onClick={handleAddVehicle}
+                                onClick={handleSaveVehicle}
                                 disabled={!vForm.vehicle_brand || !vForm.vehicle_model || !vForm.vehicle_color || !vForm.license_plate}
                                 style={{ borderRadius: 'var(--radius-xl)' }}
                             >
-                                บันทึกข้อมูลรถ
+                                {editingVehicleId ? 'อัปเดตข้อมูลรถ' : 'บันทึกข้อมูลรถ'}
                             </button>
                         </div>
                     </div>
