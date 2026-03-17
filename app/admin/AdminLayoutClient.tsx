@@ -15,9 +15,11 @@ import {
     LogOut,
     Menu,
     ChevronLeft,
-    History
+    History,
+    Bell
 } from 'lucide-react'
 import AuditLogModal from '@/components/Admin/AuditLogModal'
+import NotificationTesterModal from '@/components/Admin/NotificationTesterModal'
 import Logo from '@/components/Branding/Logo'
 import ConfirmModal from '@/components/Global/ConfirmModal'
 
@@ -37,6 +39,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
     const router = useRouter()
     const [sidebarOpen, setSidebarOpen] = useState(false)
     const [auditOpen, setAuditOpen] = useState(false)
+    const [testNotiOpen, setTestNotiOpen] = useState(false)
     const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
 
     useEffect(() => {
@@ -82,6 +85,31 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
                     })}
                 </nav>
                 <div className={styles.sidebarFooter}>
+                    <button 
+                        onClick={() => setTestNotiOpen(true)}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6,
+                            width: '100%',
+                            padding: '10px 0',
+                            marginBottom: 0,
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--text-muted)',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            textDecoration: 'underline',
+                            cursor: 'pointer',
+                            opacity: 0.8,
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.8' }}
+                    >
+                        <Bell size={14} /> ทดสอบแจ้งเตือน
+                    </button>
                     <button 
                         onClick={() => setAuditOpen(true)}
                         style={{
@@ -135,6 +163,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
             </div>
 
             <AuditLogModal isOpen={auditOpen} onClose={() => setAuditOpen(false)} />
+            <NotificationTesterModal isOpen={testNotiOpen} onClose={() => setTestNotiOpen(false)} />
             
             <ConfirmModal 
                 isOpen={logoutConfirmOpen}

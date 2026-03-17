@@ -71,9 +71,28 @@ export default function AdvancedDiscountsPage() {
         }
 
         if (editingId) {
+            const oldCode = codes.find(c => c.id === editingId)
             await supabase.from('discount_codes').update(payload).eq('id', editingId)
+            
+            await trackAuditLog({
+                action_type: 'UPDATE',
+                entity_type: 'discount_code',
+                entity_id: editingId,
+                old_data: oldCode,
+                new_data: payload,
+                description: `แก้ไขโค้ดส่วนลด: ${payload.code}`
+            })
         } else {
-            await supabase.from('discount_codes').insert(payload)
+            const { data: newCode } = await supabase.from('discount_codes').insert(payload).select().single()
+            if (newCode) {
+                await trackAuditLog({
+                    action_type: 'CREATE',
+                    entity_type: 'discount_code',
+                    entity_id: newCode.id,
+                    new_data: newCode,
+                    description: `สร้างโค้ดส่วนลดใหม่: ${payload.code}`
+                })
+            }
         }
 
         resetForm()
@@ -117,7 +136,18 @@ export default function AdvancedDiscountsPage() {
     }
 
     const toggleStatus = async (id: string, currentStatus: boolean) => {
+        const oldCode = codes.find(c => c.id === id)
         await supabase.from('discount_codes').update({ is_active: !currentStatus }).eq('id', id)
+        
+        await trackAuditLog({
+            action_type: 'TOGGLE_STATUS',
+            entity_type: 'discount_code',
+            entity_id: id,
+            old_data: oldCode,
+            new_data: { is_active: !currentStatus },
+            description: `${!currentStatus ? 'เปิด' : 'ปิด'}การใช้งานโค้ด: ${oldCode?.code || id}`
+        })
+        
         loadData()
     }
 

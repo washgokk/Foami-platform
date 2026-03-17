@@ -81,8 +81,14 @@ export default function GlobalLogin() {
     // ─── Phase 3: PWA Polling (for iOS) ───
     useEffect(() => {
         const searchParams = new URLSearchParams(window.location.search)
-        const activeBridgeId = searchParams.get('pwaBridgeId')
+        const urlId = searchParams.get('pwaBridgeId')
+        const storageId = localStorage.getItem('pwa_bridge_id')
+        const activeBridgeId = urlId || storageId
+        
         if (!activeBridgeId) return
+
+        // If we have it in URL but not storage, sync it
+        if (urlId && !storageId) localStorage.setItem('pwa_bridge_id', urlId)
 
         let pollInterval: any = setInterval(async () => {
             try {
@@ -90,6 +96,7 @@ export default function GlobalLogin() {
                 const result = await res.json()
                 if (result.status === 'completed' && result.customerData) {
                     clearInterval(pollInterval)
+                    localStorage.removeItem('pwa_bridge_id')
                     localStorage.setItem('liff_customer', JSON.stringify(result.customerData))
                     localStorage.setItem('liff_line_user_id', result.customerData.line_user_id)
                     router.replace('/search')
@@ -140,7 +147,8 @@ export default function GlobalLogin() {
         }
 
         // Detect iOS PWA session isolation
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         const isStandalone = (window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches;
         
         if (isIOS && isStandalone) {
@@ -151,7 +159,8 @@ export default function GlobalLogin() {
                 
             const loginUrl = `${window.location.origin}/login?bridgeId=${bridgeId}`;
             
-            // Set polling state in URL
+            // Set polling state in URL and localStorage for persistence
+            localStorage.setItem('pwa_bridge_id', bridgeId);
             const newUrl = new URL(window.location.href);
             newUrl.searchParams.set('pwaBridgeId', bridgeId);
             window.history.replaceState({}, '', newUrl.toString());
@@ -219,7 +228,7 @@ export default function GlobalLogin() {
                             <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem' }}>กรุณากลับไปที่แอป Foami เพื่อใช้งานต่อครับ</p>
                             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: 20 }}>คุณสามารถปิดหน้านี้ได้ทันที</p>
                         </div>
-                    ) : (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('pwaBridgeId')) ? (
+                    ) : (typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id'))) ? (
                          <div className={styles.waitingBox}>
                             <div className="spinner-blue" style={{ width: 40, height: 40, margin: '0 auto 15px' }} />
                             <p style={{ color: 'var(--text-primary)', fontSize: '1.1rem', fontWeight: 600 }}>กำลังรอการเข้าสู่ระบบ...</p>
@@ -227,6 +236,7 @@ export default function GlobalLogin() {
                             <button 
                                 className={styles.retryBtn} 
                                 onClick={() => {
+                                    localStorage.removeItem('pwa_bridge_id');
                                     const url = new URL(window.location.href);
                                     url.searchParams.delete('pwaBridgeId');
                                     window.location.href = url.toString();
@@ -244,7 +254,7 @@ export default function GlobalLogin() {
                     )}
                 </div>
 
-                {!(typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('pwaBridgeId')) && (
+                {!(typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id'))) && (
                     <button 
                         className={styles.lineBtn} 
                         onClick={handleLineLogin}

@@ -90,9 +90,8 @@ export async function GET(req: NextRequest) {
             .single()
 
         // 1. Notify STAFF (Urgent)
-        const staffMsg = `🚨 ระบบกำหนดงานอัตโนมัติ!\nคุณได้รับมอบหมายงาน วันที่ ${booking.scheduled_date} เวลา ${booking.scheduled_time}\nกรุณาเปิดแอปเพื่อดูรายละเอียดและเตรียมตัวครับ`
-        
         if (staffData?.line_user_id) {
+            const staffUrl = `${process.env.NEXT_PUBLIC_APP_URL}/staff/jobs/${booking.id}`
             fetch('https://api.line.me/v2/bot/message/push', {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -110,10 +109,10 @@ export async function GET(req: NextRequest) {
                             body: {
                                 type: 'box', layout: 'vertical', paddingAll: '16px',
                                 contents: [
-                                    { type: 'text', text: staffMsg, wrap: true, size: 'sm' },
+                                    { type: 'text', text: `คุณได้รับมอบหมายงานใหม่\nวันที่: ${booking.scheduled_date}\nเวลา: ${booking.scheduled_time}`, wrap: true, size: 'sm' },
                                     {
                                         type: 'button', style: 'primary', color: '#E11D48', margin: 'lg',
-                                        action: { type: 'uri', label: '📋 ดูรายละเอียดงาน', uri: `${process.env.NEXT_PUBLIC_APP_URL}/staff/jobs/${booking.id}` }
+                                        action: { type: 'uri', label: '📋 ดูรายละเอียดงาน', uri: staffUrl }
                                     }
                                 ]
                             }
@@ -129,20 +128,37 @@ export async function GET(req: NextRequest) {
             url: `/staff/jobs/${booking.id}`
         }).catch(() => {})
 
-        // 2. Notify CUSTOMER (Confirmation - Match manual acceptance style)
-        const customerName = (booking.customers as any)?.full_name || ''
-        const customerMsg = `✅ พนักงานรับงานของคุณแล้ว!\nคุณ ${customerName} เตรียมตัวรอรับบริการได้เลยครับ`
-        
+        // 2. Notify CUSTOMER (Confirmation)
         const customerLineId = (booking.customers as any)?.line_user_id
         if (customerLineId) {
-            fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/line/notify-customer`, {
+            const customerUrl = `${process.env.NEXT_PUBLIC_APP_URL}/liff/my-bookings`
+            fetch('https://api.line.me/v2/bot/message/push', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    line_user_id: customerLineId,
-                    message: customerMsg,
-                    booking_id: booking.id,
-                }),
+                    to: customerLineId,
+                    messages: [{
+                        type: 'flex',
+                        altText: '✅ พนักงานรับงานของคุณแล้ว!',
+                        contents: {
+                            type: 'bubble',
+                            header: {
+                                type: 'box', layout: 'vertical', backgroundColor: '#F4B8C8', paddingAll: '16px',
+                                contents: [{ type: 'text', text: '🫧 ยืนยันพนักงานรับงาน', color: '#1A2340', weight: 'bold', size: 'md' }]
+                            },
+                            body: {
+                                type: 'box', layout: 'vertical', paddingAll: '16px',
+                                contents: [
+                                    { type: 'text', text: `พนักงานรับงานของคุณแล้ว!\nคุณเตรียมตัวรอรับบริการได้เลยครับ`, wrap: true, size: 'sm', color: '#1A2340' },
+                                    {
+                                        type: 'button', style: 'primary', color: '#3B5FCC', margin: 'lg',
+                                        action: { type: 'uri', label: '📦 ดูการจองของฉัน', uri: customerUrl }
+                                    }
+                                ]
+                            }
+                        }
+                    }]
+                })
             }).catch(e => console.error('[Auto-Assign] Customer Line Error:', e))
         }
 

@@ -85,6 +85,9 @@ export default function AuditLogModal({ isOpen, onClose }: AuditLogModalProps) {
             if (tableName === 'zone') tableName = 'zones'
             if (tableName === 'discount_code') tableName = 'discount_codes'
             if (tableName === 'cc_price_group') tableName = 'cc_price_groups'
+            if (tableName === 'customer') tableName = 'customers'
+            if (tableName === 'staff') tableName = 'staff'
+            if (tableName === 'payout') tableName = 'payouts'
 
             let query;
             if (isDelete) {
