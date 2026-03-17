@@ -18,15 +18,30 @@ export async function GET(req: NextRequest) {
     // Get pending bookings happening within 2 hours
     const { data: pendingBookings } = await supabase
         .from('bookings')
-        .select('id, zone_id, scheduled_date, scheduled_time, customers(full_name, line_user_id)')
+        .select('id, zone_id, customer_id, scheduled_date, scheduled_time, customers(full_name, line_user_id)')
         .eq('status', 'pending')
         .is('staff_id', null)
 
+    const token = process.env.LINE_CHANNEL_ACCESS_TOKEN
+
     let assigned = 0
     for (const booking of pendingBookings || []) {
-        // Force parse as Thai time (+07:00) to match DB storage format
-        const bookingDt = new Date(`${booking.scheduled_date}T${booking.scheduled_time}:00+07:00`)
-        if (bookingDt > cutoff) continue // More than 2 hours away, skip
+        // Robust Thai time parsing: Append :00 only if seconds are missing, then +07:00
+        const timeStr = booking.scheduled_time.includes(':') && booking.scheduled_time.split(':').length === 2 
+            ? `${booking.scheduled_time}:00` 
+            : booking.scheduled_time
+        
+        const bookingDt = new Date(`${booking.scheduled_date}T${timeStr}+07:00`)
+        
+        if (isNaN(bookingDt.getTime())) {
+            console.error(`[Auto-Assign] Invalid date for booking ${booking.id}: ${booking.scheduled_date}T${timeStr}+07:00`)
+            continue
+        }
+
+        if (bookingDt > cutoff) {
+            console.log(`[Auto-Assign] Booking ${booking.id} is too far away (${bookingDt.toLocaleString()}). Skipping.`)
+            continue
+        }
 
         // Find available staff for this zone/date/time
         const { data: schedules } = await supabase
@@ -37,17 +52,27 @@ export async function GET(req: NextRequest) {
             .eq('time_slot', booking.scheduled_time)
             .eq('is_booked', false)
 
-        if (!schedules || schedules.length === 0) continue
+        if (!schedules || schedules.length === 0) {
+            console.log(`[Auto-Assign] No available staff for booking ${booking.id} at ${booking.scheduled_date} ${booking.scheduled_time}`)
+            continue
+        }
 
         // Randomly pick one
         const picked = schedules[Math.floor(Math.random() * schedules.length)]
 
-        await supabase.from('bookings').update({
+        console.log(`[Auto-Assign] Assigning booking ${booking.id} to staff ${picked.staff_id}`)
+
+        const { error: updateError } = await supabase.from('bookings').update({
             staff_id: picked.staff_id,
             status: 'confirmed',
             auto_assigned: true,
             updated_at: new Date().toISOString(),
         }).eq('id', booking.id)
+
+        if (updateError) {
+            console.error(`[Auto-Assign] Failed to update booking ${booking.id}:`, updateError)
+            continue
+        }
 
         // Mark schedule as booked
         await supabase.from('staff_schedules')
@@ -57,35 +82,75 @@ export async function GET(req: NextRequest) {
             .eq('date', booking.scheduled_date)
             .eq('time_slot', booking.scheduled_time)
 
-        // Get staff line_user_id for urgent notification
+        // Get staff & customer info for notifications
         const { data: staffData } = await supabase
             .from('staff')
             .select('full_name, line_user_id')
             .eq('id', picked.staff_id)
             .single()
 
+        // 1. Notify STAFF (Urgent)
+        const staffMsg = `🚨 ระบบกำหนดงานอัตโนมัติ!\nคุณได้รับมอบหมายงาน วันที่ ${booking.scheduled_date} เวลา ${booking.scheduled_time}\nกรุณาเปิดแอปเพื่อดูรายละเอียดและเตรียมตัวครับ`
+        
         if (staffData?.line_user_id) {
-            try {
-                await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/line/notify-staff`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        line_user_ids: [staffData.line_user_id],
-                        booking_id: booking.id,
-                        message: `🚨 ระบบกำหนดงานอัตโนมัติ!\nคุณได้รับมอบหมายงาน วันที่ ${booking.scheduled_date} เวลา ${booking.scheduled_time}\nกรุณาเปิดแอปเพื่อดูรายละเอียด`,
-                    }),
+            fetch('https://api.line.me/v2/bot/message/push', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    to: staffData.line_user_id,
+                    messages: [{
+                        type: 'flex',
+                        altText: '🚨 มีงานถูกมอบหมายอัตโนมัติ!',
+                        contents: {
+                            type: 'bubble',
+                            header: {
+                                type: 'box', layout: 'vertical', backgroundColor: '#E11D48', paddingAll: '16px',
+                                contents: [{ type: 'text', text: '🚨 งานด่วน! ระบบมอบหมายออโต้', color: '#FFFFFF', weight: 'bold', size: 'md' }]
+                            },
+                            body: {
+                                type: 'box', layout: 'vertical', paddingAll: '16px',
+                                contents: [
+                                    { type: 'text', text: staffMsg, wrap: true, size: 'sm' },
+                                    {
+                                        type: 'button', style: 'primary', color: '#E11D48', margin: 'lg',
+                                        action: { type: 'uri', label: '📋 ดูรายละเอียดงาน', uri: `${process.env.NEXT_PUBLIC_APP_URL}/staff/jobs/${booking.id}` }
+                                    }
+                                ]
+                            }
+                        }
+                    }]
                 })
-            } catch { /* Non-critical */ }
+            }).catch(e => console.error('[Auto-Assign] Staff Line Error:', e))
         }
 
-        // Send Web Push notification
-        try {
-            await sendPushNotification(picked.staff_id, 'staff', {
-                title: '🚨 งานถูกมอบหมายอัตโนมัติ!',
-                body: `ได้รับงานวันที่ ${booking.scheduled_date} เวลา ${booking.scheduled_time} แล้ว\nกดเพื่อดูรายละเอียดงานเลย`,
-                url: `/staff`
-            })
-        } catch { /* Non-critical */ }
+        sendPushNotification(picked.staff_id, 'staff', {
+            title: '🚨 งานถูกมอบหมายอัตโนมัติ!',
+            body: `วันที่: ${booking.scheduled_date} เวลา: ${booking.scheduled_time}`,
+            url: `/staff/jobs/${booking.id}`
+        }).catch(() => {})
+
+        // 2. Notify CUSTOMER (Confirmation - Match manual acceptance style)
+        const customerName = (booking.customers as any)?.full_name || ''
+        const customerMsg = `✅ พนักงานรับงานของคุณแล้ว!\nคุณ ${customerName} เตรียมตัวรอรับบริการได้เลยครับ`
+        
+        const customerLineId = (booking.customers as any)?.line_user_id
+        if (customerLineId) {
+            fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/line/notify-customer`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    line_user_id: customerLineId,
+                    message: customerMsg,
+                    booking_id: booking.id,
+                }),
+            }).catch(e => console.error('[Auto-Assign] Customer Line Error:', e))
+        }
+
+        sendPushNotification(booking.customer_id, 'customer', {
+            title: 'พนักงานรับงานแล้ว! ✅',
+            body: `พนักงานกำลังเตรียมตัวเพื่อไปดูแลรถของคุณในเวลา ${booking.scheduled_time}`,
+            url: `/menu/my-bookings`
+        }).catch(() => {})
 
         assigned++
     }

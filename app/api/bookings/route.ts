@@ -17,6 +17,17 @@ export async function POST(req: NextRequest) {
         vehicle_data
     } = body
 
+    // Validate 20-minute buffer (Thai Time)
+    const now = new Date()
+    const bookingTimeUTC = new Date(`${scheduled_date}T${scheduled_time}:00+07:00`).getTime()
+    const cutoffTimeUTC = now.getTime() + (20 * 60 * 1000)
+
+    if (bookingTimeUTC < cutoffTimeUTC) {
+        return NextResponse.json({ 
+            error: 'ขออภัยครับ เวลานัดหมายต้องล่วงหน้าอย่างน้อย 20 นาที กรุณาเลือกเวลาอื่น' 
+        }, { status: 400 })
+    }
+
     const { data, error } = await supabase.from('bookings').insert({
         customer_id, service_id, addon_ids: addon_ids || [],
         pickup_lat, pickup_lng, pickup_address,

@@ -274,7 +274,7 @@ export default function BookPage() {
             const now = new Date()
             const thTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }))
             const todayStr = thTime.getFullYear() + '-' + String(thTime.getMonth() + 1).padStart(2, '0') + '-' + String(thTime.getDate()).padStart(2, '0')
-            const currentHourMin = String(thTime.getHours()).padStart(2, '0') + ':' + String(thTime.getMinutes()).padStart(2, '0')
+            const nowMinutes = thTime.getHours() * 60 + thTime.getMinutes()
 
             const availabilityMap: Record<string, any[]> = {}
 
@@ -284,7 +284,12 @@ export default function BookPage() {
                 const dayBookings = (allBookings || []).filter(b => b.scheduled_date === dateKey)
 
                 const slotsForDay = TIME_SLOTS.map(slot => {
-                    if (dateKey === todayStr && slot <= currentHourMin) return null
+                    if (dateKey === todayStr) {
+                        const [sh, sm] = slot.split(':').map(Number)
+                        const slotMinutes = sh * 60 + sm
+                        if (slotMinutes <= nowMinutes) return null
+                        if (slotMinutes < nowMinutes + 20) return { time_slot: slot, type: 'timed_out' }
+                    }
 
                     // Capacity Calculation:
                     // A slot is available if:
@@ -1533,21 +1538,23 @@ export default function BookPage() {
 
                                     const hasSurcharge = slotSurcharge > 0
 
+                                    const isTimedOut = sl.type === 'timed_out'
+
                                     return (
-                                        <button key={sl.time_slot} disabled={isFull}
+                                        <button key={sl.time_slot} disabled={isFull || isTimedOut}
                                             onClick={() => setSelectedSlot(sl.time_slot)}
                                             style={{
                                                 padding: '10px 8px', borderRadius: 'var(--radius)', fontWeight: 700,
                                                 border: isSelected ? '2.5px solid var(--primary)' : '1.5px solid var(--border)',
-                                                background: isSelected ? 'var(--primary)' : isFull ? 'var(--surface-2)' : hasSurcharge ? '#FFF9C4' : 'var(--surface)',
-                                                color: isSelected ? '#fff' : isFull ? 'var(--text-muted)' : 'var(--text-primary)',
-                                                cursor: isFull ? 'not-allowed' : 'pointer', opacity: isFull ? 0.6 : 1,
+                                                background: isSelected ? 'var(--primary)' : (isFull || isTimedOut) ? 'var(--surface-2)' : hasSurcharge ? '#FFF9C4' : 'var(--surface)',
+                                                color: isSelected ? '#fff' : (isFull || isTimedOut) ? 'var(--text-muted)' : 'var(--text-primary)',
+                                                cursor: (isFull || isTimedOut) ? 'not-allowed' : 'pointer', opacity: (isFull || isTimedOut) ? 0.6 : 1,
                                                 transition: 'all 0.2s', position: 'relative', overflow: 'hidden'
                                             }}
                                         >
                                             <div style={{ fontSize: '0.9rem' }}>{sl.time_slot?.slice(0, 5)}</div>
                                             <div style={{ fontSize: '0.62rem', fontWeight: 600, marginTop: 2, color: isSelected ? 'rgba(255,255,255,0.9)' : hasSurcharge ? '#D4A017' : 'var(--text-muted)' }}>
-                                                {isFull ? 'คิวเต็ม' : hasSurcharge ? `+฿${slotSurcharge}` : 'ว่าง'}
+                                                {isTimedOut ? 'หมดเวลา' : isFull ? 'คิวเต็ม' : hasSurcharge ? `+฿${slotSurcharge}` : 'ว่าง'}
                                             </div>
                                             {hasSurcharge && !isSelected && !isFull && <div style={{ position: 'absolute', top: 0, right: 0, width: 0, height: 0, borderStyle: 'solid', borderWidth: '0 12px 12px 0', borderColor: `transparent #FBC02D transparent transparent` }} />}
                                         </button>
