@@ -557,12 +557,16 @@ export default function CRMPage() {
                         </div>
                         <div className={styles.filterItem} style={{ flex: 1 }}>
                             <label className={styles.filterLabel}>ค้นหา (ชื่อ/เบอร์/ทะเบียน/ID)</label>
-                            <input 
-                                className="form-input" 
-                                placeholder="🔍 คีย์เวิร์ด..." 
-                                value={txFilters.search} 
-                                onChange={e => setTxFilters({ ...txFilters, search: e.target.value })} 
-                            />
+                            <div className={styles.searchWrapper}>
+                                <Search size={16} className={styles.searchIcon} />
+                                <input 
+                                    className="form-input" 
+                                    style={{ paddingLeft: 40, width: '100%' }}
+                                    placeholder="คีย์เวิร์ด..." 
+                                    value={txFilters.search} 
+                                    onChange={e => setTxFilters({ ...txFilters, search: e.target.value })} 
+                                />
+                            </div>
                         </div>
                         <button 
                             className="btn btn-ghost btn-sm"
@@ -1506,7 +1510,7 @@ export default function CRMPage() {
                                         <div key={idx} style={{ padding: 10, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)', fontSize: '0.85rem' }}>
                                             <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{l.name}</div>
                                             <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{l.address}</div>
-                                            {l.note && <div style={{ color: 'var(--warning)', fontSize: '0.75rem', marginTop: 4 }}>📝 {l.note}</div>}
+                                            {l.note && <div style={{ color: 'var(--warning)', fontSize: '0.75rem', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}><FileText size={12} /> {l.note}</div>}
                                         </div>
                                     ))}
                                     {(!selectedCustomer.saved_locations || selectedCustomer.saved_locations.length === 0) && <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 12 }}>ไม่มีข้อมูลที่อยู่</div>}

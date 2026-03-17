@@ -115,14 +115,32 @@
 /* Filter Bar */
 .txFilterBar {
     display: flex;
-    gap: var(--space-3);
-    margin-bottom: var(--space-4);
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
     flex-wrap: wrap;
     align-items: flex-end;
-    background: var(--surface-2);
-    padding: var(--space-4);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: var(--space-5) var(--space-6);
+    border-radius: 20px;
+    border: 1px solid rgba(49, 94, 195, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.03);
+}
+
+.searchWrapper {
+    position: relative;
+    flex: 1;
+    min-width: 280px;
+}
+
+.searchIcon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
 }
 
 .filterItem {
@@ -132,10 +150,13 @@
 }
 
 .filterLabel {
-    font-size: 0.75rem;
-    font-weight: 700;
+    font-size: 0.72rem;
+    font-weight: 800;
     color: var(--text-muted);
     margin-left: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.8;
 }
 
 /* CRM Tags/Segments */
