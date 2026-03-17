@@ -756,6 +756,9 @@ export default function BookPage() {
         const activeSlot = slots[selectedDate]?.find((s: any) => s.time_slot === selectedSlot)
         const activeBranchId = activeSlot ? zones.find(z => z.id === activeSlot.serving_zone_id)?.branch_id : null
 
+        // Snapshot branch costs
+        const bSettings = branches.find(b => b.id === activeBranchId) || branches[0]
+
         try {
             const { data: bookingData, error } = await supabase.from('bookings').insert({
                 id: bookingId,
@@ -777,7 +780,11 @@ export default function BookPage() {
                 vehicle_photos: [], // Start with empty
                 customer_note: customerNote || null,
                 status: 'pending',
-                auto_assigned: false
+                auto_assigned: false,
+                labor_cost: bSettings?.labor_cost_per_job || 0,
+                capital_cost: bSettings?.max_capital_per_job || 0,
+                rental_cost: bSettings?.vehicle_rental_per_job || 0,
+                fuel_cost: bSettings?.fuel_cost_per_job || 0
             }).select().single()
 
             if (error) throw error
@@ -921,9 +928,7 @@ export default function BookPage() {
         <div className={styles.page}>
             {/* Topbar */}
             <div className={styles.topbar}>
-                <button onClick={() => step === 0 ? router.back() : setStep(step - 1)} className={styles.exitButton}>
-                    {step === 0 ? <X size={22} /> : <ChevronLeft size={24} />}
-                </button>
+                <div style={{ width: 44 }} />
                 <div className={styles.topbarCenter}>
                     <Logo width={110} variant="landscape" />
                 </div>
@@ -972,7 +977,13 @@ export default function BookPage() {
                                         {/* Image Header */}
                                         <div className={styles.packageImageContainer}>
                                             {pkg.image_url ? (
-                                                <img src={pkg.image_url} alt={pkg.name} className={styles.packageImg} />
+                                                <img 
+                                                    src={pkg.image_url} 
+                                                    alt={pkg.name} 
+                                                    className={styles.packageImg} 
+                                                    style={{ cursor: 'zoom-in' }}
+                                                    onClick={(e) => { e.stopPropagation(); setPreviewImg(pkg.image_url) }}
+                                                />
                                             ) : (
                                                 <div className={styles.packageIconOverlay}>
                                                     <IconComp size={48} color={pkg.color} style={{ opacity: 0.2 }} />
@@ -1711,11 +1722,14 @@ export default function BookPage() {
             {/* Footer navigation */}
             <div className={styles.footer}>
                 <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-                    {step > 0 && (
-                        <button className="btn btn-ghost" style={{ flex: 1, gap: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setStep(s => s - 1)}>
-                            <ChevronLeft size={18} /> ย้อนกลับ
-                        </button>
-                    )}
+                    <button 
+                        className="btn btn-ghost" 
+                        style={{ flex: 1, gap: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
+                        onClick={() => step === 0 ? router.back() : setStep(s => s - 1)}
+                    >
+                        {step === 0 ? <X size={18} /> : <ChevronLeft size={18} />} 
+                        {step === 0 ? 'กลับหน้าหลัก' : 'ย้อนกลับ'}
+                    </button>
                     {(step < STEPS.length - 1 && step !== 4) ? (
                         <button
                             className="btn btn-primary"

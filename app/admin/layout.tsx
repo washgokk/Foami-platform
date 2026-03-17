@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: 'ระบบจัดการหลังบ้าน Foami',
   manifest: '/manifest-admin.json',
   icons: {
-    icon: '/icon-192x192_admin.png',
+    icon: '/icon.svg',
     apple: '/icon-512x512_admin.png',
   },
 }

@@ -301,6 +301,10 @@ export interface Booking {
     additional_price_note?: string
     additional_price_slips?: string[]
     payout_id?: string
+    labor_cost?: number
+    capital_cost?: number
+    rental_cost?: number
+    fuel_cost?: number
     created_at: string
     updated_at: string
     // Joins

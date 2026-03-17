@@ -270,9 +270,26 @@ export default function JobDetailPage() {
             additional_price_slips: slipUrls,
             total_price: newTotal
         }).eq('id', id)
+
+        // Trigger notification to customer
+        if (job.customer_id && newAdditionalPrice > oldAdditionalPrice) {
+            fetch('/api/push/notify-customer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    customer_id: job.customer_id,
+                    title: 'มีค่าใช้จ่ายเพิ่มเติม 💰',
+                    body: `รบกวนชำระเงิน ฿${newAdditionalPrice.toLocaleString()} (${additionalNote || 'ค่าบริการเพิ่มเติม'}) เพื่อให้พนักงานดำเนินการต่อครับ`,
+                    url: `/menu/my-bookings`
+                })
+            }).catch(() => {})
+
+            // Also Line if possible (handled by another API ideally, but for now we focus on PWA)
+        }
         
         setAdditionalSlipFiles([])
         setSavingCost(false)
+        load() // Refresh after save
     }
 
     const isFuelJob = job?.services?.name?.includes('น้ำมัน') || 

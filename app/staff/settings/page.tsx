@@ -9,6 +9,7 @@ import { Booking } from '@/lib/types'
 import ImageZoom from '@/components/Global/ImageZoom'
 import { usePushNotifications } from '@/lib/hooks/usePushNotifications'
 import { Bell, BellOff, Send } from 'lucide-react'
+import SuccessModal from '@/components/Global/SuccessModal'
 
 export default function StaffSettingsPage() {
     const [staff, setStaff] = useState<Staff | null>(null)
@@ -20,6 +21,7 @@ export default function StaffSettingsPage() {
     const [historyDetailBookings, setHistoryDetailBookings] = useState<Booking[]>([])
     const [loadingHistoryDetail, setLoadingHistoryDetail] = useState(false)
     const [zoomConfig, setZoomConfig] = useState<{ images: { src: string; alt?: string }[]; initialIndex: number } | null>(null)
+    const [showPushSuccess, setShowPushSuccess] = useState(false)
 
     const { 
         subscribe, 
@@ -349,7 +351,7 @@ export default function StaffSettingsPage() {
                                 borderRadius: '12px',
                                 border: isSubscribed ? '1px solid var(--border)' : 'none'
                             }}
-                            onClick={() => isSubscribed ? unsubscribe() : subscribe()}
+                            onClick={() => isSubscribed ? unsubscribe() : subscribe(() => setShowPushSuccess(true))}
                             disabled={pushLoading}
                         >
                             {pushLoading ? <span className="spinner" style={{ width: 16, height: 16 }} /> : 
@@ -470,6 +472,13 @@ export default function StaffSettingsPage() {
                     onClose={() => setZoomConfig(null)} 
                 />
             )}
+
+            <SuccessModal 
+                isOpen={showPushSuccess}
+                onClose={() => setShowPushSuccess(false)}
+                title="เปิดแจ้งเตือนสำเร็จ!"
+                message="คุณจะไม่พลาดงานใหม่หรืองานที่กำลังดำเนินการแบบเรียลไทม์แล้วครับ"
+            />
         </div>
     )
 }

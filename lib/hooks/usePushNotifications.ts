@@ -66,8 +66,11 @@ export function usePushNotifications(userId: string | undefined, platform: 'cust
         }
     }, [userId])
 
-    const subscribe = async () => {
-        if (!userId) return
+    const subscribe = async (onSuccess?: () => void) => {
+        if (!userId) {
+            setError('User ID is missing')
+            return false
+        }
         setLoading(true)
         setError(null)
 
@@ -85,6 +88,9 @@ export function usePushNotifications(userId: string | undefined, platform: 'cust
                 console.log('No SW registration found during subscribe - registering now...')
                 registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' })
             }
+
+            // Ensure it's ready
+            await navigator.serviceWorker.ready
 
             // Robust check for active state
             if (!registration.active) {
@@ -105,11 +111,10 @@ export function usePushNotifications(userId: string | undefined, platform: 'cust
                                 console.log('SW still installing...')
                                 setTimeout(check, 500)
                             } else {
-                                resolve(null) // Should not happen easily
+                                resolve(null)
                             }
                         }
                         check()
-                        // Final safety timeout
                         setTimeout(() => resolve(null), 8000)
                     })
                 }
@@ -118,19 +123,10 @@ export function usePushNotifications(userId: string | undefined, platform: 'cust
                 if (activeReg) registration = activeReg
             }
 
-            // If still not active, try the standard ready promise as last resort
-            if (!registration.active) {
-                console.log('Trying navigator.serviceWorker.ready fallback...')
-                const registrationPromise = navigator.serviceWorker.ready
-                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('ระบบ Service Worker ไม่ตอบสนอง (Timeout 10s)')), 10000))
-                registration = await Promise.race([registrationPromise, timeoutPromise]) as ServiceWorkerRegistration
-            }
-            
             if (!registration || !registration.active) {
                 throw new Error('ไม่สามารถเปิดใช้งาน Service Worker ได้ โปรดรีเฟรชหน้าเว็บและลองอีกครั้ง')
             }
 
-            // Convert VAPID public key
             const base64String = VAPID_PUBLIC_KEY
             if (!base64String) throw new Error('VAPID public key is missing')
 
@@ -165,6 +161,7 @@ export function usePushNotifications(userId: string | undefined, platform: 'cust
 
             setSubscription(newSubscription)
             setIsSubscribed(true)
+            if (onSuccess) onSuccess()
             return true
         } catch (err: any) {
             console.error('Error subscribing to push:', err)

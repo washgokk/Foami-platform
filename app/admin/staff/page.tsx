@@ -236,40 +236,29 @@ export default function StaffPage() {
             laborTotal: number, 
             rentalTotal: number, 
             fuelTotal: number,
+            capitalTotal: number,
             extraFromJobs: number 
         }> = {}
         selectedBookingIds.forEach(id => {
             const b = bookings.find(x => x.id === id)
             if (b && b.staff_id) {
-                if (!groups[b.staff_id]) groups[b.staff_id] = { bookings: [], laborTotal: 0, rentalTotal: 0, fuelTotal: 0, extraFromJobs: 0 }
+                if (!groups[b.staff_id]) groups[b.staff_id] = { bookings: [], laborTotal: 0, rentalTotal: 0, fuelTotal: 0, capitalTotal: 0, extraFromJobs: 0 }
                 groups[b.staff_id].bookings.push(b)
                 
                 const s = staff.find(st => st.id === b.staff_id)
                 const bData = s ? (s as any).branch_data : null
                 
-                let addonsTotal = 0
-                if (Array.isArray(b.addon_ids)) {
-                    b.addon_ids.forEach((addon: any) => {
-                        let price = 0
-                        if (typeof addon !== 'string') {
-                            if (addon.isFree) price = 0
-                            else if (addon.selectedPrice !== undefined) price = addon.selectedPrice
-                            else if (addon.price !== undefined) price = addon.price
-                            else if (addon.variableState?.customAmount) price = Number(addon.variableState.customAmount)
-                        }
-                        addonsTotal += price
-                    })
-                }
-                const bBase = b.base_price || 0
-                const bTotal = b.total_price || 0
-                const bExtra = b.extra_fee || 0
-                const bDisc = b.discount_amount || 0
+                // Use snapshot values if available, otherwise fallback to branch defaults
+                const labor = b.labor_cost !== undefined ? b.labor_cost : (bData?.labor_cost_per_job || 0)
+                const rental = b.rental_cost !== undefined ? b.rental_cost : (bData?.vehicle_rental_per_job || 0)
+                const fuel = b.fuel_cost !== undefined ? b.fuel_cost : (bData?.fuel_cost_per_job || 0)
+                const capital = b.capital_cost !== undefined ? b.capital_cost : (bData?.max_capital_per_job || 0)
                 const bAddi = b.additional_price || 0
-                const smlAdj = bTotal - bBase - addonsTotal - bExtra - bAddi + bDisc
                 
-                groups[b.staff_id].laborTotal += (bData?.labor_cost_per_job || 0)
-                groups[b.staff_id].rentalTotal += bData?.vehicle_rental_per_job || 0
-                groups[b.staff_id].fuelTotal += bData?.fuel_cost_per_job || 0
+                groups[b.staff_id].laborTotal += labor
+                groups[b.staff_id].rentalTotal += rental
+                groups[b.staff_id].fuelTotal += fuel
+                groups[b.staff_id].capitalTotal += capital
                 groups[b.staff_id].extraFromJobs += bAddi
             }
         })
@@ -661,6 +650,7 @@ export default function StaffPage() {
                                     <th style={{ textAlign: 'center' }}>ค่าแรง</th>
                                     <th style={{ textAlign: 'center' }}>ค่ารถ</th>
                                     <th style={{ textAlign: 'center' }}>น้ำมัน</th>
+                                    <th style={{ textAlign: 'center' }}>ต้นทุน</th>
                                     <th style={{ textAlign: 'center' }}>เพิ่มเติม</th>
                                 </tr>
                             </thead>
@@ -674,6 +664,17 @@ export default function StaffPage() {
                                     const s = staff.find(st => st.id === b.staff_id)
                                     const bData = s ? (s as any).branch_data : null
                                     const isSelected = selectedBookingIds.includes(b.id)
+                                    
+                                    // Snapshot values with fallback
+                                    const labor = b.labor_cost !== undefined ? b.labor_cost : (bData?.labor_cost_per_job || 0)
+                                    const rental = b.rental_cost !== undefined ? b.rental_cost : (bData?.vehicle_rental_per_job || 0)
+                                    const fuel = b.fuel_cost !== undefined ? b.fuel_cost : (bData?.fuel_cost_per_job || 0)
+                                    const capital = b.capital_cost !== undefined ? b.capital_cost : (bData?.max_capital_per_job || 0)
+                                    
+                                    // Use joined staff name if state lookup fails
+                                    const staffName = s?.full_name || (b as any).staff?.full_name || 'รอดำเนินการ'
+                                    const branchName = (s as any)?.branch_name || 'ไม่ทราบสาขา'
+
                                     return (
                                         <tr key={b.id} className={isSelected ? styles.selectedRow : ''}>
                                             <td style={{ textAlign: 'center' }}>
@@ -691,20 +692,21 @@ export default function StaffPage() {
                                                 </label>
                                             </td>
                                             <td>
-                                                <div style={{ fontWeight: 700, color: 'var(--brand-dominant)' }}>{s?.full_name}</div>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{(s as any).branch_name}</div>
+                                                <div style={{ fontWeight: 700, color: 'var(--brand-dominant)' }}>{staffName}</div>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{branchName}</div>
                                             </td>
                                             <td>
                                                 <div style={{ fontWeight: 600 }}>{format(new Date(b.scheduled_date), 'dd/MM/yyyy')}</div>
                                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{b.scheduled_time}</div>
                                             </td>
                                             <td style={{ fontSize: '0.85rem' }}>{(b as any).services?.name}</td>
-                                            <td style={{ textAlign: 'center', fontWeight: 700 }}>{(bData?.labor_cost_per_job || 0).toLocaleString()}</td>
-                                            <td style={{ textAlign: 'center', fontWeight: 700 }}>{(bData?.vehicle_rental_per_job || 0).toLocaleString()}</td>
-                                            <td style={{ textAlign: 'center', fontWeight: 700 }}>{(bData?.fuel_cost_per_job || 0).toLocaleString()}</td>
+                                            <td style={{ textAlign: 'center', fontWeight: 700 }}>{labor.toLocaleString()}</td>
+                                            <td style={{ textAlign: 'center', fontWeight: 700 }}>{rental.toLocaleString()}</td>
+                                            <td style={{ textAlign: 'center', fontWeight: 700 }}>{fuel.toLocaleString()}</td>
+                                            <td style={{ textAlign: 'center', fontWeight: 700 }}>{capital.toLocaleString()}</td>
                                             <td style={{ textAlign: 'center' }}>
                                                 {b.additional_price ? (
-                                                    <div style={{ color: 'var(--brand-dominant)', fontWeight: 800 }}>Extra: +{b.additional_price.toLocaleString()} ฿</div>
+                                                    <div style={{ color: 'var(--brand-dominant)', fontWeight: 800 }}>+{b.additional_price.toLocaleString()} ฿</div>
                                                 ) : '-'}
                                                 {b.additional_price_note && <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{b.additional_price_note}</div>}
                                             </td>
@@ -724,8 +726,7 @@ export default function StaffPage() {
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: 24, marginBottom: 28 }}>
                                 {Object.entries(selectedByStaff).map(([staffId, data]) => {
                                     const s = staff.find(x => x.id === staffId)
-                                    const totalBase = data.laborTotal + data.rentalTotal + data.fuelTotal
-                                    const total = totalBase + data.extraFromJobs
+                                    const total = data.laborTotal + data.rentalTotal + data.fuelTotal + data.capitalTotal + data.extraFromJobs
                                     return (
                                         <div key={staffId} style={{ background: 'var(--surface)', padding: 28, borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 8px 24px rgba(0,0,0,0.05)' }}>
                                             <div style={{ fontWeight: 900, color: 'var(--brand-dominant)', marginBottom: 20, fontSize: '1.2rem', borderBottom: '2px solid var(--brand-dominant-ghost)', paddingBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -739,13 +740,17 @@ export default function StaffPage() {
                                                 <span style={{ color: 'var(--text-secondary)' }}>ค่าเช่ารถ / น้ำมัน</span>
                                                 <span style={{ fontWeight: 700 }}>{(data.rentalTotal + data.fuelTotal).toLocaleString()} ฿</span>
                                             </div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', marginBottom: 10 }}>
+                                                <span style={{ color: 'var(--text-secondary)' }}>ค่าต้นทุนอุปกรณ์</span>
+                                                <span style={{ fontWeight: 700 }}>{data.capitalTotal.toLocaleString()} ฿</span>
+                                            </div>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', marginBottom: 20 }}>
                                                 <span style={{ fontWeight: 700, color: 'var(--brand-dominant)' }}>บริการพิเศษ / SML / อื่นๆ</span>
                                                 <span style={{ fontWeight: 900, color: 'var(--brand-dominant)' }}>+{data.extraFromJobs.toLocaleString()} ฿</span>
                                             </div>
                                             
                                             <div style={{ background: 'var(--brand-dominant-ghost)', padding: 20, borderRadius: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, border: '1.5px solid var(--brand-dominant-light)' }}>
-                                                <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--brand-dominant)' }}>ยอดสุทธิ</span>
+                                                <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--brand-dominant)' }}>ยอดโอนสุทธิ</span>
                                                 <span style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--brand-dominant)' }}>{total.toLocaleString()} ฿</span>
                                             </div>
                                             
@@ -801,7 +806,7 @@ export default function StaffPage() {
                                                 <button 
                                                     className="btn btn-primary" 
                                                     style={{ width: '100%', borderRadius: 16, padding: '16px', fontWeight: 800, gap: 12, fontSize: '1rem', boxShadow: '0 8px 16px var(--brand-dominant-ghost)' }}
-                                                    onClick={() => handleRecordPayout(staffId, data.bookings.map(x => x.id), totalBase, data.extraFromJobs)}
+                                                    onClick={() => handleRecordPayout(staffId, data.bookings.map(x => x.id), total - data.extraFromJobs, data.extraFromJobs)}
                                                     disabled={recordingPayout || !staffSlips[staffId]}
                                                 >
                                                     {recordingPayout ? <span className="spinner" /> : <><Banknote size={24} /> บันทึกการจ่ายเงิน</>}

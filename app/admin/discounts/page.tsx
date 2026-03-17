@@ -85,7 +85,7 @@ export default function AdvancedDiscountsPage() {
         setEditingId(null)
         setFormData({
             code: '', discount_type: 'percent', discount_value: '',
-            max_discount_amount: '', max_uses: '10', max_uses_per_customer: '1',
+            max_discount_amount: '100', max_uses: '10', max_uses_per_customer: '1',
             target_segment: 'all', expires_at: ''
         })
     }
@@ -207,17 +207,28 @@ export default function AdvancedDiscountsPage() {
                                     <div className={styles.codeDetails}>
                                         สิทธิ์ต่อคน: <strong style={{ color: 'var(--primary)' }}>{c.max_uses_per_customer || 'ไม่จำกัด'}</strong>
                                     </div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
-                                        ใช้ไป {c.used_count || 0} / {c.max_uses || '∞'} สิทธิ์
-                                    </div>
-                                    {c.expires_at && (
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--danger)', marginTop: 2, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                            <Clock size={12} /> หมดอายุ: {new Date(c.expires_at).toLocaleDateString('th-TH', { 
-                                                year: 'numeric', month: 'short', day: 'numeric', 
-                                                hour: '2-digit', minute: '2-digit' 
-                                            })}
-                                        </div>
-                                    )}
+                                    {(() => {
+                                        const isExpired = c.expires_at && new Date(c.expires_at) < new Date();
+                                        const isFull = c.max_uses && (c.used_count || 0) >= c.max_uses;
+                                        const isUsable = c.is_active && !isExpired && !isFull;
+                                        const statusColor = isUsable ? 'var(--success)' : 'var(--danger)';
+
+                                        return (
+                                            <>
+                                                <div style={{ fontSize: '0.75rem', color: isUsable ? 'var(--text-muted)' : 'var(--danger)', marginTop: 4 }}>
+                                                    ใช้ไป: <strong style={{ color: statusColor }}>{c.used_count || 0} / {c.max_uses || '∞'}</strong> สิทธิ์
+                                                </div>
+                                                {c.expires_at && (
+                                                    <div style={{ fontSize: '0.75rem', color: isUsable ? 'var(--text-muted)' : 'var(--danger)', marginTop: 2, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                        <Clock size={12} /> หมดอายุ: <span style={{ color: statusColor }}>{new Date(c.expires_at).toLocaleDateString('th-TH', { 
+                                                            year: 'numeric', month: 'short', day: 'numeric', 
+                                                            hour: '2-digit', minute: '2-digit' 
+                                                        })}</span>
+                                                    </div>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
                                 </div>
 
                                 <div className={styles.codeItemRight}>

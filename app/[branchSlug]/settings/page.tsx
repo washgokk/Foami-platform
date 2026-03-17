@@ -42,6 +42,7 @@ import Logo from '@/components/Branding/Logo'
 import { usePushNotifications } from '@/lib/hooks/usePushNotifications'
 import { Bell, BellOff, Send } from 'lucide-react'
 import ConfirmModal from '@/components/Global/ConfirmModal'
+import SuccessModal from '@/components/Global/SuccessModal'
 
 import type MapPickerType from '../book/MapPicker'
 const MapPicker = dynamic<React.ComponentProps<typeof MapPickerType>>(
@@ -58,6 +59,7 @@ export default function SettingsPage() {
     const [saving, setSaving] = useState(false)
     const [saved, setSaved] = useState(false)
     const [showSuccessModal, setShowSuccessModal] = useState(false)
+    const [showPushSuccess, setShowPushSuccess] = useState(false)
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
     const [loading, setLoading] = useState(true)
@@ -723,7 +725,7 @@ export default function SettingsPage() {
                                 borderRadius: '12px',
                                 border: isSubscribed ? '1px solid var(--border)' : 'none'
                             }}
-                            onClick={() => isSubscribed ? unsubscribe() : subscribe()}
+                            onClick={() => isSubscribed ? unsubscribe() : subscribe(() => setShowPushSuccess(true))}
                             disabled={pushLoading}
                         >
                             {pushLoading ? <span className="spinner" style={{ width: 16, height: 16 }} /> : 
@@ -733,9 +735,12 @@ export default function SettingsPage() {
 
                 </div>
 
-                {saved && <div className="alert alert-success" style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-lg)', gap: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <CheckCircle size={18} /> บันทึกเรียบร้อยแล้ว
-                </div>}
+                {/* Status Alerts */}
+                <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {saved && <div className="alert alert-success animate-fade-in" style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-lg)', gap: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <CheckCircle size={18} /> บันทึกเรียบร้อยแล้ว
+                    </div>}
+                </div>
 
                 <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={saving} style={{ marginTop: 'var(--space-2)', gap: 8, borderRadius: 'var(--radius-xl)' }}>
                     {saving ? <div className="spinner" style={{ width: 22, height: 22, borderTopColor: '#fff' }} /> : <><Save size={18} /> บันทึกข้อมูล</>}
@@ -767,6 +772,13 @@ export default function SettingsPage() {
                     </button>
                 </div>
             </form>
+
+            <SuccessModal 
+                isOpen={showPushSuccess}
+                onClose={() => setShowPushSuccess(false)}
+                title="เปิดแจ้งเตือนสำเร็จ!"
+                message="คุณจะไม่พลาดความเคลื่อนไหวขอนัดหมายและสถานะล้างรถของคุณแล้วครับ"
+            />
 
             {/* Modal for adding a new location */}
             {showLocModal && (

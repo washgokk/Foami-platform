@@ -193,6 +193,21 @@ export default function MyBookingsPage() {
             
             setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, is_additional_paid: true } : b))
             alert('ชำระค่าใช้จ่ายเพิ่มเติมสำเร็จ! ขอบคุณครับ')
+
+            // Trigger notification to staff
+            if (selectedBooking.staff_id) {
+                fetch('/api/push/notify-staff', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        staff_id: selectedBooking.staff_id,
+                        title: 'ลูกค้าชำระเงินแล้ว! ✨',
+                        body: `ยอดเพิ่มเติม ฿${selectedBooking.additional_price.toLocaleString()} ชำระเรียบร้อยแล้ว ดำเนินการต่อได้เลย`,
+                        url: `/staff/jobs/${selectedBooking.id}`
+                    })
+                }).catch(() => {})
+            }
+
             setSelectedBooking((p: any) => ({ ...p, is_additional_paid: true }))
             setClientSecret('')
         } catch (e: any) {

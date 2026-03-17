@@ -4,6 +4,7 @@
   "short_name": "Foami",
   "description": "บริการล้างมอเตอร์ไซค์ รับ-ส่งถึงบ้าน",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
@@ -17,11 +18,6 @@
       "src": "/icon-512x512_user.png",
       "sizes": "512x512",
       "type": "image/png"
-    },
-    {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml"
     }
   ]
 }
