@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { Service, ServiceAddon, Branch, VEHICLE_SIZE_LABEL, CCPriceGroup } from '@/lib/types'
 import ImageUpload from '@/components/ImageUpload'
 import { Plus, Trash2, Edit2, Check, X as XIcon, ChevronDown, CheckSquare, Square, Wrench, Package, TrendingUp } from 'lucide-react'
+import ConfirmModal from '@/components/Global/ConfirmModal'
 import styles from './services.module.css'
 import { trackAuditLog } from '@/lib/audit'
 
@@ -42,6 +43,13 @@ export default function ServicesPage() {
         dynamicPrices: [{ label: '', price: '0', imageUrl: '' }]
     })
     const [saving, setSaving] = useState(false)
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        type: 'svc' | 'addon' | 'group';
+        id: string;
+        title: string;
+        message: string;
+    }>({ isOpen: false, type: 'svc', id: '', title: '', message: '' })
 
     const load = useCallback(async () => {
         setLoading(true)
@@ -59,6 +67,12 @@ export default function ServicesPage() {
     }, [])
 
     useEffect(() => { load() }, [load])
+
+    useEffect(() => {
+        const handleRefresh = () => load()
+        window.addEventListener('foami:refresh', handleRefresh)
+        return () => window.removeEventListener('foami:refresh', handleRefresh)
+    }, [load])
 
     const saveSvc = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -274,20 +288,14 @@ export default function ServicesPage() {
     const deleteGroup = async (id: string) => {
         const pg = priceGroups.find(p => p.id === id)
         if (!pg) return
-        if (!confirm('ยืนยันการลบกลุ่มราคานี้?')) return
-        const { error } = await supabase.from('cc_price_groups').delete().eq('id', id)
-        if (error) alert(error.message)
-        else {
-            // [AUDIT Phase 17] Delete price group
-            await trackAuditLog({
-                action_type: 'DELETE',
-                entity_type: 'service',
-                entity_id: id,
-                old_data: pg,
-                description: `ลบกลุ่มราคา: ${pg.name}`
-            })
-            load()
-        }
+        
+        setConfirmConfig({
+            isOpen: true,
+            type: 'group',
+            id: id,
+            title: 'ยืนยันการลบกลุ่มราคา',
+            message: `ยืนยันการลบกลุ่มราคา "${pg.name}"?`
+        })
     }
 
     const toggleGroupStatus = async (id: string, current: boolean) => {
@@ -351,7 +359,7 @@ export default function ServicesPage() {
             if (a) {
                 await trackAuditLog({
                     action_type: 'TOGGLE_STATUS',
-                    entity_type: 'service', // Using service as generic for addons too
+                    entity_type: 'service_addon', // Using specific type
                     entity_id: id,
                     old_data: { is_active: current },
                     new_data: { is_active: nextState },
@@ -365,38 +373,73 @@ export default function ServicesPage() {
     const deleteSvc = async (id: string) => {
         const s = services.find(item => item.id === id)
         if (!s) return
-        if (!confirm('ยืนยันการลบตัวเลือกนี้?')) return
-        const { error } = await supabase.from('services').delete().eq('id', id)
-        if (error) alert(error.message)
-        else {
-            // [AUDIT Phase 17] Delete service
-            await trackAuditLog({
-                action_type: 'DELETE',
-                entity_type: 'service',
-                entity_id: id,
-                old_data: s,
-                description: `ลบบริการ: ${s.name}`
-            })
-            load()
-        }
+        
+        setConfirmConfig({
+            isOpen: true,
+            type: 'svc',
+            id: id,
+            title: 'ยืนยันการลบบริการ',
+            message: `ยืนยันการลบบริการ "${s.name}"?`
+        })
     }
 
     const deleteAddon = async (id: string) => {
         const a = addons.find(item => item.id === id)
         if (!a) return
-        if (!confirm('ยืนยันการลบบริการเสริมนี้?')) return
-        const { error } = await supabase.from('service_addons').delete().eq('id', id)
-        if (error) alert(error.message)
-        else {
-            // [AUDIT Phase 21] Delete addon
-            await trackAuditLog({
-                action_type: 'DELETE',
-                entity_type: 'service',
-                entity_id: id,
-                old_data: a,
-                description: `ลบบริการเสริม: ${a.name}`
-            })
+        
+        setConfirmConfig({
+            isOpen: true,
+            type: 'addon',
+            id: id,
+            title: 'ยืนยันการลบบริการเสริม',
+            message: `ยืนยันการลบบริการเสริม "${a.name}"?`
+        })
+    }
+
+    const handleConfirmDelete = async () => {
+        const { id, type } = confirmConfig
+        setConfirmConfig(p => ({ ...p, isOpen: false }))
+        setSaving(true)
+
+        try {
+            if (type === 'svc') {
+                const s = services.find(item => item.id === id)
+                if (!s) return
+                const { error } = await supabase.from('services').delete().eq('id', id)
+                if (error) {
+                    if (error.code === '23503') alert('ไม่สามารถลบบริการนี้ได้ เนื่องจากยังมีการจองงานที่เกี่ยวข้อง\n\nกรุณาปิดการใช้งานแทน')
+                    else throw error
+                    return
+                }
+                await trackAuditLog({ action_type: 'DELETE', entity_type: 'service', entity_id: id, old_data: s, description: `ลบบริการ: ${s.name}` })
+            } else if (type === 'addon') {
+                const a = addons.find(item => item.id === id)
+                if (!a) return
+                const { error } = await supabase.from('service_addons').delete().eq('id', id)
+                if (error) {
+                    if (error.code === '23503') alert('ไม่สามารถลบบริการเสริมนี้ได้ เนื่องจากมีการใช้งานอยู่ในรายการจอง')
+                    else throw error
+                    return
+                }
+                await trackAuditLog({ action_type: 'DELETE', entity_type: 'service_addon', entity_id: id, old_data: a, description: `ลบบริการเสริม: ${a.name}` })
+            } else if (type === 'group') {
+                const pg = priceGroups.find(p => p.id === id)
+                if (!pg) return
+                const { error } = await supabase.from('cc_price_groups').delete().eq('id', id)
+                if (error) {
+                    if (error.code === '23503') alert('ไม่สามารถลบกลุ่มราคานี้ได้ เนื่องจากยังมีสาขาที่ใช้งานอยู่')
+                    else throw error
+                    return
+                }
+                await trackAuditLog({ action_type: 'DELETE', entity_type: 'cc_price_group', entity_id: id, old_data: pg, description: `ลบกลุ่มราคา: ${pg.name}` })
+            }
+            
             load()
+            alert('ลบข้อมูลเรียบร้อยแล้ว')
+        } catch (err: any) {
+            alert('เกิดข้อผิดพลาดในการลบ: ' + err.message)
+        } finally {
+            setSaving(false)
         }
     }
 
@@ -513,9 +556,9 @@ export default function ServicesPage() {
                                                     </button>
                                                 </td>
                                                 <td>
-                                                    <div style={{ display: 'flex', gap: 8 }}>
+                                                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                                         <button className="btn btn-outline btn-sm" onClick={() => openSvcModal(s)}><Edit2 size={16} /></button>
-                                                        <button className="btn btn-ghost btn-sm" onClick={() => deleteSvc(s.id)}><Trash2 size={16} /></button>
+                                                        <button className="btn-delete-premium" onClick={() => deleteSvc(s.id)} title="ลบบริการ"><Trash2 size={16} /></button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -550,7 +593,7 @@ export default function ServicesPage() {
                                             <td>
                                                 <div style={{ display: 'flex', gap: 8 }}>
                                                     <button className="btn btn-outline btn-sm" onClick={() => openAddonModal(a)}><Edit2 size={16} /></button>
-                                                    <button className="btn btn-ghost btn-sm" onClick={() => deleteAddon(a.id)}><Trash2 size={16} /></button>
+                                                    <button className="btn-delete-premium" onClick={() => deleteAddon(a.id)} title="ลบบริการเสริม"><Trash2 size={16} /></button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -846,7 +889,14 @@ export default function ServicesPage() {
                     </div>
                 </div>
             )}
-
+            <ConfirmModal 
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig(p => ({ ...p, isOpen: false }))}
+                onConfirm={handleConfirmDelete}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                isLoading={saving}
+            />
         </div>
     )
 }

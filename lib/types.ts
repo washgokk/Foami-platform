@@ -149,6 +149,7 @@ export interface Zone {
     extra_fee: number
     polygon_coords: [number, number][]
     is_active: boolean
+    color?: string
 }
 
 export interface Staff {
@@ -346,7 +347,7 @@ export interface Payout {
 
 // ─── Audit Log Types ──────────────────────────────────────────
 export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'TOGGLE_STATUS' | 'PAYOUT' | 'RESTORE'
-export type AuditEntity = 'staff' | 'branch' | 'service' | 'booking' | 'payout'
+export type AuditEntity = 'staff' | 'branch' | 'service' | 'booking' | 'payout' | 'service_addon' | 'zone' | 'discount_code' | 'cc_price_group'
 
 export interface AuditLog {
     id: string

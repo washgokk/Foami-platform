@@ -12,7 +12,9 @@ import {
     ArrowLeft,
     Clock,
     Tag,
-    Hash
+    Hash,
+    Database,
+    ExternalLink
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { th } from 'date-fns/locale'
@@ -24,17 +26,32 @@ interface AuditLogModalProps {
 
 export default function AuditLogModal({ isOpen, onClose }: AuditLogModalProps) {
     const [logs, setLogs] = useState<AuditLog[]>([])
+    const [adminMap, setAdminMap] = useState<Record<string, string>>({})
     const [loading, setLoading] = useState(true)
     const [restoringId, setRestoringId] = useState<string | null>(null)
 
     const fetchLogs = async () => {
         setLoading(true)
-        const { data } = await supabase
-            .from('audit_logs')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(50)
-        setLogs(data || [])
+        
+        // Fetch logs and admins in parallel
+        const [logsRes, staffRes] = await Promise.all([
+            supabase
+                .from('audit_logs')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(50),
+            supabase
+                .from('staff')
+                .select('id, full_name')
+        ])
+
+        if (staffRes.data) {
+            const map: Record<string, string> = {}
+            staffRes.data.forEach(s => { map[s.id] = s.full_name })
+            setAdminMap(map)
+        }
+
+        setLogs(logsRes.data || [])
         setLoading(false)
     }
 
@@ -44,35 +61,70 @@ export default function AuditLogModal({ isOpen, onClose }: AuditLogModalProps) {
 
     const handleRestore = async (log: AuditLog) => {
         if (!log.old_data) return
-        if (!confirm('ต้องการย้อนกลับสถานะข้อมูลนี้ใช่หรือไม่? ข้อมูลปัจจุบันจะถูกแทนที่ด้วยข้อมูลเดิม')) return
+        
+        const isDelete = log.action_type === 'DELETE'
+        const confirmMsg = isDelete 
+            ? 'ต้องการกู้คืนข้อมูลที่ถูกลบไปใช่หรือไม่?' 
+            : 'ต้องการย้อนกลับสถานะข้อมูลนี้ใช่หรือไม่? ข้อมูลปัจจุบันจะถูกแทนที่ด้วยข้อมูลเดิม'
+            
+        if (!confirm(confirmMsg)) return
 
         setRestoringId(log.id)
         try {
-            const { error } = await supabase
-                .from(log.entity_type)
-                .update(log.old_data)
-                .eq('id', log.entity_id)
+            // Table mapping
+            let tableName = log.entity_type as string
+            if (tableName === 'branch') tableName = 'branches'
+            if (tableName === 'service') {
+                // Heuristic for old generic 'service' logs
+                if (log.old_data.price_s !== undefined) tableName = 'services'
+                else if (log.old_data.prices && typeof log.old_data.prices === 'object') tableName = 'cc_price_groups'
+                else if (log.old_data.polygon_coords) tableName = 'zones'
+                else tableName = 'service_addons'
+            }
+            if (tableName === 'service_addon') tableName = 'service_addons'
+            if (tableName === 'zone') tableName = 'zones'
+            if (tableName === 'discount_code') tableName = 'discount_codes'
+            if (tableName === 'cc_price_group') tableName = 'cc_price_groups'
+
+            let query;
+            if (isDelete) {
+                // Restore by re-inserting
+                query = supabase.from(tableName).insert(log.old_data)
+            } else {
+                // Restore by updating back to old state
+                query = supabase.from(tableName).update(log.old_data).eq('id', log.entity_id)
+            }
+
+            const { error } = await query
 
             if (error) throw error
 
-            // Record the restore action itself
+            // Record the restore action
+            const adminId = localStorage.getItem('admin_token') || 'system'
             await supabase.from('audit_logs').insert({
-                admin_id: localStorage.getItem('admin_token') || 'system',
+                admin_id: adminId,
                 action_type: 'RESTORE',
                 entity_type: log.entity_type,
                 entity_id: log.entity_id,
-                description: `ย้อนกลับสถานะ: ${log.description}`,
+                description: `กู้คืนข้อมูล: ${log.description}`,
                 created_at: new Date().toISOString()
             })
 
-            alert('ย้อนกลับสถานะเรียบร้อยแล้ว')
+            alert(isDelete ? 'กู้คืนข้อมูลเรียบร้อยแล้ว' : 'ย้อนกลับสถานะเรียบร้อยแล้ว')
+            window.dispatchEvent(new CustomEvent('foami:refresh'))
             fetchLogs()
-        } catch (err) {
+        } catch (err: any) {
             console.error(err)
-            alert('เกิดข้อผิดพลาดในการกดย้อนกลับ')
+            alert('เกิดข้อผิดพลาดในการคืนค่า: ' + (err.message || 'Unknown error'))
         } finally {
             setRestoringId(null)
         }
+    }
+
+    const getAdminName = (id: string) => {
+        if (id === 'mock_admin_token') return 'แอดมิน (Super)'
+        if (id === 'system') return 'ระบบอัตโนมัติ'
+        return adminMap[id] || id.slice(-8)
     }
 
     if (!isOpen) return null
@@ -208,14 +260,14 @@ export default function AuditLogModal({ isOpen, onClose }: AuditLogModalProps) {
                                     
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.8rem', color: '#64748b' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                            <User size={12} /> {log.admin_id === 'mock_admin_token' ? 'แอดมิน (Super)' : log.admin_id}
+                                            <User size={12} /> {getAdminName(log.admin_id)}
                                         </div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                             <Hash size={12} /> ID: {log.entity_id.slice(-8)}
                                         </div>
                                     </div>
 
-                                    {log.old_data && (log.action_type === 'UPDATE' || log.action_type === 'TOGGLE_STATUS') && (
+                                    {log.old_data && (log.action_type === 'UPDATE' || log.action_type === 'TOGGLE_STATUS' || log.action_type === 'DELETE') && (
                                         <button 
                                             onClick={() => handleRestore(log)}
                                             disabled={restoringId === log.id}
@@ -225,9 +277,9 @@ export default function AuditLogModal({ isOpen, onClose }: AuditLogModalProps) {
                                                 bottom: 20,
                                                 padding: '8px 16px',
                                                 borderRadius: 10,
-                                                border: '1.5px solid #0ea5e9',
+                                                border: log.action_type === 'DELETE' ? '1.5px solid #22c55e' : '1.5px solid #0ea5e9',
                                                 background: 'white',
-                                                color: '#0ea5e9',
+                                                color: log.action_type === 'DELETE' ? '#22c55e' : '#0ea5e9',
                                                 fontSize: '0.85rem',
                                                 fontWeight: 700,
                                                 cursor: 'pointer',
@@ -236,10 +288,11 @@ export default function AuditLogModal({ isOpen, onClose }: AuditLogModalProps) {
                                                 gap: 6,
                                                 transition: 'all 0.2s'
                                             }}
-                                            onMouseEnter={(e) => { e.currentTarget.style.background = '#e0f2fe' }}
+                                            onMouseEnter={(e) => { e.currentTarget.style.background = log.action_type === 'DELETE' ? '#f0fdf4' : '#e0f2fe' }}
                                             onMouseLeave={(e) => { e.currentTarget.style.background = 'white' }}
                                         >
-                                            <RotateCcw size={16} /> {restoringId === log.id ? 'กำลังคืนค่า...' : 'ย้อนกลับสถานะ'}
+                                            <RotateCcw size={16} /> 
+                                            {restoringId === log.id ? 'กำลังคืนค่า...' : log.action_type === 'DELETE' ? 'กู้คืนข้อมูล' : 'ย้อนกลับสถานะ'}
                                         </button>
                                     )}
                                 </div>
@@ -253,9 +306,14 @@ export default function AuditLogModal({ isOpen, onClose }: AuditLogModalProps) {
                     borderTop: '1px solid #f1f5f9',
                     background: '#f8fafc',
                     display: 'flex',
-                    justifyContent: 'flex-end'
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
                 }}>
-                   <button 
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#94a3b8', fontSize: '0.75rem' }}>
+                        <Database size={14} />
+                        <span>ระบบบันทึกประวัติอัตโนมัติเพื่อความโปร่งใส</span>
+                    </div>
+                    <button 
                         onClick={onClose}
                         style={{
                             padding: '12px 24px',
@@ -265,7 +323,8 @@ export default function AuditLogModal({ isOpen, onClose }: AuditLogModalProps) {
                             color: '#475569',
                             fontSize: '0.95rem',
                             fontWeight: 700,
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
                         }}
                     >
                         ปิดหน้าต่าง

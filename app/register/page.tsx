@@ -114,7 +114,14 @@ export default function GlobalRegisterPage() {
         }
 
         localStorage.setItem('liff_customer', JSON.stringify(data))
-        router.replace('/search')
+        
+        const lastBranch = localStorage.getItem('last_branch_slug')
+        if (lastBranch) {
+            localStorage.removeItem('last_branch_slug') // Cleanup
+            router.replace(`/${lastBranch}/menu`)
+        } else {
+            router.replace('/search')
+        }
     }
 
     if (checkingAuth) {

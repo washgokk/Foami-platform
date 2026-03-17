@@ -9,9 +9,8 @@ export default function LiffEntry() {
 
     useEffect(() => {
         // Check if using real LIFF or mock mode
-        const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID
-
-        if (!liffId || liffId === 'your_liff_id') {
+        const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID
+        if (!liffId || liffId === 'your_liff_id' || liffId === '') {
             // Development mock: use stored customer or redirect to register
             const stored = localStorage.getItem('liff_customer')
             if (stored) {
@@ -44,6 +43,7 @@ export default function LiffEntry() {
                     localStorage.setItem('liff_customer', JSON.stringify(data))
                     router.replace(`/${branchSlug}/menu`)
                 } else {
+                    localStorage.setItem('last_branch_slug', branchSlug) // Remember where they came from
                     router.replace('/register')
                 }
             })

@@ -81,7 +81,6 @@ export default function AdminLoginPage() {
                         {loading ? <span className="spinner" /> : 'เข้าสู่ระบบ'}
                     </button>
                 </form>
-                <p className={styles.hint}>Internal access only. Restricted for authorized personnel.</p>
             </div>
         </div>
     )

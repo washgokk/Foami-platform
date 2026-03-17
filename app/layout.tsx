@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
-import MockDbToggle from '@/components/MockDbToggle'
 import { LiffProvider } from '@/components/Providers/LiffProvider'
 
 export const viewport: Viewport = {
@@ -17,8 +16,8 @@ export const metadata: Metadata = {
     title: 'Foami',
   },
   icons: {
-    icon: '/icon-192x192_user.png',
-    apple: '/icon-192x192_user.png',
+    icon: '/icon.svg',
+    apple: '/icon.svg',
   },
 }
 
@@ -35,7 +34,6 @@ export default function RootLayout({
         <LiffProvider liffId={liffId}>
           {children}
         </LiffProvider>
-        <MockDbToggle />
       </body>
     </html>
   )

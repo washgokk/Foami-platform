@@ -49,22 +49,37 @@ export default function StaffLoginPage() {
     return (
         <div className={styles.page}>
             <div className={styles.card}>
-                <div className={styles.logo}>
-                    <Logo width={140} variant="landscape" />
+                <div className={styles.logoWrapper}>
+                    <Logo width={160} />
                 </div>
                 <h1 className={styles.title}>Staff Portal</h1>
                 <p className={styles.sub}>แผงควบคุมสำหรับพนักงาน</p>
+
                 <form onSubmit={handleLogin} className={styles.form}>
                     <div className="form-group">
-                        <label className="form-label">อีเมลผู้ใช้งาน</label>
-                        <input type="email" className="form-input" value={email} onChange={e => setEmail(e.target.value)} placeholder="staff@foami.th" required />
+                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>อีเมลพนักงาน</label>
+                        <input
+                            type="email"
+                            className="form-input"
+                            value={email}
+                            onChange={e => setEmail(e.target.value)}
+                            placeholder="staff@foami.th"
+                            required
+                        />
                     </div>
-                    <div className="form-group">
-                        <label className="form-label">รหัสผ่าน</label>
-                        <input type="password" className="form-input" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
+                    <div className="form-group" style={{ marginTop: 8 }}>
+                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>รหัสผ่าน</label>
+                        <input
+                            type="password"
+                            className="form-input"
+                            value={password}
+                            onChange={e => setPassword(e.target.value)}
+                            placeholder="••••••••"
+                            required
+                        />
                     </div>
-                    {error && <div className="alert alert-error">{error}</div>}
-                    <button type="submit" className="btn btn-primary btn-full btn-lg" disabled={loading} style={{ borderRadius: 'var(--radius-xl)' }}>
+                    {error && <div className="alert alert-error" style={{ fontSize: '0.85rem' }}>{error}</div>}
+                    <button type="submit" className="btn btn-primary btn-full btn-lg" style={{ marginTop: 12, height: 54, fontWeight: 800 }} disabled={loading}>
                         {loading ? <span className="spinner" /> : 'เข้าสู่ระบบ'}
                     </button>
                 </form>

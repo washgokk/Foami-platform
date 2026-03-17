@@ -5,7 +5,7 @@ DROP TABLE IF EXISTS service_price_groups;
 DROP TABLE IF EXISTS service_size_adjustments;
 
 -- Create new CC price groups table
-CREATE TABLE cc_price_groups (
+CREATE TABLE IF NOT EXISTS cc_price_groups (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
   branch_ids UUID[] DEFAULT '{}',
@@ -16,7 +16,9 @@ CREATE TABLE cc_price_groups (
 
 -- RLS
 ALTER TABLE cc_price_groups ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public read cc_price_groups" ON cc_price_groups;
 CREATE POLICY "Public read cc_price_groups" ON cc_price_groups FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Admin manage cc_price_groups" ON cc_price_groups;
 CREATE POLICY "Admin manage cc_price_groups" ON cc_price_groups FOR ALL USING (true);
 
 -- Update branches to point to the new table (old column was price_group_id, we can keep it but rename in logic or just leave as is)

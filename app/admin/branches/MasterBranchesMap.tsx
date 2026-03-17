@@ -17,8 +17,19 @@ export default function MasterBranchesMap({ branches, zones }: Props) {
 
     // 1. Initialize Map once
     useEffect(() => {
-        if (mapInstanceRef.current || !mapRef.current) return
+        if (!mapRef.current) return
+
+        // Ensure container is empty and ready
+        if (mapInstanceRef.current) {
+            mapInstanceRef.current.remove()
+            mapInstanceRef.current = null
+        }
+
+        let map: any = null
+
         import('leaflet').then(L => {
+            if (!mapRef.current) return
+
             if (!document.querySelector('link[href*="leaflet.css"]')) {
                 const link = document.createElement('link')
                 link.rel = 'stylesheet'
@@ -26,24 +37,20 @@ export default function MasterBranchesMap({ branches, zones }: Props) {
                 document.head.appendChild(link)
             }
 
-            delete (L.Icon.Default.prototype as any)._getIconUrl
-            L.Icon.Default.mergeOptions({
-                iconRetinaUrl: '/leaflet/marker-icon-2x.png',
-                iconUrl: '/leaflet/marker-icon.png',
-                shadowUrl: '/leaflet/marker-shadow.png',
-            })
-
-            const map = L.map(mapRef.current!, { center: [16.4419, 102.8360], zoom: 12, zoomControl: true })
+            map = L.map(mapRef.current!, { center: [16.4419, 102.8360], zoom: 12, zoomControl: true })
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map)
 
             layerGroupRef.current = L.featureGroup().addTo(map)
             mapInstanceRef.current = map
             setMapReady(true)
         })
+        
         return () => {
-            mapInstanceRef.current?.remove();
-            mapInstanceRef.current = null;
-            setMapReady(false);
+            if (map) {
+                map.remove()
+            }
+            mapInstanceRef.current = null
+            setMapReady(false)
         }
     }, [])
 
@@ -53,10 +60,16 @@ export default function MasterBranchesMap({ branches, zones }: Props) {
         import('leaflet').then(L => {
             layerGroupRef.current.clearLayers()
 
+            // Map each branch ID to a consistent color from our palette
+            const branchColorMap: Record<string, string> = {}
+            branches.forEach((b, idx) => {
+                branchColorMap[b.id] = ZONE_COLORS[idx % ZONE_COLORS.length]
+            })
+
             // Draw Branches
             branches.forEach(b => {
                 if (b.lat && b.lng) {
-                    const brandColor = '#0066FF'
+                    const brandColor = branchColorMap[b.id]
                     const svg = `
                         <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M20 38C20 38 34 26 34 16C34 8.26801 27.732 2 20 2C12.268 2 6 8.26801 6 16C6 26 20 38 20 38Z" fill="${brandColor}" stroke="white" stroke-width="2.5"/>
@@ -79,16 +92,48 @@ export default function MasterBranchesMap({ branches, zones }: Props) {
                 }
             })
 
-            // Draw Zones
-            zones.forEach((z, idx) => {
-                if (!z.is_active) return
-                const color = (z as any).color || ZONE_COLORS[idx % ZONE_COLORS.length]
-                if (z.polygon_coords && z.polygon_coords.length >= 3) {
-                    const branchName = branches.find(b => b.id === z.branch_id)?.name || 'ไม่ทราบสาขา'
-                    L.polygon(z.polygon_coords, {
-                        color, fillColor: color, fillOpacity: 0.1, weight: 2, dashArray: '5, 5'
-                    }).addTo(layerGroupRef.current).bindTooltip(`<strong>${z.name}</strong><br/><span style="font-size:0.8rem;color:#666;">สาขา ${branchName}</span>`, {
-                        permanent: true, direction: 'center', className: 'leaflet-zone-label',
+            // Draw Zones (Grouped and Unioned)
+            branches.forEach(b => {
+                const branchZones = zones.filter(z => z.branch_id === b.id && z.is_active && z.polygon_coords && z.polygon_coords.length >= 3)
+                if (branchZones.length === 0) return
+
+                const color = branchColorMap[b.id] || ZONE_COLORS[0]
+
+                try {
+                    // Import turf functions
+                    const turf = require('@turf/turf')
+
+                    // Convert all zones of this branch to turf polygons
+                    const polygons = branchZones.map(z => {
+                        // Turf expects [lng, lat] and needs to be closed (first == last)
+                        const coords = z.polygon_coords.map(c => [c[1], c[0]])
+                        if (coords[0][0] !== coords[coords.length - 1][0] || coords[0][1] !== coords[coords.length - 1][1]) {
+                            coords.push([coords[0][0], coords[0][1]])
+                        }
+                        return turf.polygon([coords])
+                    })
+
+                    if (polygons.length === 1) {
+                        L.geoJSON(polygons[0], {
+                            style: { color, fillColor: color, fillOpacity: 0.4, weight: 3 }
+                        }).addTo(layerGroupRef.current)
+                    } else if (polygons.length > 1) {
+                        // Use featureCollection for union in newer Turf versions
+                        const collection = turf.featureCollection(polygons)
+                        const unioned = turf.union(collection)
+                        if (unioned) {
+                            L.geoJSON(unioned, {
+                                style: { color, fillColor: color, fillOpacity: 0.4, weight: 3 }
+                            }).addTo(layerGroupRef.current)
+                        }
+                    }
+                } catch (e) {
+                    console.error("Turf union failed, falling back to individual polygons", e)
+                    // Fallback to drawing individual polygons if union fails
+                    branchZones.forEach(z => {
+                        L.polygon(z.polygon_coords, {
+                            color, fillColor: color, fillOpacity: 0.4, weight: 3
+                        }).addTo(layerGroupRef.current)
                     })
                 }
             })

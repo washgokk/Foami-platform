@@ -15,12 +15,48 @@ export default function GlobalLogin() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
 
-    // Reset customer stored data if entering login page explicitly
+    // ─── Phase 1: Check existing session ───
     useEffect(() => {
         const stored = localStorage.getItem('liff_customer')
         if (stored) {
             router.replace('/search')
+            return
         }
+
+        // ─── Phase 2: Auto-init LIFF to handle returning from redirect ───
+        const autoInit = async () => {
+            const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID
+            if (!liffId || liffId === 'your_liff_id' || liffId === '') return
+            
+            try {
+                const { default: liff } = await import('@line/liff')
+                await liff.init({ liffId })
+                
+                if (liff.isLoggedIn()) {
+                    console.log('User is logged in via LINE. Fetching profile...')
+                    const profile = await liff.getProfile()
+                    localStorage.setItem('liff_line_user_id', profile.userId)
+                    localStorage.setItem('liff_display_name', profile.displayName)
+
+                    const { data } = await supabase
+                        .from('customers')
+                        .select('*')
+                        .eq('line_user_id', profile.userId)
+                        .single()
+
+                    if (data) {
+                        localStorage.setItem('liff_customer', JSON.stringify(data))
+                        router.replace('/search')
+                    } else {
+                        router.replace('/register')
+                    }
+                }
+            } catch (err) {
+                console.error('LIFF Auto-init Error:', err)
+            }
+        }
+
+        autoInit()
     }, [router])
 
     const handleLineLogin = async () => {
@@ -55,6 +91,7 @@ export default function GlobalLogin() {
         // ─── Real LIFF Mode ───
         try {
             const { default: liff } = await import('@line/liff')
+            // Note: liff.init might have already run in useEffect, but calling it again is safe or cached
             await liff.init({ liffId })
 
             if (!liff.isLoggedIn()) {
@@ -62,12 +99,12 @@ export default function GlobalLogin() {
                 return // Page will redirect
             }
 
+            // If already logged in here (e.g. click after auto-init finished)
             const profile = await liff.getProfile()
             localStorage.setItem('liff_line_user_id', profile.userId)
             localStorage.setItem('liff_display_name', profile.displayName)
 
-            // Check database for existing customer
-            const { data, error: dbErr } = await supabase
+            const { data } = await supabase
                 .from('customers')
                 .select('*')
                 .eq('line_user_id', profile.userId)

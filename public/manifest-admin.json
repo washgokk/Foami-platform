@@ -1,12 +1,17 @@
 {
   "name": "Foami Admin",
-  "short_name": "Admin",
+  "short_name": "Foami Admin",
   "description": "ระบบจัดการ Foami สำหรับผู้ดูแล",
   "start_url": "/admin/dashboard",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#315EC3",
   "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
     {
       "src": "/icon-192x192_admin.png",
       "sizes": "192x192",

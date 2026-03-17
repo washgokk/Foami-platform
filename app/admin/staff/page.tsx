@@ -38,6 +38,7 @@ import {
 import { Payout, THAI_BANKS } from '@/lib/types'
 import ImageUpload from '@/components/ImageUpload'
 import ImageZoom from '@/components/Global/ImageZoom'
+import ConfirmModal from '@/components/Global/ConfirmModal'
 
 export default function StaffPage() {
     const [staff, setStaff] = useState<Staff[]>([])
@@ -54,6 +55,12 @@ export default function StaffPage() {
     const [viewMode, setViewMode] = useState<'list' | 'payouts'>('list')
     const [revealed, setRevealed] = useState<Record<string, boolean>>({})
     const [previewImage, setPreviewImage] = useState<string | null>(null)
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        id: string;
+        title: string;
+        message: string;
+    }>({ isOpen: false, id: '', title: '', message: '' })
 
     // Payout State
     const [selectedPayoutStaffId, setSelectedPayoutStaffId] = useState('')
@@ -276,6 +283,12 @@ export default function StaffPage() {
 
     useEffect(() => { load() }, [load])
 
+    useEffect(() => {
+        const handleRefresh = () => load()
+        window.addEventListener('foami:refresh', handleRefresh)
+        return () => window.removeEventListener('foami:refresh', handleRefresh)
+    }, [load])
+
     const openAdd = () => {
         setEditing(null)
         setForm({ 
@@ -401,17 +414,39 @@ export default function StaffPage() {
     }
     
     const handleDeleteStaff = async (s: Staff) => {
-        if (!confirm(`ยืนยันการลบพนักงาน "${s.full_name}"? \nการลบนี้จะไม่สามารถย้อนคืนได้`)) return
+        setConfirmConfig({
+            isOpen: true,
+            id: s.id,
+            title: 'ยืนยันการลบพนักงาน',
+            message: `คุณแน่ใจหรือไม่ว่าต้องการลบพนักงาน "${s.full_name}"? การลบนี้จะไม่สามารถย้อนคืนได้`
+        })
+    }
+
+    const handleConfirmDeleteStaff = async () => {
+        const id = confirmConfig.id
+        const s = staff.find(x => x.id === id)
+        if (!s) return
+
+        setConfirmConfig(p => ({ ...p, isOpen: false }))
+        setSaving(true)
         
         try {
-            const { error } = await supabase.from('staff').delete().eq('id', s.id)
-            if (error) throw error
+            const { error: delError } = await supabase.from('staff').delete().eq('id', id)
+            if (delError) {
+                if (delError.code === '23503') {
+                    alert('ไม่สามารถลบพนักงานคนนี้ได้ เนื่องจากมีประวัติการจองงานหรือข้อมูลการจ่ายเงินที่ผูกอยู่ในระบบ\n\nกรุณาปิดการใช้งาน (Deactivate) แทนการลบเพื่อรักษาประวัติข้อมูล')
+                } else {
+                    throw delError
+                }
+                setSaving(false)
+                return
+            }
             
             // [AUDIT Phase 19] Delete staff
             await trackAuditLog({
                 action_type: 'DELETE',
                 entity_type: 'staff',
-                entity_id: s.id,
+                entity_id: id,
                 old_data: s,
                 description: `ลบพนักงาน: ${s.full_name}`
             })
@@ -419,7 +454,9 @@ export default function StaffPage() {
             load()
             alert('ลบข้อมูลพนักงานเรียบร้อยแล้ว')
         } catch (err: any) {
-            alert('ลบพนักงานไม่สำเร็จ: ' + err.message)
+            alert('เกิดข้อผิดพลาดในการลบ: ' + err.message)
+        } finally {
+            setSaving(false)
         }
     }
 
@@ -1044,6 +1081,15 @@ export default function StaffPage() {
                     </div>
                 </div>
             )}
+
+            <ConfirmModal 
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig(p => ({ ...p, isOpen: false }))}
+                onConfirm={handleConfirmDeleteStaff}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                isLoading={saving}
+            />
 
             {previewImage && (
                 <div className="overlay" onClick={() => setPreviewImage(null)} style={{ zIndex: 99999 }}>

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase'
 import { Branch, Zone } from '@/lib/types'
+import ConfirmModal from '@/components/Global/ConfirmModal'
 import { Store, Map as MapIcon, List, Plus, MapPin, Copy, Edit3, Pause, Play, Trash2, Globe, Phone, Clock, ArrowRight, Coins, Fuel as GasStation, Wrench, Settings } from 'lucide-react'
 import styles from './branches.module.css'
 import { trackAuditLog } from '@/lib/audit'
@@ -41,12 +42,18 @@ export default function BranchesPage() {
     const defaultForm = {
         name: '', slug: '', lat: 16.4419, lng: 102.836, rawAddress: '',
         houseNumber: '', moo: '', street: '', subdistrict: '', district: '', province: '', zipcode: '',
-        out_of_zone_type: 'per_km' as 'per_km' | 'flat_rate', out_of_zone_fee: 10,
-        labor_cost_per_job: 0, max_capital_per_job: 0, vehicle_rental_per_job: 0, fuel_cost_per_job: 0
+        out_of_zone_type: 'per_km' as 'per_km' | 'flat_rate', out_of_zone_fee: 5,
+        labor_cost_per_job: 30, max_capital_per_job: 0, vehicle_rental_per_job: 0, fuel_cost_per_job: 0
     }
     const [form, setForm] = useState(defaultForm)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState('')
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        id: string;
+        title: string;
+        message: string;
+    }>({ isOpen: false, id: '', title: '', message: '' })
     const [geocoding, setGeocoding] = useState(false)
 
     const load = useCallback(async () => {
@@ -61,6 +68,12 @@ export default function BranchesPage() {
 
     useEffect(() => { load() }, [load])
 
+    useEffect(() => {
+        const handleRefresh = () => load()
+        window.addEventListener('foami:refresh', handleRefresh)
+        return () => window.removeEventListener('foami:refresh', handleRefresh)
+    }, [load])
+
     const openAdd = () => {
         setEditing(null)
         setForm(defaultForm)
@@ -69,8 +82,6 @@ export default function BranchesPage() {
     }
     const openEdit = (b: Branch) => {
         setEditing(b)
-        // Naive parsing or just fallback to rawAddress for old data
-        // If address contains "ตำบล... อำเภอ... จังหวัด...", they can edit via rawAddress or re-pin
         setForm({
             ...defaultForm, name: b.name, slug: b.slug || '', rawAddress: b.address, lat: b.lat, lng: b.lng,
             out_of_zone_type: b.out_of_zone_type || 'per_km',
@@ -127,7 +138,6 @@ export default function BranchesPage() {
         if (editing) {
             ({ error: err } = await supabase.from('branches').update(payload).eq('id', editing.id))
             
-            // [AUDIT Phase 17] Update branch
             if (!err) {
                 await trackAuditLog({
                     action_type: 'UPDATE',
@@ -142,7 +152,6 @@ export default function BranchesPage() {
             const { data, error } = await supabase.from('branches').insert({ ...payload, is_active: true }).select().single()
             err = error
             
-            // [AUDIT Phase 17] Create branch
             if (!err && data) {
                 await trackAuditLog({
                     action_type: 'CREATE',
@@ -161,7 +170,6 @@ export default function BranchesPage() {
         const nextState = !b.is_active
         await supabase.from('branches').update({ is_active: nextState }).eq('id', b.id)
         
-        // [AUDIT Phase 17] Toggle status
         await trackAuditLog({
             action_type: 'TOGGLE_STATUS',
             entity_type: 'branch',
@@ -177,19 +185,50 @@ export default function BranchesPage() {
     const deleteBranch = async (id: string) => {
         const b = branches.find(item => item.id === id)
         if (!b) return
-        if (!confirm('ต้องการลบสาขานี้?')) return
-        await supabase.from('branches').delete().eq('id', id)
         
-        // [AUDIT Phase 17] Delete branch
-        await trackAuditLog({
-            action_type: 'DELETE',
-            entity_type: 'branch',
-            entity_id: id,
-            old_data: b,
-            description: `ลบสาขา: ${b.name}`
+        setConfirmConfig({
+            isOpen: true,
+            id: id,
+            title: 'ยืนยันการลบสาขา',
+            message: `คุณแน่ใจหรือไม่ว่าต้องการลบสาขา "${b.name}"? การลบนี้จะไม่สามารถย้อนคืนได้`
         })
+    }
+
+    const handleConfirmDelete = async () => {
+        const id = confirmConfig.id
+        const b = branches.find(item => item.id === id)
+        if (!b) return
+
+        setConfirmConfig(p => ({ ...p, isOpen: false }))
+        setSaving(true)
         
-        load()
+        try {
+            const { error: delError } = await supabase.from('branches').delete().eq('id', id)
+            if (delError) {
+                if (delError.code === '23503') {
+                    alert('ไม่สามารถลบสาขานี้ได้ เนื่องจากยังมีพนักงานหรือการจองงานที่ค้างอยู่ในระบบของสาขานี้\n\nกรุณาย้ายหรือลบข้อมูลเหล่านั้นก่อนทำการลบสาขา')
+                } else {
+                    throw delError
+                }
+                setSaving(false)
+                return
+            }
+            
+            await trackAuditLog({
+                action_type: 'DELETE',
+                entity_type: 'branch',
+                entity_id: id,
+                old_data: b,
+                description: `ลบสาขา: ${b.name}`
+            })
+            
+            load()
+            alert('ลบสาขาเรียบร้อยแล้ว')
+        } catch (err: any) {
+            alert('เกิดข้อผิดพลาดในการลบ: ' + err.message)
+        } finally {
+            setSaving(false)
+        }
     }
 
     return (
@@ -270,18 +309,20 @@ export default function BranchesPage() {
                                     {b.is_active ? 'เปิดให้บริการ' : 'ปิดชั่วคราว'}
                                 </span>
                             </div>
-                            <div className={styles.cardActions} style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-                                <Link href={`/admin/branches/${b.id}/zones`} className="btn btn-ghost btn-sm" style={{ borderRadius: 8, gap: 6 }}>
-                                    <MapIcon size={14} /> โซน
-                                </Link>
-                                <button className="btn btn-outline btn-sm" style={{ borderRadius: 8, gap: 6 }} onClick={() => openEdit(b)}>
-                                    <Edit3 size={14} /> แก้ไข
-                                </button>
-                                <button className="btn btn-ghost btn-sm" style={{ borderRadius: 8, gap: 6 }} onClick={() => toggleActive(b)}>
-                                    {b.is_active ? <><Pause size={14} /> ปิด</> : <><Play size={14} /> เปิด</>}
-                                </button>
-                                <button className="btn btn-danger btn-sm" style={{ borderRadius: 8, width: 32, height: 32, padding: 0 }} onClick={() => deleteBranch(b.id)}>
-                                    <Trash2 size={14} />
+                            <div className={styles.cardActions} style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                    <Link href={`/admin/branches/${b.id}/zones`} className="btn btn-ghost btn-sm" style={{ borderRadius: 8, gap: 6 }}>
+                                        <MapIcon size={14} /> โซน
+                                    </Link>
+                                    <button className="btn btn-outline btn-sm" style={{ borderRadius: 8, gap: 6 }} onClick={() => openEdit(b)}>
+                                        <Edit3 size={14} /> แก้ไข
+                                    </button>
+                                    <button className="btn btn-ghost btn-sm" style={{ borderRadius: 8, gap: 6 }} onClick={() => toggleActive(b)}>
+                                        {b.is_active ? <><Pause size={14} /> ปิด</> : <><Play size={14} /> เปิด</>}
+                                    </button>
+                                </div>
+                                <button className="btn-delete-premium" onClick={() => deleteBranch(b.id)} title="ลบสาขา">
+                                    <Trash2 size={16} />
                                 </button>
                             </div>
                         </div>
@@ -391,24 +432,27 @@ export default function BranchesPage() {
                                 <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 10, color: 'var(--brand-dominant)' }}>
                                     <Coins size={20} /> ข้อมูลการเงินรายทริป
                                 </h3>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-3)' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-4)' }}>
                                     <div className="form-group">
-                                        <label className="form-label">ค่าแรง (บาท)</label>
-                                        <input type="number" className="form-input" value={form.labor_cost_per_job} onChange={e => setForm(p => ({ ...p, labor_cost_per_job: Number(e.target.value) }))} />
+                                        <label className="form-label" style={{ fontWeight: 700 }}>ค่าแรงพนักงาน (บาท)</label>
+                                        <input type="number" className="form-input" style={{ background: 'white' }} value={form.labor_cost_per_job} onChange={e => setForm(p => ({ ...p, labor_cost_per_job: Number(e.target.value) }))} />
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label">ต้นทุนสูงสุด (บาท)</label>
-                                        <input type="number" className="form-input" value={form.max_capital_per_job} onChange={e => setForm(p => ({ ...p, max_capital_per_job: Number(e.target.value) }))} />
+                                        <label className="form-label" style={{ fontWeight: 700 }}>ค่าน้ำมัน (บาท)</label>
+                                        <input type="number" className="form-input" style={{ background: 'white' }} value={form.fuel_cost_per_job} onChange={e => setForm(p => ({ ...p, fuel_cost_per_job: Number(e.target.value) }))} />
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label">ค่าเช่ารถ (บาท)</label>
-                                        <input type="number" className="form-input" value={form.vehicle_rental_per_job} onChange={e => setForm(p => ({ ...p, vehicle_rental_per_job: Number(e.target.value) }))} />
+                                        <label className="form-label" style={{ fontWeight: 700 }}>ค่าเช่ารถ (บาท)</label>
+                                        <input type="number" className="form-input" style={{ background: 'white' }} value={form.vehicle_rental_per_job} onChange={e => setForm(p => ({ ...p, vehicle_rental_per_job: Number(e.target.value) }))} />
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label">ค่าน้ำมัน (บาท)</label>
-                                        <input type="number" className="form-input" style={{ borderRadius: 10 }} value={form.fuel_cost_per_job} onChange={e => setForm(p => ({ ...p, fuel_cost_per_job: Number(e.target.value) }))} />
+                                        <label className="form-label" style={{ fontWeight: 700 }}>ต้นทุนสูงสุด (บาท)</label>
+                                        <input type="number" className="form-input" style={{ background: 'white' }} value={form.max_capital_per_job} onChange={e => setForm(p => ({ ...p, max_capital_per_job: Number(e.target.value) }))} />
                                     </div>
                                 </div>
+                                <p style={{ fontSize: '0.75rem', color: 'var(--brand-dominant)', marginTop: 12, opacity: 0.8, fontWeight: 500 }}>
+                                    * ข้อมูลนี้ใช้สำหรับคำนวณกำไรและค่าตอบแทนพนักงานต่อ 1 รายการงาน
+                                </p>
                             </div>
 
                             {error && <div className="alert alert-error">{error}</div>}
@@ -422,6 +466,15 @@ export default function BranchesPage() {
                     </div>
                 </div>
             )}
+
+            <ConfirmModal 
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig(p => ({ ...p, isOpen: false }))}
+                onConfirm={handleConfirmDelete}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                isLoading={saving}
+            />
         </div>
     )
 }

@@ -318,8 +318,9 @@ function getSupabase(): SupabaseClient {
     if (isMockDbEnabled) {
       _supabase = createMockSupabaseClient(true)
     } else {
-      // If Mock DB is OFF, use the real URL. If the real URL is missing/invalid, 
-      // return a dummy client that returns empty data, instead of reading localStorage.
+      // DEFAULT: Use real client if URL is valid. 
+      // If URL is missing, fall back to an EMPTY mock client (doesn't read localStorage) 
+      // instead of a populated one, to ensure production data is prioritized.
       _supabase = isValidUrl(SUPABASE_URL)
         ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
         : createMockSupabaseClient('empty')

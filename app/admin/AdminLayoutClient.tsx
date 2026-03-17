@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import AuditLogModal from '@/components/Admin/AuditLogModal'
 import Logo from '@/components/Branding/Logo'
+import ConfirmModal from '@/components/Global/ConfirmModal'
 
 const NAV_ITEMS = [
     { href: '/admin/dashboard', icon: LayoutDashboard, label: 'ภาพรวม' },
@@ -36,6 +37,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
     const router = useRouter()
     const [sidebarOpen, setSidebarOpen] = useState(false)
     const [auditOpen, setAuditOpen] = useState(false)
+    const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
 
     useEffect(() => {
         const token = localStorage.getItem('admin_token')
@@ -47,10 +49,13 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
     if (pathname === '/admin/login') return <>{children}</>
 
     const handleLogout = () => {
-        if (typeof window !== 'undefined' && window.confirm('ต้องการออกจากระบบใช่หรือไม่?')) {
-            localStorage.removeItem('admin_token')
-            window.location.href = '/admin/login'
-        }
+        setLogoutConfirmOpen(true)
+    }
+
+    const confirmLogout = () => {
+        setLogoutConfirmOpen(false)
+        localStorage.removeItem('admin_token')
+        window.location.href = '/admin/login'
     }
 
     return (
@@ -130,6 +135,16 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
             </div>
 
             <AuditLogModal isOpen={auditOpen} onClose={() => setAuditOpen(false)} />
+            
+            <ConfirmModal 
+                isOpen={logoutConfirmOpen}
+                onClose={() => setLogoutConfirmOpen(false)}
+                onConfirm={confirmLogout}
+                title="ยืนยันการออกจากระบบ"
+                message="คุณต้องการออกจากระบบ Foami Admin ใช่หรือไม่?"
+                confirmText="ออกจากระบบ"
+                variant="warning"
+            />
         </div>
     )
 }

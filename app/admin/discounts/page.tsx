@@ -3,11 +3,20 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import styles from './discounts.module.css'
 import { Ticket, Sparkles, Edit2, CheckCircle, AlertCircle, Trash2, Calendar, ClipboardList, Clock } from 'lucide-react'
+import ConfirmModal from '@/components/Global/ConfirmModal'
+import { trackAuditLog } from '@/lib/audit'
 
 export default function AdvancedDiscountsPage() {
     const [codes, setCodes] = useState<any[]>([])
     const [segments, setSegments] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
+    const [saving, setSaving] = useState(false)
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        id: string;
+        title: string;
+        message: string;
+    }>({ isOpen: false, id: '', title: '', message: '' })
     const [showModal, setShowModal] = useState(false)
 
     // Form state
@@ -36,6 +45,12 @@ export default function AdvancedDiscountsPage() {
     }
 
     useEffect(() => { loadData() }, [])
+
+    useEffect(() => {
+        const handleRefresh = () => loadData()
+        window.addEventListener('foami:refresh', handleRefresh)
+        return () => window.removeEventListener('foami:refresh', handleRefresh)
+    }, [])
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -106,6 +121,56 @@ export default function AdvancedDiscountsPage() {
         loadData()
     }
 
+    const deleteCode = async (id: string) => {
+        const c = codes.find(item => item.id === id)
+        if (!c) return
+        
+        setConfirmConfig({
+            isOpen: true,
+            id: id,
+            title: 'ยืนยันการลบโค้ดส่วนลด',
+            message: `คุณแน่ใจหรือไม่ว่าต้องการลบโค้ด "${c.code}"? การลบนี้จะไม่สามารถย้อนคืนได้`
+        })
+    }
+
+    const handleConfirmDelete = async () => {
+        const id = confirmConfig.id
+        const c = codes.find(item => item.id === id)
+        if (!c) return
+
+        setConfirmConfig(p => ({ ...p, isOpen: false }))
+        setSaving(true)
+        
+        try {
+            const { error: delError } = await supabase.from('discount_codes').delete().eq('id', id)
+            if (delError) {
+                if (delError.code === '23503') {
+                    alert('ไม่สามารถลบโค้ดนี้ได้ เนื่องจากมีการนำไปใช้งานในรายการจองแล้ว\n\nกรุณาปิดการใช้งาน (Deactivate) แทนการลบเพื่อรักษาประวัติข้อมูล')
+                } else {
+                    throw delError
+                }
+                setSaving(false)
+                return
+            }
+            
+            // [AUDIT Phase 23] Delete discount code
+            await trackAuditLog({
+                action_type: 'DELETE',
+                entity_type: 'discount_code',
+                entity_id: id,
+                old_data: c,
+                description: `ลบโค้ดส่วนลด: ${c.code}`
+            })
+            
+            loadData()
+            alert('ลบโค้ดส่วนลดเรียบร้อยแล้ว')
+        } catch (err: any) {
+            alert('เกิดข้อผิดพลาดในการลบ: ' + err.message)
+        } finally {
+            setSaving(false)
+        }
+    }
+
     return (
         <div className={styles.page}>
             <div className="page-header animate-fade">
@@ -163,9 +228,12 @@ export default function AdvancedDiscountsPage() {
                                         <button className="btn btn-outline btn-sm" style={{ padding: '4px 8px' }} onClick={() => toggleStatus(c.id, c.is_active)}>
                                             {c.is_active ? 'ปิด' : 'เปิด'}
                                         </button>
-                                        <button className="btn btn-outline btn-sm" style={{ padding: '4px 8px' }} onClick={() => handleEdit(c)}>
-                                            <Edit2 size={14} />
-                                        </button>
+                                         <button className="btn btn-outline btn-sm" style={{ padding: '4px 8px' }} onClick={() => handleEdit(c)}>
+                                             <Edit2 size={14} />
+                                         </button>
+                                         <button className="btn-delete-premium" onClick={() => deleteCode(c.id)} title="ลบโค้ด">
+                                             <Trash2 size={16} />
+                                         </button>
                                     </div>
                                 </div>
                             </div>
@@ -248,6 +316,15 @@ export default function AdvancedDiscountsPage() {
                     </div>
                 </div>
             )}
+
+            <ConfirmModal 
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig(p => ({ ...p, isOpen: false }))}
+                onConfirm={handleConfirmDelete}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                isLoading={saving}
+            />
         </div>
     )
 }

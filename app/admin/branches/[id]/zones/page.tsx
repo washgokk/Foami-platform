@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { Zone, Branch } from '@/lib/types'
+import ConfirmModal from '@/components/Global/ConfirmModal'
 import { Map, Plus, Edit2, Trash2, ArrowLeft, CheckCircle, AlertCircle, Save, MousePointer2, MapPin } from 'lucide-react'
 import { trackAuditLog } from '@/lib/audit'
 
@@ -24,6 +25,12 @@ export default function ZonesPage() {
 
     // Which zone's polygon is being re-drawn
     const [redrawZone, setRedrawZone] = useState<Zone | null>(null)
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        id: string;
+        title: string;
+        message: string;
+    }>({ isOpen: false, id: '', title: '', message: '' })
 
     const load = useCallback(async () => {
         const [{ data: br }, { data: zns }] = await Promise.all([
@@ -36,6 +43,12 @@ export default function ZonesPage() {
     }, [id])
 
     useEffect(() => { load() }, [load])
+
+    useEffect(() => {
+        const handleRefresh = () => load()
+        window.addEventListener('foami:refresh', handleRefresh)
+        return () => window.removeEventListener('foami:refresh', handleRefresh)
+    }, [load])
 
     const saveNewZone = async (polygon_coords: [number, number][]) => {
         if (!newName.trim()) return
@@ -55,7 +68,7 @@ export default function ZonesPage() {
             // [AUDIT Phase 22] Create zone
             await trackAuditLog({
                 action_type: 'CREATE',
-                entity_type: 'service', // Using service as generic for zones too or we could add 'zone' if supported
+                entity_type: 'zone',
                 entity_id: data.id,
                 new_data: data,
                 description: `สร้างโซนใหม่: ${data.name} (สาขา ${branch?.name || id})`
@@ -78,7 +91,7 @@ export default function ZonesPage() {
             // [AUDIT Phase 22] Redraw zone
             await trackAuditLog({
                 action_type: 'UPDATE',
-                entity_type: 'service',
+                entity_type: 'zone',
                 entity_id: redrawZone.id,
                 old_data: { polygon_coords: redrawZone.polygon_coords },
                 new_data: { polygon_coords },
@@ -94,21 +107,51 @@ export default function ZonesPage() {
     const deleteZone = async (zid: string) => {
         const z = zones.find(item => item.id === zid)
         if (!z) return
-        if (!confirm('ลบโซนนี้?')) return
-        const { error } = await supabase.from('zones').delete().eq('id', zid)
         
-        if (!error) {
+        setConfirmConfig({
+            isOpen: true,
+            id: zid,
+            title: 'ยืนยันการลบโซน',
+            message: `ต้องการลบโซน "${z.name}"? การลบนี้จะไม่สามารถย้อนคืนได้`
+        })
+    }
+
+    const handleConfirmDelete = async () => {
+        const zid = confirmConfig.id
+        const z = zones.find(item => item.id === zid)
+        if (!z) return
+
+        setConfirmConfig(p => ({ ...p, isOpen: false }))
+        setSaving(true)
+        
+        try {
+            const { error: delError } = await supabase.from('zones').delete().eq('id', zid)
+            if (delError) {
+                if (delError.code === '23503') {
+                    alert('ไม่สามารถลบโซนนี้ได้ เนื่องจากมีการจองงานที่ค้างอยู่ในพื้นที่นี้\n\nกรุณายกเลิกหรือเปลี่ยนโซนของการจองเหล่านั้นก่อนทำการลบ')
+                } else {
+                    throw delError
+                }
+                setSaving(false)
+                return
+            }
+            
             // [AUDIT Phase 22] Delete zone
             await trackAuditLog({
                 action_type: 'DELETE',
-                entity_type: 'service',
+                entity_type: 'zone',
                 entity_id: zid,
                 old_data: z,
                 description: `ลบโซน: ${z.name}`
             })
+            
+            load()
+            alert('ลบโซนเรียบร้อยแล้ว')
+        } catch (err: any) {
+            alert('เกิดข้อผิดพลาดในการลบ: ' + err.message)
+        } finally {
+            setSaving(false)
         }
-        
-        load()
     }
 
     const toggleActive = async (z: Zone) => {
@@ -190,13 +233,8 @@ export default function ZonesPage() {
             )}
 
             {/* ─── Overview map (all zones) ─── */}
-            {createMode === 'idle' && !redrawZone && (
+            {createMode === 'idle' && !redrawZone && branch && (
                 <div style={{ position: 'relative' }}>
-                    {loading && (
-                        <div style={{ position: 'absolute', inset: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.7)', borderRadius: 'var(--radius-xl)' }}>
-                            <span className="spinner" />
-                        </div>
-                    )}
                     <ZoneOverviewMap
                         center={branchCenter}
                         zones={zones}
@@ -236,11 +274,13 @@ export default function ZonesPage() {
                                         return (
                                             <tr key={z.id}>
                                                 <td>
-                                                    <div style={{ width: 18, height: 18, borderRadius: 4, background: color }} />
-                                                </td>
-                                                <td>
-                                                    <strong>{z.name}</strong>
-                                                    {z.description && <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{z.description}</div>}
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                        <div style={{ width: 4, height: 24, borderRadius: 2, background: color }} />
+                                                        <div>
+                                                            <strong style={{ display: 'block' }}>{z.name}</strong>
+                                                            {z.description && <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{z.description}</div>}
+                                                        </div>
+                                                    </div>
                                                 </td>
                                                 <td>
                                                     {z.polygon_coords?.length >= 3
@@ -256,12 +296,12 @@ export default function ZonesPage() {
                                                     </button>
                                                 </td>
                                                 <td>
-                                                    <div style={{ display: 'flex', gap: 6 }}>
+                                                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                                                         <button className="btn btn-ghost btn-sm" style={{ gap: 4 }} onClick={() => setRedrawZone(z)}>
                                                             <Edit2 size={14} /> วาดกรอบ
                                                         </button>
-                                                        <button className="btn btn-outline btn-sm" style={{ color: 'var(--danger)', border: 'none' }} onClick={() => deleteZone(z.id)}>
-                                                            <Trash2 size={14} />
+                                                        <button className="btn-delete-premium" onClick={() => deleteZone(z.id)} title="ลบโซน">
+                                                            <Trash2 size={16} />
                                                         </button>
                                                     </div>
                                                 </td>
@@ -274,6 +314,15 @@ export default function ZonesPage() {
                     )}
                 </div>
             )}
+
+            <ConfirmModal 
+                isOpen={confirmConfig.isOpen}
+                onClose={() => setConfirmConfig(p => ({ ...p, isOpen: false }))}
+                onConfirm={handleConfirmDelete}
+                title={confirmConfig.title}
+                message={confirmConfig.message}
+                isLoading={saving}
+            />
         </div>
     )
 }
@@ -289,8 +338,22 @@ function ZoneOverviewMap({ center, zones, onRedraw }: {
 
     // 1. Initialize Map once
     useEffect(() => {
-        if (mapInstanceRef.current || !mapRef.current) return
+        if (!mapRef.current) return
+        
+        // Ensure container is empty and ready
+        if (mapInstanceRef.current) {
+            mapInstanceRef.current.remove()
+            mapInstanceRef.current = null
+        }
+        
+        let map: any = null
+
         import('leaflet').then(L => {
+            if (!mapRef.current) return
+            
+            // Extra guard against race condition
+            if ((mapRef.current as any)._leaflet_id) return
+
             if (!document.querySelector('link[href*="leaflet.css"]')) {
                 const link = document.createElement('link')
                 link.rel = 'stylesheet'
@@ -298,23 +361,38 @@ function ZoneOverviewMap({ center, zones, onRedraw }: {
                 document.head.appendChild(link)
             }
 
-            const map = L.map(mapRef.current!, { center, zoom: 15, zoomControl: true })
+            map = L.map(mapRef.current!, { center, zoom: 15, zoomControl: true })
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map)
 
-            // Center marker
-            L.circleMarker(center, { radius: 8, fillColor: '#fff', color: '#3B5FCC', weight: 3, fillOpacity: 1 })
-                .addTo(map).bindTooltip('สาขา')
+            // Branch Marker (Pin)
+            const branchIcon = L.divIcon({
+                html: `<div style="color: #3B5FCC; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));"><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg></div>`,
+                className: '',
+                iconSize: [32, 32],
+                iconAnchor: [16, 32]
+            });
+
+            L.marker(center, { icon: branchIcon }).addTo(map).bindTooltip('ที่ตั้งสาขา', { permanent: true, direction: 'top', offset: [0, -32], className: 'leaflet-branch-label' })
 
             layerGroupRef.current = L.featureGroup().addTo(map)
             mapInstanceRef.current = map
+            
+            // Force redraw size to ensure layers show up correctly
+            setTimeout(() => {
+                map?.invalidateSize()
+            }, 100)
+            
             setMapReady(true)
         })
+
         return () => {
-            mapInstanceRef.current?.remove();
-            mapInstanceRef.current = null;
-            setMapReady(false);
+            if (map) {
+                map.remove()
+            }
+            mapInstanceRef.current = null
+            setMapReady(false)
         }
-    }, [center]) // Only re-init if center truly changes
+    }, [JSON.stringify(center)]) // Use stringified center for reliable comparison
 
     // 2. Redraw zones when zones prop changes
     useEffect(() => {
@@ -329,7 +407,7 @@ function ZoneOverviewMap({ center, zones, onRedraw }: {
                 const color = (z as any).color || COLORS[idx % COLORS.length]
                 if (z.polygon_coords?.length >= 3) {
                     L.polygon(z.polygon_coords, {
-                        color, fillColor: color, fillOpacity: 0.15, weight: 2.5,
+                        color, fillColor: color, fillOpacity: 0.4, weight: 3,
                     }).addTo(layerGroupRef.current).bindTooltip(`<strong>${z.name}</strong>`, {
                         permanent: true, direction: 'center',
                         className: 'leaflet-zone-label',
@@ -341,6 +419,9 @@ function ZoneOverviewMap({ center, zones, onRedraw }: {
             if (layerGroupRef.current.getLayers().length > 0) {
                 mapInstanceRef.current.fitBounds(layerGroupRef.current.getBounds(), { padding: [20, 20], maxZoom: 16 })
             }
+            
+            // Important: ensure map knows its size changed or loaded child elements
+            mapInstanceRef.current.invalidateSize()
         })
     }, [zones, mapReady])
 
@@ -367,6 +448,29 @@ function ZoneOverviewMap({ center, zones, onRedraw }: {
                     <AlertCircle size={14} /> โซนที่ยังไม่มีกรอบ: {zones.filter(z => !z.polygon_coords?.length || z.polygon_coords.length < 3).map(z => z.name).join(', ')} — กด <Edit2 size={12} style={{ display: 'inline' }} /> วาดกรอบ ในตารางด้านล่าง
                 </div>
             )}
+            
+            <style jsx global>{`
+                .leaflet-zone-label {
+                    background: rgba(255, 255, 255, 0.9) !important;
+                    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+                    border-radius: 8px !important;
+                    padding: 4px 10px !important;
+                    font-weight: 800 !important;
+                    color: #1e293b !important;
+                    font-size: 0.75rem !important;
+                    pointer-events: none !important;
+                }
+                .leaflet-branch-label {
+                    background: #3B5FCC !important;
+                    color: white !important;
+                    border: none !important;
+                    border-radius: 6px !important;
+                    padding: 2px 8px !important;
+                    font-weight: 800 !important;
+                    font-size: 0.7rem !important;
+                }
+            `}</style>
         </div>
     )
 }
@@ -387,8 +491,18 @@ function ZoneDrawMap({ center, zones, editingZoneId, title, accentColor, existin
     const [points, setPoints] = useState<[number, number][]>(existingCoords || [])
 
     useEffect(() => {
-        if (mapInstanceRef.current || !mapRef.current) return
+        if (!mapRef.current) return
+        
+        if (mapInstanceRef.current) {
+            mapInstanceRef.current.remove()
+            mapInstanceRef.current = null
+        }
+
+        let map: any = null
+
         import('leaflet').then(L => {
+            if (!mapRef.current) return
+
             if (!document.querySelector('link[href*="leaflet.css"]')) {
                 const link = document.createElement('link')
                 link.rel = 'stylesheet'
@@ -398,6 +512,15 @@ function ZoneDrawMap({ center, zones, editingZoneId, title, accentColor, existin
 
             const map = L.map(mapRef.current!, { center, zoom: 15 })
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map)
+
+            // Branch Marker (Pin) for reference
+            const branchIcon = L.divIcon({
+                html: `<div style="color: #3B5FCC; opacity: 0.6; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3" fill="white"></circle></svg></div>`,
+                className: '',
+                iconSize: [24, 24],
+                iconAnchor: [12, 24]
+            });
+            L.marker(center, { icon: branchIcon }).addTo(map).bindTooltip('ที่ตั้งสาขา')
 
             // Show OTHER zones for reference
             zones.forEach((z, idx) => {
@@ -445,7 +568,12 @@ function ZoneDrawMap({ center, zones, editingZoneId, title, accentColor, existin
 
             mapInstanceRef.current = map
         })
-        return () => { mapInstanceRef.current?.remove(); mapInstanceRef.current = null }
+        return () => {
+            if (map) {
+                map.remove()
+            }
+            mapInstanceRef.current = null
+        }
     }, [])
 
     const clearAll = () => {

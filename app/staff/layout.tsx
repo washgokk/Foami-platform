@@ -6,8 +6,8 @@ export const metadata: Metadata = {
   description: 'ระบบพนักงาน Foami สำหรับรับงาน',
   manifest: '/manifest-staff.json',
   icons: {
-    icon: '/icon-192x192_staff.png',
-    apple: '/icon-192x192_staff.png',
+    icon: '/icon.svg',
+    apple: '/icon.svg',
   },
 }
 
