@@ -298,16 +298,32 @@ export default function JobDetailPage() {
 
             // Trigger notification to customer if price increased
             if (job.customer_id && newAdditionalPrice > oldAdditionalPrice) {
+                const message = `💰 มีค่าใช้จ่ายเพิ่มเติมครับ\nยอดเงิน: ฿${newAdditionalPrice.toLocaleString()}\nรายละเอียด: ${additionalNote || 'ค่าบริการเพิ่มเติม'}\n\nรบกวนตรวจสอบและชำระเพื่อดำเนินการต่อครับ`
+                
+                // Web Push
                 fetch('/api/push/notify-customer', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         customer_id: job.customer_id,
                         title: 'มีค่าใช้จ่ายเพิ่มเติม 💰',
-                        body: `รบกวนชำระเงิน ฿${newAdditionalPrice.toLocaleString()} (${additionalNote || 'ค่าบริการเพิ่มเติม'}) เพื่อให้พนักงานดำเนินการต่อครับ`,
+                        body: message,
                         url: `/${job.branches?.slug || 'menu'}/my-bookings`
                     })
                 }).catch(() => { })
+
+                // Line
+                if (job.customers?.line_user_id) {
+                    fetch('/api/line/notify-customer', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            line_user_id: job.customers.line_user_id,
+                            message: message,
+                            booking_id: id,
+                        }),
+                    }).catch(() => { })
+                }
             }
 
             setAdditionalSlipFiles([])

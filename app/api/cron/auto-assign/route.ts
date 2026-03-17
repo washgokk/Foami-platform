@@ -24,7 +24,8 @@ export async function GET(req: NextRequest) {
 
     let assigned = 0
     for (const booking of pendingBookings || []) {
-        const bookingDt = new Date(`${booking.scheduled_date}T${booking.scheduled_time}`)
+        // Force parse as Thai time (+07:00) to match DB storage format
+        const bookingDt = new Date(`${booking.scheduled_date}T${booking.scheduled_time}:00+07:00`)
         if (bookingDt > cutoff) continue // More than 2 hours away, skip
 
         // Find available staff for this zone/date/time
