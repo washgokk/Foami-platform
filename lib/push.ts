@@ -40,17 +40,26 @@ export async function sendPushNotification(
     }
 
     // 2. Send to all devices for this user/platform (Foami currently upserts to one, but could be many)
-    const notificationPromises = subs.map(async (s) => {
+    console.log(`[Push] Found ${subs.length} subscriptions for user ${userId}`)
+    
+    const notificationPromises = subs.map(async (s, idx) => {
         try {
-            await webpush.sendNotification(
+            console.log(`[Push] Sending to device ${idx + 1}...`)
+            const response = await webpush.sendNotification(
                 s.subscription as any,
                 JSON.stringify(payload)
             )
+            console.log(`[Push] Device ${idx + 1} success:`, response.statusCode)
             return true
         } catch (err: any) {
-            console.error('Error sending individual push:', err)
+            console.error(`[Push] Device ${idx + 1} error:`, {
+                status: err.statusCode,
+                message: err.message,
+                endpoint: (s.subscription as any)?.endpoint
+            })
             // If subscription is expired/invalid, remove it
             if (err.statusCode === 410 || err.statusCode === 404) {
+                console.log(`[Push] Removing expired subscription for user ${userId}`)
                 await supabase
                     .from('push_subscriptions')
                     .delete()
@@ -61,6 +70,8 @@ export async function sendPushNotification(
     })
 
     const results = await Promise.all(notificationPromises)
+    const successCount = results.filter(r => r === true).length
+    console.log(`[Push] Delivery summary for ${userId}: ${successCount}/${subs.length} successful`)
     return results.some(r => r === true)
 }
 

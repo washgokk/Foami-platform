@@ -2,9 +2,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { 
+import {
     ChevronLeft, Calendar, Clock, MapPin, Bike, CheckCircle2, CheckCircle,
-    Upload, X, Image as ImageIcon, MessageCircle, Phone, 
+    Upload, X, Image as ImageIcon, MessageCircle, Phone,
     Info, Star, ClipboardList, AlertCircle, Tag, Package,
     User, HelpCircle, BadgeDollarSign, Receipt, History, FileText
 } from 'lucide-react'
@@ -34,7 +34,7 @@ const InfoSection = ({ job }: { job: any }) => {
             addonsTotal += price
         })
     }
-    
+
     const totalPkgPlusAdj = (job.total_price || 0) - addonsTotal - (job.extra_fee || 0) + (job.discount_amount || 0) - (job.additional_price || 0)
     const rawBasePrice = job.services?.price_s || job.services?.price || 0
     const sizeAdjustment = totalPkgPlusAdj - rawBasePrice
@@ -167,7 +167,7 @@ export default function JobDetailPage() {
                 `)
                 .eq('id', id)
                 .single()
-            
+
             if (error) throw error
             const currentJob = data ? { ...data } : null
 
@@ -200,7 +200,7 @@ export default function JobDetailPage() {
                 if (currentJob.additional_price) {
                     setAdditionalPrice(currentJob.additional_price)
                 } else {
-                    const customAddon = (currentJob.addon_ids || []).find((a: any) => 
+                    const customAddon = (currentJob.addon_ids || []).find((a: any) =>
                         typeof a !== 'string' && a.variableState?.mode === 'custom' && a.variableState?.customAmount
                     )
                     if (customAddon) {
@@ -231,7 +231,7 @@ export default function JobDetailPage() {
         try {
             const { error: updateError } = await supabase.from('bookings').update({ staff_id: staffData.id, status: 'confirmed' }).eq('id', id)
             if (updateError) throw updateError
-            
+
             await load()
         } catch (e: any) {
             console.error('Accept error:', e)
@@ -242,57 +242,86 @@ export default function JobDetailPage() {
     }
 
     const saveAdditionalCostData = async () => {
-        if (additionalPrice === '' || isNaN(Number(additionalPrice)) || Number(additionalPrice) === 0) return
+        // Only return if price is unset AND there are no new slips
+        if ((additionalPrice === '' || isNaN(Number(additionalPrice))) && additionalSlipFiles.length === 0) return
+
         setSavingCost(true)
+        console.log('[CostSave] Starting save for booking:', id)
 
-        let slipUrls = [...(job.additional_price_slips || [])];
+        try {
+            let slipUrls = [...(job.additional_price_slips || [])];
 
-        for (const file of additionalSlipFiles) {
-            const ext = file.name.split('.').pop()
-            const fileName = `slip-${id}-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-            const { error: uploadError } = await supabase.storage
-                .from('slips')
-                .upload(`additional/${fileName}`, file)
-            if (!uploadError) {
-                const { data: { publicUrl } } = supabase.storage.from('slips').getPublicUrl(`additional/${fileName}`)
-                slipUrls.push(publicUrl)
+            // Upload new slips
+            for (const file of additionalSlipFiles) {
+                const ext = file.name.split('.').pop()
+                const fileName = `slip-${id}-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+                const { error: uploadError } = await supabase.storage
+                    .from('slips')
+                    .upload(`additional/${fileName}`, file)
+
+                if (uploadError) {
+                    console.error('[CostSave] Slip upload failed:', uploadError)
+                } else {
+                    const { data: { publicUrl } } = supabase.storage.from('slips').getPublicUrl(`additional/${fileName}`)
+                    slipUrls.push(publicUrl)
+                }
             }
-        }
 
-        const oldAdditionalPrice = Number(job.additional_price) || 0
-        const newAdditionalPrice = Number(additionalPrice)
-        const priceDiff = newAdditionalPrice - oldAdditionalPrice
-        const newTotal = (Number(job.total_price) || 0) + priceDiff
+            const oldAdditionalPrice = Number(job.additional_price) || 0
+            const newAdditionalPrice = Number(additionalPrice) || 0
+            const priceDiff = newAdditionalPrice - oldAdditionalPrice
+            const newTotal = (Number(job.total_price) || 0) + priceDiff
 
-        await supabase.from('bookings').update({
-            additional_price: newAdditionalPrice,
-            additional_price_note: additionalNote,
-            additional_price_slips: slipUrls,
-            total_price: newTotal
-        }).eq('id', id)
-
-        // Trigger notification to customer
-        if (job.customer_id && newAdditionalPrice > oldAdditionalPrice) {
-            fetch('/api/push/notify-customer', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    customer_id: job.customer_id,
-                    title: 'มีค่าใช้จ่ายเพิ่มเติม 💰',
-                    body: `รบกวนชำระเงิน ฿${newAdditionalPrice.toLocaleString()} (${additionalNote || 'ค่าบริการเพิ่มเติม'}) เพื่อให้พนักงานดำเนินการต่อครับ`,
-                    url: `/menu/my-bookings`
+            // Prepare History
+            const history = [...(job.additional_history || [])]
+            if (newAdditionalPrice !== oldAdditionalPrice || additionalNote !== job.additional_price_note) {
+                history.push({
+                    price: newAdditionalPrice,
+                    note: additionalNote,
+                    timestamp: new Date().toISOString(),
+                    staff: job.staff?.full_name || 'Staff'
                 })
-            }).catch(() => {})
+            }
 
-            // Also Line if possible (handled by another API ideally, but for now we focus on PWA)
+            const updateData: any = {
+                additional_price: newAdditionalPrice,
+                additional_price_note: additionalNote,
+                additional_price_slips: slipUrls,
+                total_price: newTotal,
+                additional_history: history
+            }
+
+            console.log('[CostSave] Updating booking with:', updateData)
+            const { error: updateError } = await supabase.from('bookings').update(updateData).eq('id', id)
+
+            if (updateError) throw updateError
+
+            // Trigger notification to customer if price increased
+            if (job.customer_id && newAdditionalPrice > oldAdditionalPrice) {
+                fetch('/api/push/notify-customer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        customer_id: job.customer_id,
+                        title: 'มีค่าใช้จ่ายเพิ่มเติม 💰',
+                        body: `รบกวนชำระเงิน ฿${newAdditionalPrice.toLocaleString()} (${additionalNote || 'ค่าบริการเพิ่มเติม'}) เพื่อให้พนักงานดำเนินการต่อครับ`,
+                        url: `/${job.branches?.slug || 'menu'}/my-bookings`
+                    })
+                }).catch(() => { })
+            }
+
+            setAdditionalSlipFiles([])
+            console.log('[CostSave] Save completed successfully')
+        } catch (err: any) {
+            console.error('[CostSave] Error:', err)
+            // We don't alert here to not break the photo upload flow if it's called from there, 
+            // but we log it clearly.
+        } finally {
+            setSavingCost(false)
         }
-        
-        setAdditionalSlipFiles([])
-        setSavingCost(false)
-        load() // Refresh after save
     }
 
-    const isFuelJob = job?.services?.name?.includes('น้ำมัน') || 
+    const isFuelJob = job?.services?.name?.includes('น้ำมัน') ||
         (Array.isArray(job?.addon_ids) && job.addon_ids.some((a: any) => {
             const name = typeof a === 'string' ? a : (a.name || '')
             return name.includes('น้ำมัน')
@@ -320,7 +349,7 @@ export default function JobDetailPage() {
 
         if (localStorage.getItem('foami_mock_db_enabled') === 'true') {
             console.log('[MockDB] Updating status locally:', action.next)
-            await supabase.from('bookings').update({ 
+            await supabase.from('bookings').update({
                 status: action.next,
                 updated_at: new Date().toISOString()
             }).eq('id', id)
@@ -329,18 +358,18 @@ export default function JobDetailPage() {
             if (job.customer_id) {
                 const localSubs = JSON.parse(localStorage.getItem('foami_mock_db_push_subscriptions') || '[]')
                 const targetSub = localSubs.find((s: any) => s.user_id === job.customer_id && s.platform === 'customer')
-                
+
                 if (targetSub) {
                     fetch('/api/push/send-test', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
+                        body: JSON.stringify({
                             subscription: targetSub.subscription,
                             title: `🔔 อัปเดตสถานะ: ${BOOKING_STATUS_LABEL[action.next]}`,
                             body: `รายการล้าง ${job.services?.name} ของคุณได้รับการอัปเดตสถานะแล้ว`,
                             url: `/my-bookings`
                         }),
-                    }).catch(() => {})
+                    }).catch(() => { })
                 }
             }
 
@@ -350,7 +379,7 @@ export default function JobDetailPage() {
         }
 
         setActionLoading(true)
-        await supabase.from('bookings').update({ 
+        await supabase.from('bookings').update({
             status: action.next,
             updated_at: new Date().toISOString()
         }).eq('id', id)
@@ -359,7 +388,7 @@ export default function JobDetailPage() {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: action.next }),
-        }).catch(() => {})
+        }).catch(() => { })
 
         load()
         setActionLoading(false)
@@ -373,14 +402,24 @@ export default function JobDetailPage() {
         setUploading(true)
 
         const urls: string[] = []
-        for (const file of selectedFiles) {
+        for (const [index, file] of selectedFiles.entries()) {
             if (!file) continue
             const ext = file.name.split('.').pop()
             const path = `jobs/${id}/${uploadType}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+
+            console.log(`[handleUpload] Uploading photo ${index + 1}/${selectedFiles.length}...`)
             const { data, error } = await supabase.storage
                 .from('job-photos')
                 .upload(path, file, { contentType: file.type })
-            if (!error && data) {
+
+            if (error) {
+                console.error(`[handleUpload] Photo ${index + 1} failed:`, error)
+                alert(`อัปโหลดรูปที่ ${index + 1} ไม่สำเร็จ: ${error.message}\nตรวจสอบว่าคุณได้สร้าง Bucket "job-photos" ใน Supabase แล้ว`)
+                setUploading(false)
+                return // Stop everything if a photo fails
+            }
+
+            if (data) {
                 const { data: { publicUrl } } = supabase.storage.from('job-photos').getPublicUrl(path)
                 urls.push(publicUrl)
             }
@@ -393,21 +432,23 @@ export default function JobDetailPage() {
             uploaded_at: new Date().toISOString()
         })
 
-        if (uploadType === 'after' && Number(additionalPrice) > 0) {
+        if (uploadType === 'after' && (Number(additionalPrice) > 0 || additionalSlipFiles.length > 0)) {
+            console.log('[handleUpload] Triggering additional cost save before status change...')
             await saveAdditionalCostData()
         }
 
         const nextStatus = uploadType === 'before' ? 'washing' : 'delivering'
-        await supabase.from('bookings').update({ status: nextStatus }).eq('id', id)
+        console.log('[handleUpload] Updating status to:', nextStatus)
 
-        if (localStorage.getItem('foami_mock_db_enabled') === 'true') {
-            await supabase.from('bookings').update({ status: nextStatus }).eq('id', id)
-        } else {
+        const { error: statusError } = await supabase.from('bookings').update({ status: nextStatus }).eq('id', id)
+        if (statusError) console.error('[handleUpload] Status update failed:', statusError)
+
+        if (localStorage.getItem('foami_mock_db_enabled') !== 'true') {
             fetch(`/api/bookings/${id}/status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: nextStatus }),
-            }).catch(() => {})
+            }).catch(() => { })
         }
 
         setShowPhotoUpload(false)
@@ -427,11 +468,11 @@ export default function JobDetailPage() {
     if (!job) return <div className="empty-state"><p className="empty-state-title">ไม่พบงาน</p></div>
 
     const action = STATUS_ACTIONS[job.status]
-    const isDifferent = job.pickup_lat && job.delivery_lat && 
-        (Math.abs(job.pickup_lat - job.delivery_lat) > 0.0001 || 
-         Math.abs(job.pickup_lng - job.delivery_lng) > 0.0001);
+    const isDifferent = job.pickup_lat && job.delivery_lat &&
+        (Math.abs(job.pickup_lat - job.delivery_lat) > 0.0001 ||
+            Math.abs(job.pickup_lng - job.delivery_lng) > 0.0001);
 
-    const embedUrl = isDifferent 
+    const embedUrl = isDifferent
         ? `https://maps.google.com/maps?saddr=${job.pickup_lat},${job.pickup_lng}&daddr=${job.delivery_lat},${job.delivery_lng}&output=embed`
         : `https://maps.google.com/maps?q=${job.pickup_lat},${job.pickup_lng}&z=15&output=embed`;
 
@@ -440,400 +481,375 @@ export default function JobDetailPage() {
 
     return (
         <>
-        <div className="animate-fade" style={{ paddingBottom: 'calc(100px + env(safe-area-inset-bottom))' }}>
-            <div className={styles.header}>
-                <button className="btn btn-ghost btn-sm" style={{ gap: 6, display: 'flex', alignItems: 'center' }} onClick={() => router.back()}><ChevronLeft size={18} /> กลับ</button>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                    <span className={`badge badge-${job.status.replace('_', '-')}`}>{BOOKING_STATUS_LABEL[job.status as BookingStatus]}</span>
-                    {job.staff && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>รับงานโดย: {job.staff.full_name}</span>}
+            <div className="animate-fade" style={{ paddingBottom: 'calc(100px + env(safe-area-inset-bottom))' }}>
+                <div className={styles.header}>
+                    <button className="btn btn-ghost btn-sm" style={{ gap: 6, display: 'flex', alignItems: 'center' }} onClick={() => router.back()}><ChevronLeft size={18} /> กลับ</button>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                        <span className={`badge badge-${job.status.replace('_', '-')}`}>{BOOKING_STATUS_LABEL[job.status as BookingStatus]}</span>
+                        {job.staff && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>รับงานโดย: {job.staff.full_name}</span>}
+                    </div>
                 </div>
-            </div>
 
-            <div className={`card card-padded ${styles.section}`}>
-                <div className={styles.sectionTitle}><User size={18} /> ข้อมูลลูกค้า</div>
-                <div className={styles.infoGrid}>
-                    <div className={styles.infoRow}><span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><User size={14} /> ชื่อลูกค้า</span><strong>{job.customers?.full_name || 'ไม่ระบุชื่อ'}</strong></div>
-                    <div className={styles.infoRow}>
-                        <span>เบอร์โทร</span>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                            <strong style={{ fontSize: '1.1rem' }}>{job.customers?.phone || 'ไม่พบเบอร์'}</strong>
-                            <div style={{ display: 'flex', gap: 6 }}>
-                                <a href={`tel:${job.customers?.phone}`} className="btn btn-primary btn-sm" style={{ gap: 6 }}>
-                                    <Phone size={14} /> โทรเลย
-                                </a>
-                                <button className="btn btn-ghost btn-sm" onClick={handleCopy} style={{ border: '1px solid var(--border)', fontSize: '1rem', padding: '0 8px', borderRadius: '10px' }} title="คัดลอก">
-                                    {copySuccess ? <CheckCircle2 size={16} color="var(--success)" /> : <ClipboardList size={16} />}
-                                </button>
+                <div className={`card card-padded ${styles.section}`}>
+                    <div className={styles.sectionTitle}><User size={18} /> ข้อมูลลูกค้า</div>
+                    <div className={styles.infoGrid}>
+                        <div className={styles.infoRow}><span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><User size={14} /> ชื่อลูกค้า</span><strong>{job.customers?.full_name || 'ไม่ระบุชื่อ'}</strong></div>
+                        <div className={styles.infoRow}>
+                            <span>เบอร์โทร</span>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                                <strong style={{ fontSize: '1.1rem' }}>{job.customers?.phone || 'ไม่พบเบอร์'}</strong>
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                    <a href={`tel:${job.customers?.phone}`} className="btn btn-primary btn-sm" style={{ gap: 6 }}>
+                                        <Phone size={14} /> โทรเลย
+                                    </a>
+                                    <button className="btn btn-ghost btn-sm" onClick={handleCopy} style={{ border: '1px solid var(--border)', fontSize: '1rem', padding: '0 8px', borderRadius: '10px' }} title="คัดลอก">
+                                        {copySuccess ? <CheckCircle2 size={16} color="var(--success)" /> : <ClipboardList size={16} />}
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div className={styles.infoRow}><span>รถ</span><strong>{job.customers?.vehicle_brand} {job.customers?.vehicle_model}</strong></div>
-                    <div className={styles.infoRow}><span>สี</span><strong>{job.customers?.vehicle_color || '-'}</strong></div>
-                    <div className={styles.infoRow}><span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Package size={14} /> ทะเบียน</span><strong style={{ fontFamily: 'monospace', fontSize: '1.1rem', color: 'var(--primary)' }}>{job.customers?.license_plate}</strong></div>
-                </div>
-            </div>
-
-            <div className={`card card-padded ${styles.section}`}>
-                <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '1rem', fontWeight: 800, marginBottom: 16 }}>
-                    <ClipboardList size={20} color="var(--primary)" /> รายละเอียดการบริการ
-                </h3>
-                <InfoSection job={job} />
-            </div>
-
-            <div className={`card card-padded ${styles.section}`}>
-                <div className={styles.sectionTitle}><MapPin size={18} /> ตำแหน่งรับ/ส่งรถ</div>
-                <div className={styles.infoGrid}>
-                    <div className={styles.infoRow} style={{ alignItems: 'flex-start' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><MapPin size={14} /> จุดรับ</span>
-                        <span style={{ textAlign: 'right', fontSize: '0.85rem', fontWeight: 500 }}>{job.pickup_address}</span>
-                    </div>
-                    <div className={styles.infoRow} style={{ alignItems: 'flex-start' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={14} /> จุดส่ง</span>
-                        <span style={{ textAlign: 'right', fontSize: '0.85rem', fontWeight: 500 }}>{job.delivery_address}</span>
+                        <div className={styles.infoRow}><span>รถ</span><strong>{job.customers?.vehicle_brand} {job.customers?.vehicle_model}</strong></div>
+                        <div className={styles.infoRow}><span>สี</span><strong>{job.customers?.vehicle_color || '-'}</strong></div>
+                        <div className={styles.infoRow}><span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Package size={14} /> ทะเบียน</span><strong style={{ fontFamily: 'monospace', fontSize: '1.1rem', color: 'var(--primary)' }}>{job.customers?.license_plate}</strong></div>
                     </div>
                 </div>
 
-                <div className={styles.mapContainer} style={{ marginTop: 'var(--space-4)', borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid var(--border)', height: 240 }}>
-                    <iframe
-                        width="100%"
-                        height="100%"
-                        frameBorder="0"
-                        style={{ border: 0 }}
-                        src={embedUrl}
-                        allowFullScreen
-                    ></iframe>
+                <div className={`card card-padded ${styles.section}`}>
+                    <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '1rem', fontWeight: 800, marginBottom: 16 }}>
+                        <ClipboardList size={20} color="var(--primary)" /> รายละเอียดการบริการ
+                    </h3>
+                    <InfoSection job={job} />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: isDifferent ? '1fr 1fr' : '1fr', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
-                    <a href={pickupNavUrl} target="_blank" rel="noreferrer" className="btn btn-ghost btn-full" style={{ border: '1px solid var(--border)', fontSize: '0.85rem', padding: '10px 4px', borderRadius: '12px', gap: 6 }}>
-                        <MapPin size={14} /> นำทางจุดรับ
-                    </a>
-                    {isDifferent && (
-                        <a href={deliveryNavUrl} target="_blank" rel="noreferrer" className="btn btn-ghost btn-full" style={{ border: '1px solid var(--border)', fontSize: '0.85rem', padding: '10px 4px', borderRadius: '12px', gap: 6 }}>
-                            <CheckCircle2 size={14} /> นำทางจุดส่ง
+                <div className={`card card-padded ${styles.section}`}>
+                    <div className={styles.sectionTitle}><MapPin size={18} /> ตำแหน่งรับ/ส่งรถ</div>
+                    <div className={styles.infoGrid}>
+                        <div className={styles.infoRow} style={{ alignItems: 'flex-start' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><MapPin size={14} /> จุดรับ</span>
+                            <span style={{ textAlign: 'right', fontSize: '0.85rem', fontWeight: 500 }}>{job.pickup_address}</span>
+                        </div>
+                        <div className={styles.infoRow} style={{ alignItems: 'flex-start' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={14} /> จุดส่ง</span>
+                            <span style={{ textAlign: 'right', fontSize: '0.85rem', fontWeight: 500 }}>{job.delivery_address}</span>
+                        </div>
+                    </div>
+
+                    <div className={styles.mapContainer} style={{ marginTop: 'var(--space-4)', borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid var(--border)', height: 240 }}>
+                        <iframe
+                            width="100%"
+                            height="100%"
+                            frameBorder="0"
+                            style={{ border: 0 }}
+                            src={embedUrl}
+                            allowFullScreen
+                        ></iframe>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: isDifferent ? '1fr 1fr' : '1fr', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
+                        <a href={pickupNavUrl} target="_blank" rel="noreferrer" className="btn btn-ghost btn-full" style={{ border: '1px solid var(--border)', fontSize: '0.85rem', padding: '10px 4px', borderRadius: '12px', gap: 6 }}>
+                            <MapPin size={14} /> นำทางจุดรับ
                         </a>
-                    )}
-                </div>
-            </div>
-
-            {job.customer_note && (
-                <div className={`card card-padded ${styles.section}`} style={{ borderLeft: '4px solid var(--warning)', background: '#FFFDF0' }}>
-                    <div className={styles.sectionTitle} style={{ color: '#856404', display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <MessageCircle size={18} /> หมายเหตุจากลูกค้า
-                    </div>
-                    <div style={{ fontSize: '1rem', fontWeight: 600, color: '#856404', whiteSpace: 'pre-wrap' }}>
-                        {job.customer_note}
-                    </div>
-                </div>
-            )}
-
-            {job.vehicle_photos && job.vehicle_photos.length > 0 && (
-                <div className={`card card-padded ${styles.section}`}>
-                    <div className={styles.sectionTitle}><ImageIcon size={18} /> รูปประกอบจากลูกค้า</div>
-                    <div style={{ display: 'flex', gap: 'var(--space-2)', overflowX: 'auto', paddingBottom: 4 }}>
-                        {job.vehicle_photos.map((url: string, i: number) => (
-                            <img 
-                                key={i} src={url} alt={`customer-photo-${i}`} 
-                                style={{ height: 120, width: 120, borderRadius: 'var(--radius)', objectFit: 'cover', flexShrink: 0, cursor: 'zoom-in' }} 
-                                onClick={() => setZoomConfig({ 
-                                    images: job.vehicle_photos.map((v: string, idx: number) => ({ src: v, alt: `รูปประกอบจากลูกค้า (${idx + 1})` })), 
-                                    initialIndex: i 
-                                })}
-                            />
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {(photos.before.length > 0 || photos.after.length > 0) && (
-                <div className={`card card-padded ${styles.section}`}>
-                    <div className={styles.sectionTitle}><ImageIcon size={18} /> รูปภาพ Before / After</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-                        {(() => {
-                            const jobPhotos = [
-                                ...photos.before.map((url, idx) => ({ src: url, alt: `รูปถ่ายก่อนล้าง (${idx + 1})` })),
-                                ...photos.after.map((url, idx) => ({ src: url, alt: `รูปถ่ายหลังล้าง (${idx + 1})` }))
-                            ]
-                            return (
-                                <>
-                                    {photos.before[0] && (
-                                        <div>
-                                            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 4 }}>ก่อนล้าง</p>
-                                            <img 
-                                                src={photos.before[0]} alt="before" 
-                                                style={{ width: '100%', borderRadius: 'var(--radius)', objectFit: 'cover', aspectRatio: '4/3', cursor: 'zoom-in' }} 
-                                                onClick={() => setZoomConfig({ images: jobPhotos, initialIndex: 0 })} 
-                                            />
-                                        </div>
-                                    )}
-                                    {photos.after[0] && (
-                                        <div>
-                                            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 4 }}>หลังล้าง</p>
-                                            <img 
-                                                src={photos.after[0]} alt="after" 
-                                                style={{ width: '100%', borderRadius: 'var(--radius)', objectFit: 'cover', aspectRatio: '4/3', cursor: 'zoom-in' }} 
-                                                onClick={() => setZoomConfig({ images: jobPhotos, initialIndex: photos.before.length })} 
-                                            />
-                                        </div>
-                                    )}
-                                </>
-                            )
-                        })()}
-                    </div>
-                </div>
-            )}
-
-            {['washing', 'delivering', 'completed'].includes(job.status) && (
-                <div className={`${styles.card} ${styles.section} ${styles.costCard}`} style={{ padding: 'var(--space-6)', borderRadius: '24px' }}>
-                    <div className={styles.sectionTitle} style={{ marginBottom: 'var(--space-5)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 16 }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 800, fontSize: '1.2rem' }}>
-                            <BadgeDollarSign size={24} color="var(--brand-dominant)" /> ค่าใช้จ่ายเพิ่มเติมหน้างาน
-                        </span>
-                        {Number(job.additional_price) > 0 && (
-                            <span className={`badge ${job.is_additional_paid ? 'badge-completed' : 'badge-pending'}`} style={{ fontSize: '0.8rem', padding: '6px 12px', borderRadius: '10px' }}>
-                                {job.is_additional_paid ? 'ชำระแล้ว' : 'รอชำระ'}
-                            </span>
+                        {isDifferent && (
+                            <a href={deliveryNavUrl} target="_blank" rel="noreferrer" className="btn btn-ghost btn-full" style={{ border: '1px solid var(--border)', fontSize: '0.85rem', padding: '10px 4px', borderRadius: '12px', gap: 6 }}>
+                                <CheckCircle2 size={14} /> นำทางจุดส่ง
+                            </a>
                         )}
                     </div>
-                    
-                    <div className={styles.costInputGroup}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            <label className={styles.fieldLabel}>
-                                จำนวนเงิน (บาท)
-                            </label>
-                            <div className={styles.priceInputWrapper}>
-                                <span className={styles.currencySymbol}>฿</span>
-                                <input
-                                    type="number"
-                                    placeholder="0.00"
-                                    value={additionalPrice}
-                                    onChange={e => setAdditionalPrice(e.target.value ? Number(e.target.value) : '')}
+                </div>
+
+                {job.customer_note && (
+                    <div className={`card card-padded ${styles.section}`} style={{ borderLeft: '4px solid var(--warning)', background: '#FFFDF0' }}>
+                        <div className={styles.sectionTitle} style={{ color: '#856404', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <MessageCircle size={18} /> หมายเหตุจากลูกค้า
+                        </div>
+                        <div style={{ fontSize: '1rem', fontWeight: 600, color: '#856404', whiteSpace: 'pre-wrap' }}>
+                            {job.customer_note}
+                        </div>
+                    </div>
+                )}
+
+                {job.vehicle_photos && job.vehicle_photos.length > 0 && (
+                    <div className={`card card-padded ${styles.section}`}>
+                        <div className={styles.sectionTitle}><ImageIcon size={18} /> รูปประกอบจากลูกค้า</div>
+                        <div style={{ display: 'flex', gap: 'var(--space-2)', overflowX: 'auto', paddingBottom: 4 }}>
+                            {job.vehicle_photos.map((url: string, i: number) => (
+                                <img
+                                    key={i} src={url} alt={`customer-photo-${i}`}
+                                    style={{ height: 120, width: 120, borderRadius: 'var(--radius)', objectFit: 'cover', flexShrink: 0, cursor: 'zoom-in' }}
+                                    onClick={() => setZoomConfig({
+                                        images: job.vehicle_photos.map((v: string, idx: number) => ({ src: v, alt: `รูปประกอบจากลูกค้า (${idx + 1})` })),
+                                        initialIndex: i
+                                    })}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {(photos.before.length > 0 || photos.after.length > 0) && (
+                    <div className={`card card-padded ${styles.section}`}>
+                        <div className={styles.sectionTitle}><ImageIcon size={18} /> รูปภาพ Before / After</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                            {(() => {
+                                const jobPhotos = [
+                                    ...photos.before.map((url, idx) => ({ src: url, alt: `รูปถ่ายก่อนล้าง (${idx + 1})` })),
+                                    ...photos.after.map((url, idx) => ({ src: url, alt: `รูปถ่ายหลังล้าง (${idx + 1})` }))
+                                ]
+                                return (
+                                    <>
+                                        {photos.before[0] && (
+                                            <div>
+                                                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 4 }}>ก่อนล้าง</p>
+                                                <img
+                                                    src={photos.before[0]} alt="before"
+                                                    style={{ width: '100%', borderRadius: 'var(--radius)', objectFit: 'cover', aspectRatio: '4/3', cursor: 'zoom-in' }}
+                                                    onClick={() => setZoomConfig({ images: jobPhotos, initialIndex: 0 })}
+                                                />
+                                            </div>
+                                        )}
+                                        {photos.after[0] && (
+                                            <div>
+                                                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 4 }}>หลังล้าง</p>
+                                                <img
+                                                    src={photos.after[0]} alt="after"
+                                                    style={{ width: '100%', borderRadius: 'var(--radius)', objectFit: 'cover', aspectRatio: '4/3', cursor: 'zoom-in' }}
+                                                    onClick={() => setZoomConfig({ images: jobPhotos, initialIndex: photos.before.length })}
+                                                />
+                                            </div>
+                                        )}
+                                    </>
+                                )
+                            })()}
+                        </div>
+                    </div>
+                )}
+
+                {['washing', 'delivering', 'completed'].includes(job.status) && (
+                    <div className={`${styles.card} ${styles.section} ${styles.costCard}`} style={{ padding: 'var(--space-6)', borderRadius: '24px' }}>
+                        <div className={styles.sectionTitle} style={{ marginBottom: 'var(--space-5)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 16 }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 800, fontSize: '1.2rem' }}>
+                                <BadgeDollarSign size={24} color="var(--brand-dominant)" /> ค่าใช้จ่ายเพิ่มเติมหน้างาน
+                            </span>
+                            {Number(job.additional_price) > 0 && (
+                                <span className={`badge ${job.is_additional_paid ? 'badge-completed' : 'badge-pending'}`} style={{ fontSize: '0.8rem', padding: '6px 12px', borderRadius: '10px' }}>
+                                    {job.is_additional_paid ? 'ชำระแล้ว' : 'รอชำระ'}
+                                </span>
+                            )}
+                        </div>
+
+                        <div className={styles.costInputGroup}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                <label className={styles.fieldLabel}>
+                                    จำนวนเงิน (บาท)
+                                </label>
+                                <div className={styles.priceInputWrapper}>
+                                    <span className={styles.currencySymbol}>฿</span>
+                                    <input
+                                        type="number"
+                                        placeholder="0.00"
+                                        value={additionalPrice}
+                                        onChange={e => setAdditionalPrice(e.target.value ? Number(e.target.value) : '')}
+                                        disabled={job.status !== 'washing' || savingCost}
+                                    />
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                <label className={styles.fieldLabel}>
+                                    รายละเอียด / หมายเหตุ
+                                </label>
+                                <textarea
+                                    className="form-input"
+                                    placeholder="เช่น เติมน้ำมัน 95 เต็มถัง"
+                                    rows={2}
+                                    value={additionalNote}
+                                    onChange={e => setAdditionalNote(e.target.value)}
                                     disabled={job.status !== 'washing' || savingCost}
+                                    style={{ borderRadius: '16px', padding: '16px', fontSize: '0.95rem', background: 'var(--surface-2)', border: '1px solid var(--border)' }}
                                 />
                             </div>
-                        </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            <label className={styles.fieldLabel}>
-                                รายละเอียด / หมายเหตุ
-                            </label>
-                            <textarea
-                                className="form-input"
-                                placeholder="เช่น เติมน้ำมัน 95 เต็มถัง"
-                                rows={2}
-                                value={additionalNote}
-                                onChange={e => setAdditionalNote(e.target.value)}
-                                disabled={job.status !== 'washing' || savingCost}
-                                style={{ borderRadius: '16px', padding: '16px', fontSize: '0.95rem', background: 'var(--surface-2)', border: '1px solid var(--border)' }}
-                            />
-                        </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                <label className={styles.fieldLabel} style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                                    แนบใบเสร็จ {Number(additionalPrice) > 0 && <span style={{ color: 'var(--danger)', fontSize: '0.75rem' }}>(จำเป็น!)</span>}
+                                </label>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                            <label className={styles.fieldLabel} style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
-                                แนบใบเสร็จ {Number(additionalPrice) > 0 && <span style={{ color: 'var(--danger)', fontSize: '0.75rem' }}>(จำเป็น!)</span>}
-                            </label>
-                                
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 12 }}>
-                                {[...(job.additional_price_slips || []), ...additionalSlipFiles.map(f => URL.createObjectURL(f))].map((url, idx) => (
-                                    <div key={idx} className={styles.slipPreview} style={{ position: 'relative', width: '100%', aspectRatio: '1/1' }}>
-                                    <img 
-                                        src={url} 
-                                        alt={`Slip ${idx}`} 
-                                        style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12, border: '1px solid var(--border)', cursor: 'zoom-in' }} 
-                                        onClick={() => {
-                                            const allSlips = [...(job.additional_price_slips || []), ...additionalSlipFiles.map(f => URL.createObjectURL(f))]
-                                            setZoomConfig({
-                                                images: allSlips.map((s, i) => ({ src: s, alt: `ใบเสร็จค่าใช้จ่ายเพิ่มเติม (${i + 1})` })),
-                                                initialIndex: idx
-                                            })
-                                        }}
-                                    />
-                                    {job.status === 'washing' && (
-                                            <button 
-                                                className={styles.removeSlip} 
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 12 }}>
+                                    {[...(job.additional_price_slips || []), ...additionalSlipFiles.map(f => URL.createObjectURL(f))].map((url, idx) => (
+                                        <div key={idx} className={styles.slipPreview} style={{ position: 'relative', width: '100%', aspectRatio: '1/1' }}>
+                                            <img
+                                                src={url}
+                                                alt={`Slip ${idx}`}
+                                                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12, border: '1px solid var(--border)', cursor: 'zoom-in' }}
                                                 onClick={() => {
-                                                    const existingCount = (job.additional_price_slips || []).length
-                                                    if (idx < existingCount) {
-                                                        const newSlips = job.additional_price_slips.filter((_: any, i: number) => i !== idx)
-                                                        supabase.from('bookings').update({ additional_price_slips: newSlips }).eq('id', id).then(() => load())
-                                                    } else {
-                                                        const newFiles = [...additionalSlipFiles]
-                                                        newFiles.splice(idx - existingCount, 1)
-                                                        setAdditionalSlipFiles(newFiles)
+                                                    const allSlips = [...(job.additional_price_slips || []), ...additionalSlipFiles.map(f => URL.createObjectURL(f))]
+                                                    setZoomConfig({
+                                                        images: allSlips.map((s, i) => ({ src: s, alt: `ใบเสร็จค่าใช้จ่ายเพิ่มเติม (${i + 1})` })),
+                                                        initialIndex: idx
+                                                    })
+                                                }}
+                                            />
+                                            {job.status === 'washing' && (
+                                                <button
+                                                    className={styles.removeSlip}
+                                                    onClick={() => {
+                                                        const existingCount = (job.additional_price_slips || []).length
+                                                        if (idx < existingCount) {
+                                                            const newSlips = job.additional_price_slips.filter((_: any, i: number) => i !== idx)
+                                                            supabase.from('bookings').update({ additional_price_slips: newSlips }).eq('id', id).then(() => load())
+                                                        } else {
+                                                            const newFiles = [...additionalSlipFiles]
+                                                            newFiles.splice(idx - existingCount, 1)
+                                                            setAdditionalSlipFiles(newFiles)
+                                                        }
+                                                    }}
+                                                    style={{ position: 'absolute', top: -4, right: -4, background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '50%', width: 22, height: 22, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
+                                                ><X size={12} /></button>
+                                            )}
+                                        </div>
+                                    ))}
+
+                                    {job.status === 'washing' && (
+                                        <div className={styles.slipUploadArea} onClick={() => document.getElementById('slip-input')?.click()} style={{ width: '100%', aspectRatio: '1/1', minHeight: 'unset', borderRadius: 12, border: '2px dashed var(--border)', background: 'var(--surface-3)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                                            <input
+                                                type="file"
+                                                id="slip-input"
+                                                accept="image/*"
+                                                multiple
+                                                onChange={e => {
+                                                    if (e.target.files) {
+                                                        setAdditionalSlipFiles(prev => [...prev, ...Array.from(e.target.files!)])
                                                     }
                                                 }}
-                                                style={{ position: 'absolute', top: -4, right: -4, background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '50%', width: 22, height: 22, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
-                                            ><X size={12} /></button>
-                                        )}
-                                    </div>
-                                ))}
-                                
-                                {job.status === 'washing' && (
-                                    <div className={styles.slipUploadArea} onClick={() => document.getElementById('slip-input')?.click()} style={{ width: '100%', aspectRatio: '1/1', minHeight: 'unset', borderRadius: 12, border: '2px dashed var(--border)', background: 'var(--surface-3)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                                        <input
-                                            type="file"
-                                            id="slip-input"
-                                            accept="image/*"
-                                            multiple
-                                            onChange={e => {
-                                                if (e.target.files) {
-                                                    setAdditionalSlipFiles(prev => [...prev, ...Array.from(e.target.files!)])
-                                                }
-                                            }}
-                                            disabled={job.status !== 'washing' || savingCost}
-                                            style={{ display: 'none' }}
-                                        />
-                                        <Upload size={20} color="var(--text-muted)" />
-                                        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', marginTop: 4 }}>แนบรูป</span>
-                                    </div>
-                                )}
+                                                disabled={job.status !== 'washing' || savingCost}
+                                                style={{ display: 'none' }}
+                                            />
+                                            <Upload size={20} color="var(--text-muted)" />
+                                            <span style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', marginTop: 4 }}>แนบรูป</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
-                        {job.additional_history && job.additional_history.length > 0 && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12, borderTop: '1px dashed var(--border)', paddingTop: 20 }}>
-                                <label className={styles.fieldLabel} style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                                    ประวัติการบันทึก
-                                </label>
-                                {job.additional_history.map((entry: any, index: number) => (
-                                    <div key={index} style={{ padding: '12px 16px', background: 'var(--surface-2)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                            <span style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--brand-dominant)' }}>฿{Number(entry.price).toLocaleString()}</span>
-                                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{new Date(entry.timestamp).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}</span>
-                                        </div>
-                                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
-                                            {entry.note || 'ไม่มีรายละเอียด'}
-                                        </p>
-                                    </div>
-                                ))}
+                        {job.status === 'washing' && (
+                            <div style={{ marginTop: 24, padding: '16px', borderRadius: '16px', background: 'linear-gradient(135deg, var(--brand-dominant-ghost) 0%, #EFF6FF 100%)', border: '1px solid var(--brand-dominant-light)', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                                <Info size={18} color="var(--brand-dominant)" style={{ marginTop: 2 }} />
+                                <span style={{ fontSize: '0.85rem', color: 'var(--brand-dominant-dark)', fontWeight: 600, lineHeight: 1.5 }}>บันทึกข้อมูลและใบเสร็จให้เรียบร้อย ระบบจะสรุปยอดรวมเมื่อคุณกด "อัปโหลดรูปหลังล้าง"</span>
                             </div>
                         )}
+
                     </div>
-
-                    {job.status === 'washing' && (
-                        <div style={{ marginTop: 24, padding: '16px', borderRadius: '16px', background: 'linear-gradient(135deg, var(--brand-dominant-ghost) 0%, #EFF6FF 100%)', border: '1px solid var(--brand-dominant-light)', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                            <Info size={18} color="var(--brand-dominant)" style={{ marginTop: 2 }} /> 
-                            <span style={{ fontSize: '0.85rem', color: 'var(--brand-dominant-dark)', fontWeight: 600, lineHeight: 1.5 }}>บันทึกข้อมูลและใบเสร็จให้เรียบร้อย ระบบจะสรุปยอดรวมเมื่อคุณกด "อัปโหลดรูปหลังล้าง"</span>
-                        </div>
-                    )}
-
-                    {job.status !== 'washing' && Number(additionalPrice) > 0 && (
-                        <div style={{ marginTop: 24, padding: '20px', borderRadius: '16px', background: 'var(--surface-2)', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-secondary)' }}>สรุปค่าใช้จ่ายเพิ่มเติม:</span>
-                            <span style={{ fontWeight: 900, fontSize: '1.4rem', color: 'var(--brand-dominant)' }}>+฿{Number(additionalPrice).toLocaleString()}</span>
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
-
-        {((job.status === 'pending' && !job.staff_id) || action) && (
-            <div className={styles.actionBar}>
-                {job.status === 'pending' && !job.staff_id && (
-                    <button className="btn btn-primary btn-full btn-lg" style={{ gap: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowConfirmModal(true)} disabled={actionLoading}>
-                        {actionLoading ? <span className="spinner" /> : <><CheckCircle size={20} /> รับงานนี้</>}
-                    </button>
                 )}
-                {action && (
-                    <button
-                        className="btn btn-full btn-lg"
-                        style={{ 
-                            background: action.color, 
-                            color: '#fff',
-                            borderRadius: '16px',
-                            gap: 10,
-                            opacity: (
+            </div>
+
+            {((job.status === 'pending' && !job.staff_id) || action) && (
+                <div className={styles.actionBar}>
+                    {job.status === 'pending' && !job.staff_id && (
+                        <button className="btn btn-primary btn-full btn-lg" style={{ gap: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowConfirmModal(true)} disabled={actionLoading}>
+                            {actionLoading ? <span className="spinner" /> : <><CheckCircle size={20} /> รับงานนี้</>}
+                        </button>
+                    )}
+                    {action && (
+                        <button
+                            className="btn btn-full btn-lg"
+                            style={{
+                                background: action.color,
+                                color: '#fff',
+                                borderRadius: '16px',
+                                gap: 10,
+                                opacity: (
+                                    (job.status === 'washing' && Number(additionalPrice) > 0 && additionalSlipFiles.length === 0 && (!job.additional_price_slips || job.additional_price_slips.length === 0)) ||
+                                    (job.status === 'washing' && isFuelJob && (Number(additionalPrice) === 0 || additionalPrice === '')) ||
+                                    (job.status === 'delivering' && Number(job.additional_price) > 0 && !job.is_additional_paid)
+                                ) ? 0.5 : 1
+                            }}
+                            onClick={handleStatusAction}
+                            disabled={actionLoading ||
                                 (job.status === 'washing' && Number(additionalPrice) > 0 && additionalSlipFiles.length === 0 && (!job.additional_price_slips || job.additional_price_slips.length === 0)) ||
                                 (job.status === 'washing' && isFuelJob && (Number(additionalPrice) === 0 || additionalPrice === '')) ||
                                 (job.status === 'delivering' && Number(job.additional_price) > 0 && !job.is_additional_paid)
-                            ) ? 0.5 : 1
-                        }}
-                        onClick={handleStatusAction}
-                        disabled={actionLoading || 
-                            (job.status === 'washing' && Number(additionalPrice) > 0 && additionalSlipFiles.length === 0 && (!job.additional_price_slips || job.additional_price_slips.length === 0)) ||
-                            (job.status === 'washing' && isFuelJob && (Number(additionalPrice) === 0 || additionalPrice === '')) ||
-                            (job.status === 'delivering' && Number(job.additional_price) > 0 && !job.is_additional_paid)
-                        }
-                    >
-                        {actionLoading ? <span className="spinner" /> : <>{action.icon && <action.icon size={20} />} {action.label}</>}
-                    </button>
-                )}
-            </div>
-        )}
-
-        {showPhotoUpload && (
-            <div className="overlay" onClick={() => setShowPhotoUpload(false)}>
-                <div className="modal" onClick={e => e.stopPropagation()}>
-                    <h2 style={{ fontSize: '1.15rem', fontWeight: 900, marginBottom: 'var(--space-5)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <ImageIcon size={22} color="var(--brand-dominant)" /> ถ่ายรูปรถ ({uploadType === 'before' ? 'ก่อนล้าง' : 'หลังล้าง'})
-                    </h2>
-                    <div className="photo-grid" style={{ marginBottom: 'var(--space-5)' }}>
-                        {[0, 1, 2, 3].map((side) => (
-                            <label key={side} className="photo-slot">
-                                {selectedFiles[side] ? (
-                                    <img src={URL.createObjectURL(selectedFiles[side])} alt={`photo-${side}`} />
-                                ) : (
-                                    <><Upload size={24} color="var(--text-muted)" /><span className="photo-slot-label" style={{ fontWeight: 700, fontSize: '0.75rem' }}>{['หน้า', 'หลัง', 'ซ้าย', 'ขวา'][side]}</span></>
-                                )}
-                                <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
-                                    onChange={e => {
-                                        if (e.target.files?.[0]) {
-                                            const files = [...selectedFiles]
-                                            files[side] = e.target.files[0]
-                                            setSelectedFiles(files)
-                                        }
-                                    }}
-                                />
-                            </label>
-                        ))}
-                    </div>
-                    <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-                        <button className="btn btn-ghost btn-full" onClick={() => setShowPhotoUpload(false)}>ยกเลิก</button>
-                        <button 
-                            className="btn btn-primary btn-full" 
-                            onClick={handleUpload} 
-                            disabled={
-                                uploading || 
-                                selectedFiles.filter(Boolean).length < 4 ||
-                                (uploadType === 'after' && Number(additionalPrice) > 0 && additionalSlipFiles.length === 0 && (!job.additional_price_slips || job.additional_price_slips.length === 0)) ||
-                                (uploadType === 'after' && isFuelJob && (Number(additionalPrice) === 0 || additionalPrice === ''))
                             }
                         >
-                            {uploading ? <span className="spinner" /> : <><Upload size={18} /> อัปโหลด ({selectedFiles.filter(Boolean).length}/4)</>}
+                            {actionLoading ? <span className="spinner" /> : <>{action.icon && <action.icon size={20} />} {action.label}</>}
                         </button>
+                    )}
+                </div>
+            )}
+
+            {showPhotoUpload && (
+                <div className="overlay" onClick={() => setShowPhotoUpload(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <h2 style={{ fontSize: '1.15rem', fontWeight: 900, marginBottom: 'var(--space-5)', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <ImageIcon size={22} color="var(--brand-dominant)" /> ถ่ายรูปรถ ({uploadType === 'before' ? 'ก่อนล้าง' : 'หลังล้าง'})
+                        </h2>
+                        <div className="photo-grid" style={{ marginBottom: 'var(--space-5)' }}>
+                            {[0, 1, 2, 3].map((side) => (
+                                <label key={side} className="photo-slot">
+                                    {selectedFiles[side] ? (
+                                        <img src={URL.createObjectURL(selectedFiles[side])} alt={`photo-${side}`} />
+                                    ) : (
+                                        <><Upload size={24} color="var(--text-muted)" /><span className="photo-slot-label" style={{ fontWeight: 700, fontSize: '0.75rem' }}>{['หน้า', 'หลัง', 'ซ้าย', 'ขวา'][side]}</span></>
+                                    )}
+                                    <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+                                        onChange={e => {
+                                            if (e.target.files?.[0]) {
+                                                const files = [...selectedFiles]
+                                                files[side] = e.target.files[0]
+                                                setSelectedFiles(files)
+                                            }
+                                        }}
+                                    />
+                                </label>
+                            ))}
+                        </div>
+                        <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+                            <button className="btn btn-ghost btn-full" onClick={() => setShowPhotoUpload(false)}>ยกเลิก</button>
+                            <button
+                                className="btn btn-primary btn-full"
+                                onClick={handleUpload}
+                                disabled={
+                                    uploading ||
+                                    selectedFiles.filter(Boolean).length < 4 ||
+                                    (uploadType === 'after' && Number(additionalPrice) > 0 && additionalSlipFiles.length === 0 && (!job.additional_price_slips || job.additional_price_slips.length === 0)) ||
+                                    (uploadType === 'after' && isFuelJob && (Number(additionalPrice) === 0 || additionalPrice === ''))
+                                }
+                            >
+                                {uploading ? <span className="spinner" /> : <><Upload size={18} /> อัปโหลด ({selectedFiles.filter(Boolean).length}/4)</>}
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
-        )}
+            )}
 
-        {showConfirmModal && (
-            <div className={styles.modalOverlay} onClick={() => setShowConfirmModal(false)}>
-                <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-4)' }}>
-                        <HelpCircle size={64} color="var(--brand-dominant)" />
-                    </div>
-                    <h3 className={styles.modalTitle}>รับงานนี้ใช่หรือไม่?</h3>
-                    <p className={styles.modalDesc}>
-                        เมื่อกดรับแล้ว คุณจะต้องรับผิดชอบงานนี้<br/>
-                        {job.scheduled_time?.slice(0, 5)} น. ({job.scheduled_date})
-                    </p>
-                    <div className={styles.modalActions}>
-                        <button className="btn btn-ghost btn-full" style={{ borderRadius: '16px' }} onClick={() => setShowConfirmModal(false)}>ยกเลิก</button>
-                        <button className="btn btn-primary btn-full" style={{ background: 'var(--brand-dominant)', border: 'none', borderRadius: '16px', gap: 8 }} onClick={handleAccept}>
-                            <CheckCircle2 size={18} /> ยืนยันรับงาน
-                        </button>
+            {showConfirmModal && (
+                <div className={styles.modalOverlay} onClick={() => setShowConfirmModal(false)}>
+                    <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-4)' }}>
+                            <HelpCircle size={64} color="var(--brand-dominant)" />
+                        </div>
+                        <h3 className={styles.modalTitle}>รับงานนี้ใช่หรือไม่?</h3>
+                        <p className={styles.modalDesc}>
+                            เมื่อกดรับแล้ว คุณจะต้องรับผิดชอบงานนี้<br />
+                            {job.scheduled_time?.slice(0, 5)} น. ({job.scheduled_date})
+                        </p>
+                        <div className={styles.modalActions}>
+                            <button className="btn btn-ghost btn-full" style={{ borderRadius: '16px' }} onClick={() => setShowConfirmModal(false)}>ยกเลิก</button>
+                            <button className="btn btn-primary btn-full" style={{ background: 'var(--brand-dominant)', border: 'none', borderRadius: '16px', gap: 8 }} onClick={handleAccept}>
+                                <CheckCircle2 size={18} /> ยืนยันรับงาน
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
-        )}
+            )}
 
-        {zoomConfig && (
-            <ImageZoom 
-                images={zoomConfig.images} 
-                initialIndex={zoomConfig.initialIndex}
-                onClose={() => setZoomConfig(null)} 
-            />
-        )}
+            {zoomConfig && (
+                <ImageZoom
+                    images={zoomConfig.images}
+                    initialIndex={zoomConfig.initialIndex}
+                    onClose={() => setZoomConfig(null)}
+                />
+            )}
         </>
     )
 }
