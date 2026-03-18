@@ -314,9 +314,9 @@ export default function GlobalLogin() {
                 // We use the state parameter to carry the dynamic bridgeId
                 const staticRedirectUri = encodeURIComponent(`${window.location.origin}/login`);
                 const oauthUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${staticRedirectUri}&state=${bridgeId}&scope=profile%20openid`;
-                
-                setIosPwaBridgeUrl(oauthUrl);
-                addLog('iPad Breakout via Direct OAuth prepared');
+                const breakoutUrl = `${window.location.origin}/api/auth/breakout?url=${encodeURIComponent(oauthUrl)}`;
+                setIosPwaBridgeUrl(breakoutUrl);
+                addLog('iPad Breakout via Redirector prepared');
             } else {
                 setIosPwaBridgeUrl(`${window.location.origin}/login?bridgeId=${bridgeId}`);
             }
