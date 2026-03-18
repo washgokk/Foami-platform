@@ -165,6 +165,23 @@ export default function GlobalLogin() {
         return () => clearInterval(pollInterval)
     }, [router])
 
+    // --- iPad/iOS PWA Specific ---
+    const [iosPwaBridgeUrl, setIosPwaBridgeUrl] = useState<string | null>(null);
+    const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
+    useEffect(() => {
+        if (isIOS && isStandalone) {
+            // Pre-generate a bridge ID so we can use a real <a> tag for the jump
+            const bridgeId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
+                ? crypto.randomUUID() 
+                : Math.random().toString(36).substring(2) + Date.now().toString(36);
+            
+            setIosPwaBridgeUrl(`${window.location.origin}/login?bridgeId=${bridgeId}`);
+            setDebugInfo(`Prepared Bridge ID: ${bridgeId}`);
+        }
+    }, [isIOS, isStandalone]);
+
     const handleLineLogin = async () => {
         setLoading(true)
         setError('')
@@ -182,15 +199,11 @@ export default function GlobalLogin() {
                 return
             }
             console.log('LIFF ID not found. Using Mock Login...')
-            // Simulate delay
             await new Promise(r => setTimeout(r, 800))
-            
-            // Use a stable mock ID so developer can test 'Existing User' flow too
             const mockId = 'mock_user_123' 
             localStorage.setItem('liff_line_user_id', mockId)
             localStorage.setItem('liff_display_name', 'Mock User')
 
-            // Check if mock user in DB
             const { data } = await supabase.from('customers').select('*').eq('line_user_id', mockId).single()
             if (data) {
                 localStorage.setItem('liff_customer', JSON.stringify(data))
@@ -202,42 +215,16 @@ export default function GlobalLogin() {
             return
         }
 
-        // Detect iOS PWA session isolation
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        
-        if (isIOS && isStandalone) {
-            console.log('iOS PWA detected. Using Bridge Login...')
-            const bridgeId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
-                ? crypto.randomUUID() 
-                : Math.random().toString(36).substring(2) + Date.now().toString(36);
-                
-            const loginUrl = `${window.location.origin}/login?bridgeId=${bridgeId}`;
-            
-            // Set polling state in URL and localStorage for persistence
-            localStorage.setItem('pwa_bridge_id', bridgeId);
-            const newUrl = new URL(window.location.href);
-            newUrl.searchParams.set('pwaBridgeId', bridgeId);
-            window.history.replaceState({}, '', newUrl.toString());
-            
-            // Open Safari for login
-            window.open(loginUrl, '_blank');
-            setLoading(false); 
-            return;
-        }
-
         // ─── Real LIFF Mode ───
         try {
             const { default: liff } = await import('@line/liff')
-            // Note: liff.init might have already run in useEffect, but calling it again is safe or cached
             await liff.init({ liffId })
 
             if (!liff.isLoggedIn()) {
                 liff.login()
-                return // Page will redirect
+                return 
             }
 
-            // If already logged in here (e.g. click after auto-init finished)
             const profile = await liff.getProfile()
             localStorage.setItem('liff_line_user_id', profile.userId)
             localStorage.setItem('liff_display_name', profile.displayName)
@@ -323,22 +310,48 @@ export default function GlobalLogin() {
                 </div>
 
                 {!(typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id'))) && (
-                    <button 
-                        className={styles.lineBtn} 
-                        onClick={handleLineLogin}
-                        disabled={loading}
-                    >
-                        {loading ? (
-                            <div className="spinner-white" style={{ width: 24, height: 24 }} />
-                        ) : (
-                            <>
-                                <div className={styles.lineIconWrapper}>
-                                    <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg" alt="LINE" className={styles.lineIcon} />
-                                </div>
-                                <span>เข้าสู่ระบบด้วย LINE</span>
-                            </>
-                        )}
-                    </button>
+                    iosPwaBridgeUrl ? (
+                        <a 
+                            href={iosPwaBridgeUrl}
+                            target="_blank" 
+                            className={styles.lineBtn}
+                            onClick={() => {
+                                // Extract bridgeId from url to set polling state
+                                const url = new URL(iosPwaBridgeUrl);
+                                const bId = url.searchParams.get('bridgeId');
+                                if (bId) {
+                                    localStorage.setItem('pwa_bridge_id', bId);
+                                    // Force a small state update to trigger re-render to waiting screen
+                                    setLoading(true); 
+                                    const nextUrl = new URL(window.location.href);
+                                    nextUrl.searchParams.set('pwaBridgeId', bId);
+                                    window.history.replaceState({}, '', nextUrl.toString());
+                                }
+                            }}
+                        >
+                            <div className={styles.lineIconWrapper}>
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg" alt="LINE" className={styles.lineIcon} />
+                            </div>
+                            <span>เข้าสู่ระบบด้วย LINE</span>
+                        </a>
+                    ) : (
+                        <button 
+                            className={styles.lineBtn} 
+                            onClick={handleLineLogin}
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <div className="spinner-white" style={{ width: 24, height: 24 }} />
+                            ) : (
+                                <>
+                                    <div className={styles.lineIconWrapper}>
+                                        <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg" alt="LINE" className={styles.lineIcon} />
+                                    </div>
+                                    <span>เข้าสู่ระบบด้วย LINE</span>
+                                </>
+                            )}
+                        </button>
+                    )
                 )}
 
                 {error && <div className={styles.errorBox}>{error}</div>}
