@@ -128,9 +128,12 @@ export default function GlobalLogin() {
             
             const code = searchParams.get('code')
             const state = searchParams.get('state')
+            
+            // v20: ONLY use direct sync if we have BOTH code and bridgeId (state)
+            // If we only have code, it's a standard LIFF login - let LIFF handle it to avoid redirect_uri mismatch
             if (code && state) {
                 handleDirectSync(code, state)
-                return // Skip LIFF if we have an OAuth code
+                return 
             }
 
             const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID
@@ -452,15 +455,15 @@ export default function GlobalLogin() {
                         <a 
                             href={iosPwaBridgeUrl}
                             target="_blank" 
+                            rel="noreferrer"
                             className={styles.lineBtn}
                             onClick={() => {
                                 // Extract bridgeId from url to set polling state
-                                // The ID is in the query param of the LIFF URL or internal URL
+                                // v20: In direct OAuth, it's in the 'state' param
                                 const url = new URL(iosPwaBridgeUrl);
-                                const bId = url.searchParams.get('bridgeId');
+                                const bId = url.searchParams.get('state') || url.searchParams.get('bridgeId');
                                 if (bId) {
                                     localStorage.setItem('pwa_bridge_id', bId);
-                                    // Set loading to true locally to show spinner/waiting UI immediately
                                     setLoading(true); 
                                     const nextUrl = new URL(window.location.href);
                                     nextUrl.searchParams.set('pwaBridgeId', bId);

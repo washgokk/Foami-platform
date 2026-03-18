@@ -69,8 +69,9 @@ export default function LiffEntry() {
 
         // ─── Phase 2: Execution Logic ───
         const main = async () => {
-            // Strict Isolation: If code is present, NEVER touch LIFF SDK
-            if (code) {
+            // v20: ONLY do manual sync if we have BOTH code and bridgeId
+            // If only code is present, it's a standard LIFF login - let LIFF handle it
+            if (code && (state || searchParams.get('bridgeId'))) {
                 await handleDirectSync(code, bridgeId || 'unknown')
                 return
             }
