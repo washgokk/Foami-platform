@@ -166,7 +166,7 @@ export default function GlobalLogin() {
                         .from('customers')
                         .select('*')
                         .eq('line_user_id', profile.userId)
-                        .single()
+                        .maybeSingle()
 
                     const customerData = data || { line_user_id: profile.userId, full_name: profile.displayName };
                     addLog(`Profile Loaded: ${profile.displayName}`)
@@ -374,7 +374,7 @@ export default function GlobalLogin() {
                 .from('customers')
                 .select('*')
                 .eq('line_user_id', profile.userId)
-                .single()
+                .maybeSingle()
 
             if (data) {
                 localStorage.setItem('liff_customer', JSON.stringify(data))
@@ -406,7 +406,9 @@ export default function GlobalLogin() {
                     <h1 className={styles.headline}>ยินดีต้อนรับสู่ Foami</h1>
                     {isBridgeSuccess ? (
                         <div className={styles.successBox}>
-                            <div className={styles.checkIcon}>✅</div>
+                            <div className={styles.checkIcon}>
+                                <Logo width={80} />
+                            </div>
                             <h2 style={{ color: 'var(--text-primary)', fontSize: '1.5rem', marginBottom: 10 }}>เข้าสู่ระบบสำเร็จ!</h2>
                             <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem' }}>กรุณากลับไปที่แอป Foami เพื่อใช้งานต่อครับ</p>
                             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: 20 }}>คุณสามารถปิดหน้านี้ได้ทันที</p>
@@ -452,22 +454,24 @@ export default function GlobalLogin() {
                 {/* --- Action Buttons --- */}
                 {!(typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id'))) && (
                     iosPwaBridgeUrl ? (
-                        <a 
-                            href={iosPwaBridgeUrl}
-                            target="_blank" 
-                            rel="noreferrer"
+                        <button 
                             className={styles.lineBtn}
-                            onClick={() => {
-                                // Extract bridgeId from url to set polling state
-                                // v20: In direct OAuth, it's in the 'state' param
+                            onClick={(e) => {
+                                e.preventDefault();
+                                // v21: Reliable Bridge ID extraction from the OAuth URL
                                 const url = new URL(iosPwaBridgeUrl);
                                 const bId = url.searchParams.get('state') || url.searchParams.get('bridgeId');
+                                
                                 if (bId) {
                                     localStorage.setItem('pwa_bridge_id', bId);
                                     setLoading(true); 
+                                    
                                     const nextUrl = new URL(window.location.href);
                                     nextUrl.searchParams.set('pwaBridgeId', bId);
                                     window.history.replaceState({}, '', nextUrl.toString());
+                                    
+                                    // Force breakout via window.open
+                                    window.open(iosPwaBridgeUrl, '_blank');
                                 }
                             }}
                         >
@@ -475,7 +479,7 @@ export default function GlobalLogin() {
                                 <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg" alt="LINE" className={styles.lineIcon} />
                             </div>
                             <span>เข้าสู่ระบบด้วย LINE</span>
-                        </a>
+                        </button>
                     ) : (
                         <button 
                             className={styles.lineBtn} 

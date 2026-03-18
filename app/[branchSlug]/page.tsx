@@ -105,7 +105,7 @@ export default function LiffEntry() {
                     .from('customers')
                     .select('*')
                     .eq('line_user_id', profile.userId)
-                    .single()
+                    .maybeSingle()
 
                 const customerData = data || { line_user_id: profile.userId, full_name: profile.displayName };
 
