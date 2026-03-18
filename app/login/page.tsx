@@ -18,6 +18,14 @@ export default function GlobalLogin() {
     const [isBridgeSuccess, setIsBridgeSuccess] = useState(false)
     const [debugInfo, setDebugInfo] = useState('')
 
+    // Logging for iPad Debugging
+    const [syncStatus, setSyncStatus] = useState<'initial' | 'init_liff' | 'liff_done' | 'fetching_profile' | 'syncing' | 'completed' | 'error'>('initial')
+    const [syncLogs, setSyncLogs] = useState<string[]>([])
+    const addLog = (msg: string) => {
+        console.log(`[Handshake] ${msg}`)
+        setSyncLogs(prev => [...prev.slice(-3), `${new Date().toLocaleTimeString()}: ${msg}`])
+    }
+
     // Detect standalone mode (PWA)
     const isStandalone = typeof window !== 'undefined' && 
         ((window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches);
@@ -31,28 +39,47 @@ export default function GlobalLogin() {
         }
 
         const searchParams = new URLSearchParams(window.location.search)
-        const bridgeIdParam = searchParams.get('bridgeId')
+        const hashParams = new URLSearchParams(window.location.hash.slice(1)) // Check fragment too
         
-        // --- Persistence for Safari-side bridge ---
-        // If we are in Safari (not PWA) and entered with a bridgeId, save it.
-        // This is crucial because LINE might strip URL params during redirect.
+        // Priority: URL Param > Hash > Storage
+        const bridgeIdParam = searchParams.get('bridgeId') || hashParams.get('bridgeId')
+        
         if (bridgeIdParam && !isStandalone) {
             localStorage.setItem('safari_bridge_id', bridgeIdParam)
+            addLog(`Captured Bridge ID from URL: ${bridgeIdParam}`)
         }
+        
         const activeSafariBridgeId = bridgeIdParam || localStorage.getItem('safari_bridge_id')
+        if (activeSafariBridgeId && !isStandalone) {
+            setDebugInfo(`Active Bridge: ${activeSafariBridgeId}`)
+        }
 
         // ─── Phase 2: Auto-init LIFF to handle returning from redirect ───
         const autoInit = async () => {
+            if (isStandalone) return; // PWA only polls, doesn't init LIFF for sync
+            
             const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID
-            if (!liffId || liffId === 'your_liff_id' || liffId === '') return
+            if (!liffId || liffId === 'your_liff_id' || liffId === '') {
+                addLog('No LIFF ID found in env')
+                return
+            }
             
             try {
+                setSyncStatus('init_liff')
+                addLog('Starting LIFF Init...')
                 const { default: liff } = await import('@line/liff')
-                console.log('[LIFF] Initializing...')
-                await liff.init({ liffId })
+                
+                // Add Timeout for LIFF Init (Sometimes iPad hangs here)
+                const initPromise = liff.init({ liffId })
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('LIFF_TIMEOUT')), 10000))
+                
+                await Promise.race([initPromise, timeoutPromise])
+                addLog('LIFF Init Success')
+                setSyncStatus('liff_done')
                 
                 if (liff.isLoggedIn()) {
-                    console.log('[LIFF] Logged in. Fetching profile...')
+                    setSyncStatus('fetching_profile')
+                    addLog('Fetching LINE Profile...')
                     const profile = await liff.getProfile()
                     localStorage.setItem('liff_line_user_id', profile.userId)
                     localStorage.setItem('liff_display_name', profile.displayName)
@@ -64,14 +91,15 @@ export default function GlobalLogin() {
                         .single()
 
                     const customerData = data || { line_user_id: profile.userId, full_name: profile.displayName };
+                    addLog(`Profile Loaded: ${profile.displayName}`)
 
                     // IF returned with bridgeId, sync to backend
                     if (activeSafariBridgeId) {
+                        setSyncStatus('syncing')
                         setSyncLoading(true)
-                        setError('กำลังซิงค์ข้อมูล... กรุณารอสักครู่') // Visible status
+                        addLog(`Attempting DB Sync for ${activeSafariBridgeId}...`)
                         
                         try {
-                            console.log('[Bridge] Syncing ID:', activeSafariBridgeId)
                             let success = false;
                             for (let i = 0; i < 3; i++) {
                                 try {
@@ -84,6 +112,7 @@ export default function GlobalLogin() {
                                         success = true;
                                         break;
                                     }
+                                    addLog(`Sync Attempt ${i+1} failed, retrying...`)
                                     await new Promise(r => setTimeout(r, 1000));
                                 } catch (e) {
                                     if (i === 2) throw e;
@@ -91,35 +120,47 @@ export default function GlobalLogin() {
                             }
 
                             if (success) {
+                                setSyncStatus('completed')
                                 setIsBridgeSuccess(true)
+                                addLog('SYNC SUCCESS! Closing in 2s...')
                                 localStorage.removeItem('safari_bridge_id')
                                 setTimeout(() => {
                                     try { window.close(); } catch (e) {}
                                     window.location.href = '/';
-                                }, 2000);
+                                }, 2500);
                             } else {
-                                setError('การส่งข้อมูลล้มเหลว กรุณาลองใหม่อีกครั้ง')
+                                setSyncStatus('error')
+                                addLog('Database Sync Failed')
+                                setError('การซิงค์ข้อมูลล้มเหลว กรุณาลองใหม่อีกครั้ง')
                             }
                         } catch (e: any) { 
+                            setSyncStatus('error')
+                            addLog(`Sync Error: ${e.message}`)
                             console.error('[Bridge] Sync Error:', e)
-                            setError(`ข้อผิดพลาดการซิงค์: ${e.message}`)
                         } finally {
                             setSyncLoading(false)
                         }
                     }
 
-                    if (data) {
+                    if (data && !activeSafariBridgeId) {
                         localStorage.setItem('liff_customer', JSON.stringify(data))
-                        if (!bridgeIdParam) router.replace('/search')
-                    } else {
-                        if (!bridgeIdParam) router.replace('/register')
+                        router.replace('/search')
+                    } else if (!data && !activeSafariBridgeId) {
+                        router.replace('/register')
                     }
                 } else {
-                    // If we have a bridgeId but NOT logged in, we might need a manual click or auto-trigger
-                    console.log('[LIFF] Not logged in on return page.')
+                    addLog('LIFF Not Logged In')
+                    if (activeSafariBridgeId) {
+                        // If we have an ID but not logged in, force login redirect
+                        addLog('Forcing Login Redirect...')
+                        liff.login()
+                    }
                 }
-            } catch (err) {
+            } catch (err: any) {
+                setSyncStatus('error')
+                addLog(`LIFF Error: ${err.message}`)
                 console.error('[LIFF] Error during auto-init:', err)
+                // If it's a timeout or init error on iPad, user might need a reload
             } finally {
                 setLoading(false)
             }
@@ -128,21 +169,20 @@ export default function GlobalLogin() {
         autoInit()
 
         // --- STUCK LOADING WATCHDOG ---
-        // As requested: Reload if stuck on loading for ~2-3 seconds
+        // As requested by user: reload if stuck on loading for ~3 seconds
         const loadingTimer = setTimeout(() => {
-            const searchParams = new URLSearchParams(window.location.search)
-            // If we have returned from LINE but it's still "Loading" or syncing, try a soft refresh
-            if (searchParams.has('bridgeId') && !isBridgeSuccess && !localStorage.getItem('liff_customer')) {
-                console.warn('Login process stuck - attempting auto-reload...');
-                if (!sessionStorage.getItem('login_refresh_attempt')) {
-                    sessionStorage.setItem('login_refresh_attempt', '1');
+            const hasId = searchParams.has('bridgeId') || hashParams.has('bridgeId') || !!localStorage.getItem('safari_bridge_id')
+            if (hasId && !isStandalone && syncStatus !== 'completed' && syncStatus !== 'error' && !isBridgeSuccess) {
+                addLog('Watchdog: Still loading after 5s - refreshing once...')
+                if (!sessionStorage.getItem('sync_refresh_attempt')) {
+                    sessionStorage.setItem('sync_refresh_attempt', '1');
                     window.location.reload();
                 }
             }
-        }, 3000) 
+        }, 5000) 
 
         return () => clearTimeout(loadingTimer)
-    }, [router, isBridgeSuccess, syncLoading])
+    }, [router, isBridgeSuccess])
 
     // ─── Phase 3: PWA Polling (for iOS) ───
     useEffect(() => {
@@ -151,9 +191,8 @@ export default function GlobalLogin() {
         const storageId = localStorage.getItem('pwa_bridge_id')
         const activeBridgeId = urlId || storageId
         
-        if (!activeBridgeId) return
+        if (!activeBridgeId || !isStandalone) return
 
-        // If we have it in URL but not storage, sync it
         if (urlId && !storageId) localStorage.setItem('pwa_bridge_id', urlId)
 
         let pollInterval: any = setInterval(async () => {
@@ -161,7 +200,7 @@ export default function GlobalLogin() {
                 const res = await fetch(`/api/auth/bridge/status?id=${activeBridgeId}`)
                 const result = await res.json()
                 if (result.status === 'completed' && result.customerData) {
-                    console.log('Bridge sync detected! Logging in...')
+                    addLog('Poll Detect Success!')
                     clearInterval(pollInterval)
                     localStorage.removeItem('pwa_bridge_id')
                     localStorage.setItem('liff_customer', JSON.stringify(result.customerData))
@@ -173,21 +212,8 @@ export default function GlobalLogin() {
             }
         }, 2000)
 
-        // watchdog for stale state: if we have a pwaBridgeId but after 10 seconds still here,
-        // and user is NOT visible, maybe something failed. 
-        // But for now, just fulfill user request for a "2-5 sec reload if stuck"
-        const reloadWatchdog = setTimeout(() => {
-            if (!isBridgeSuccess && !syncLoading && !localStorage.getItem('liff_customer')) {
-                console.log('Stuck in waiting state - attempting soft refresh...')
-                // Only refresh if we haven't succeeded yet
-            }
-        }, 8000)
-
-        return () => {
-            clearInterval(pollInterval)
-            clearTimeout(reloadWatchdog)
-        }
-    }, [router, isBridgeSuccess, syncLoading])
+        return () => clearInterval(pollInterval)
+    }, [router, isStandalone])
 
     // --- iPad/iOS PWA Specific ---
     const [iosPwaBridgeUrl, setIosPwaBridgeUrl] = useState<string | null>(null);
@@ -197,18 +223,15 @@ export default function GlobalLogin() {
     useEffect(() => {
         if (isIOS && isStandalone) {
             const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID;
-            
-            // Pre-generate a bridge ID
             const bridgeId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
                 ? crypto.randomUUID() 
                 : Math.random().toString(36).substring(2) + Date.now().toString(36);
             
             if (liffId && liffId !== 'your_liff_id') {
-                // Using liff.line.me domain FORCES Safari to open because it's an external domain
-                setIosPwaBridgeUrl(`https://liff.line.me/${liffId}?bridgeId=${bridgeId}`);
-                console.log('iPad Breakout URL (External):', `https://liff.line.me/${liffId}?bridgeId=${bridgeId}`);
+                // FORCE Safari breakout by using LIFF domain
+                setIosPwaBridgeUrl(`https://liff.line.me/${liffId}/?bridgeId=${bridgeId}#bridgeId=${bridgeId}`);
+                console.log('iPad Breakout URL:', `https://liff.line.me/${liffId}/?bridgeId=${bridgeId}`);
             } else {
-                // Fallback to internal if no LIFF ID
                 setIosPwaBridgeUrl(`${window.location.origin}/login?bridgeId=${bridgeId}`);
             }
             setDebugInfo(`Prepared Bridge ID: ${bridgeId}`);
@@ -325,9 +348,8 @@ export default function GlobalLogin() {
                                 className={styles.retryBtn} 
                                 onClick={() => {
                                     localStorage.removeItem('pwa_bridge_id');
-                                    const url = new URL(window.location.href);
-                                    url.searchParams.delete('pwaBridgeId');
-                                    window.location.href = url.toString();
+                                    sessionStorage.removeItem('sync_refresh_attempt');
+                                    window.location.href = '/login';
                                 }}
                                 style={{ marginTop: 20 }}
                             >
@@ -335,13 +357,44 @@ export default function GlobalLogin() {
                             </button>
                          </div>
                     ) : (
-                        <p className={styles.subheadline}>
-                            บริการล้างรถและดูแลรักษาพรีเมียม<br />
-                            จองง่าย สะดวก รวดเร็ว ถึงที่บ้านคุณ
-                        </p>
+                        <div className={styles.defaultContent}>
+                            <p className={styles.subheadline}>
+                                บริการล้างรถและดูแลรักษาพรีเมียม<br />
+                                จองง่าย สะดวก รวดเร็ว ถึงที่บ้านคุณ
+                            </p>
+                            
+                            {/* Debug Logs for iOS Handshake */}
+                            {!isStandalone && (activeSafariBridgeId || syncLogs.length > 0) && (
+                                <div style={{ 
+                                    marginTop: 30, 
+                                    padding: 15, 
+                                    background: 'rgba(255,255,255,0.05)', 
+                                    borderRadius: 12, 
+                                    fontSize: '0.75rem', 
+                                    textAlign: 'left',
+                                    fontFamily: 'monospace',
+                                    color: 'rgba(255,255,255,0.4)',
+                                    border: '1px solid rgba(255,255,255,0.1)'
+                                }}>
+                                    <div style={{ color: '#06c755', marginBottom: 5 }}>[Handshake Status]: {syncStatus}</div>
+                                    {syncLogs.map((log, idx) => (
+                                        <div key={idx} style={{ marginBottom: 2 }}>{log}</div>
+                                    ))}
+                                    {syncStatus === 'error' && (
+                                        <button 
+                                            onClick={() => window.location.reload()}
+                                            style={{ marginTop: 10, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', padding: '4px 8px', borderRadius: 4 }}
+                                        >
+                                            RETRY
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     )}
                 </div>
 
+                {/* --- Action Buttons --- */}
                 {!(typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id'))) && (
                     iosPwaBridgeUrl ? (
                         <a 
