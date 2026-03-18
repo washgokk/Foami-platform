@@ -298,20 +298,17 @@ export default function GlobalLogin() {
     useEffect(() => {
         if (isIOS && isStandalone) {
             const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID;
-            
-            // USE PERSISTENT ID
-            let bridgeId = localStorage.getItem('pwa_bridge_id');
-            if (!bridgeId) {
-                bridgeId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
-                    ? crypto.randomUUID() 
-                    : Math.random().toString(36).substring(2) + Date.now().toString(36);
-                localStorage.setItem('pwa_bridge_id', bridgeId);
-            }
+            const bridgeId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
+                ? crypto.randomUUID() 
+                : Math.random().toString(36).substring(2) + Date.now().toString(36);
             
             if (liffId && liffId !== 'your_liff_id') {
+                // Extract Channel ID (Numeric) from LIFF ID (String)
                 const channelId = liffId.includes('-') ? liffId.split('-')[0] : liffId;
+                
+                // STATIC REDIRECT URI: This must be registered in LINE Developers Console
+                // We use the state parameter to carry the dynamic bridgeId
                 const staticRedirectUri = encodeURIComponent(`${window.location.origin}/login`);
-                // Force breakout to Safari via Direct OAuth
                 const oauthUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${staticRedirectUri}&state=${bridgeId}&scope=profile%20openid`;
                 
                 setIosPwaBridgeUrl(oauthUrl);
@@ -319,18 +316,11 @@ export default function GlobalLogin() {
             } else {
                 setIosPwaBridgeUrl(`${window.location.origin}/login?bridgeId=${bridgeId}`);
             }
-            setDebugInfo(`Active Bridge ID: ${bridgeId}`);
+            setDebugInfo(`Prepared Bridge ID: ${bridgeId}`);
         }
     }, [isIOS, isStandalone]);
 
     const handleLineLogin = async () => {
-        // --- iPad PWA BREAKOUT FIRST ---
-        if (isIOS && isStandalone && iosPwaBridgeUrl) {
-            addLog('Triggering direct Safari breakout...')
-            window.location.href = iosPwaBridgeUrl
-            return
-        }
-
         setLoading(true)
         setError('')
 

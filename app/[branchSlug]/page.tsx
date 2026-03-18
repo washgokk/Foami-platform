@@ -4,18 +4,21 @@ import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 export default function LiffEntry() {
-    const syncLock = useRef(false)
     const { branchSlug } = useParams<{ branchSlug: string }>()
     const router = useRouter()
 
+    const syncLock = useRef(false)
+
     useEffect(() => {
         const searchParams = new URLSearchParams(window.location.search)
-        const bridgeId = searchParams.get('state') || searchParams.get('bridgeId')
         const code = searchParams.get('code')
+        const state = searchParams.get('state')
+        const bridgeId = state || searchParams.get('bridgeId')
         const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID
 
-        // ─── Phase 0: Handle Direct Sync (Code + State from Breakout) ───
-        const handleDirectSync = async (code: string, state: string) => {
+        // ─── Phase 1: Handle Direct OAuth Sync (Manual Handshake) ───
+        const handleDirectSync = async (code: string, bridgeId: string) => {
+            // sessionStorage lock to prevent double-processing
             const processedCodes = JSON.parse(sessionStorage.getItem('processed_line_codes') || '[]')
             if (processedCodes.includes(code)) return
 
@@ -23,27 +26,26 @@ export default function LiffEntry() {
             syncLock.current = true
 
             try {
-                // IMPORTANT: Match the redirectUri exactly with the one used in authorize
-                const currentRedirectUri = `${window.location.origin}${window.location.pathname}`
+                // IMPORTANT: Use /login as the redirectUri because that's where the breakout was authorized
+                const currentRedirectUri = `${window.location.origin}/login`
                 const res = await fetch('/api/auth/bridge/sync-with-code', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        code, 
-                        bridgeId: state,
-                        redirectUri: currentRedirectUri
-                    })
+                    body: JSON.stringify({ code, bridgeId, redirectUri: currentRedirectUri })
                 })
                 const result = await res.json()
                 if (res.ok) {
                     processedCodes.push(code)
                     sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
                     
+                    // On success, close window and return to PWA
                     setTimeout(() => {
                         try { window.close() } catch (e) {}
                         window.location.href = `/${branchSlug}/menu`
                     }, 2000)
                 } else {
+                    console.error('Handshake failed:', result.error)
+                    // If it was already invalid, we might have succeeded in a previous render
                     if (result.error?.includes('invalid authorization code')) {
                         processedCodes.push(code)
                         sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
@@ -51,13 +53,9 @@ export default function LiffEntry() {
                     syncLock.current = false
                 }
             } catch (e) {
+                console.error('Handshake error:', e)
                 syncLock.current = false
             }
-        }
-
-        if (code && bridgeId) {
-            handleDirectSync(code, bridgeId)
-            return // Skip LIFF init to avoid 'code_verifier' error
         }
 
         // Stuck Watchdog
@@ -66,24 +64,32 @@ export default function LiffEntry() {
                 sessionStorage.setItem('sync_refresh_attempt', '1')
                 window.location.reload()
             }
-        }, 5000)
+        }, 8000) // Slightly longer timeout for insurance
 
-        // Mock mode handling
-        if (!liffId || liffId === 'your_liff_id' || liffId === '') {
-            const stored = localStorage.getItem('liff_customer')
-            if (stored) {
-                router.replace(`/${branchSlug}/menu`)
-            } else {
-                router.replace('/login')
+        // ─── Phase 2: Execution Logic ───
+        const main = async () => {
+            // Check for direct sync first
+            if (code && bridgeId) {
+                await handleDirectSync(code, bridgeId)
+                return
             }
-            return
-        }
 
-        // Real LIFF initialization
-        import('@line/liff').then(({ default: liff }) => {
-            liff.init({ liffId }).then(async () => {
+            // Normal LIFF logic
+            if (!liffId || liffId === 'your_liff_id' || liffId === '') {
+                const stored = localStorage.getItem('liff_customer')
+                if (stored) {
+                    router.replace(`/${branchSlug}/menu`)
+                } else {
+                    router.replace('/login')
+                }
+                return
+            }
+
+            try {
+                const { default: liff } = await import('@line/liff')
+                await liff.init({ liffId })
+                
                 if (!liff.isLoggedIn()) {
-                    // If we have a bridgeId, we should force login so it returns with the code
                     if (bridgeId) liff.login({ redirectUri: window.location.href })
                     else liff.login()
                     return
@@ -101,7 +107,7 @@ export default function LiffEntry() {
 
                 const customerData = data || { line_user_id: profile.userId, full_name: profile.displayName };
 
-                // ─── Bridge Sync ───
+                // If somehow we land here with a bridgeId but no code (standard LIFF login)
                 if (bridgeId) {
                     try {
                         await fetch('/api/auth/bridge/sync', {
@@ -109,7 +115,6 @@ export default function LiffEntry() {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ bridgeId, customerData })
                         })
-                        // Give some time for sync to finish before closing/redirecting
                         setTimeout(() => {
                             try { window.close() } catch (e) {}
                             window.location.href = `/${branchSlug}/menu`
@@ -126,9 +131,12 @@ export default function LiffEntry() {
                     localStorage.setItem('last_branch_slug', branchSlug)
                     if (!bridgeId) router.replace('/register')
                 }
-            })
-        })
+            } catch (err) {
+                console.error('LIFF Init error:', err)
+            }
+        }
 
+        main()
         return () => clearTimeout(loadingTimer)
     }, [router, branchSlug])
 
