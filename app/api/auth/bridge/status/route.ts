@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase'
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url)
-        const id = searchParams.get('id')
+        const id = searchParams.get('id') || searchParams.get('bridgeId')
 
         if (!id) {
             return NextResponse.json({ error: 'Missing bridge ID' }, { status: 400 })
