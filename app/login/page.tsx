@@ -65,6 +65,13 @@ export default function GlobalLogin() {
 
         // ─── Phase 2: Handle Returning from Direct OAuth (Code + State) ───
     const handleDirectSync = async (code: string, state: string) => {
+        // Check if this specific code was already processed in this session
+        const processedCodes = JSON.parse(sessionStorage.getItem('processed_line_codes') || '[]')
+        if (processedCodes.includes(code)) {
+            addLog(`Code already processed. Skipping redundant attempt.`)
+            return
+        }
+
         if (syncLock.current) return
         syncLock.current = true
 
@@ -84,6 +91,10 @@ export default function GlobalLogin() {
             })
             const result = await res.json()
             if (res.ok) {
+                // Mark this code as processed
+                processedCodes.push(code)
+                sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
+                
                 addLog(`Handshake complete for: ${result.displayName}`)
                 setSyncStatus('completed')
                 setIsBridgeSuccess(true)
@@ -93,9 +104,15 @@ export default function GlobalLogin() {
                     window.location.href = '/'
                 }, 2500)
             } else {
+                // If it was already invalid, we might have succeeded in a previous render
+                if (result.error?.includes('invalid authorization code')) {
+                    processedCodes.push(code)
+                    sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
+                }
+                
                 addLog(`Handshake failed: ${result.error}`)
                 setError(`ผิดพลาด: ${result.error}`)
-                syncLock.current = false // Allow retry if it was a real error
+                syncLock.current = false 
             }
         } catch (e: any) {
             addLog(`Network Error: ${e.message}`)
