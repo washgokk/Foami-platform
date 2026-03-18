@@ -234,12 +234,15 @@ export default function GlobalLogin() {
                 : Math.random().toString(36).substring(2) + Date.now().toString(36);
             
             if (liffId && liffId !== 'your_liff_id') {
+                // Extract Channel ID (Numeric) from LIFF ID (String)
+                // Example: '2008070087-A60Oam01' -> '2008070087'
+                const channelId = liffId.includes('-') ? liffId.split('-')[0] : liffId;
+                
                 // EXTREMELY ROBUST BREAKOUT:
                 // Instead of liff.line.me (which LINE intercepts), we use the direct OAuth URL
-                // This domain (access.line.me) is guaranteed to open in Safari from a PWA.
                 const redirectUri = encodeURIComponent(`${window.location.origin}/login?bridgeId=${bridgeId}`);
-                const state = bridgeId; // Use bridgeId as state for extra security/tracking
-                const oauthUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${liffId}&redirect_uri=${redirectUri}&state=${state}&scope=profile%20openid`;
+                const state = bridgeId; 
+                const oauthUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${redirectUri}&state=${state}&scope=profile%20openid`;
                 
                 setIosPwaBridgeUrl(oauthUrl);
                 addLog('iPad Breakout via Direct OAuth prepared');
@@ -369,40 +372,10 @@ export default function GlobalLogin() {
                             </button>
                          </div>
                     ) : (
-                        <div className={styles.defaultContent}>
-                            <p className={styles.subheadline}>
-                                บริการล้างรถและดูแลรักษาพรีเมียม<br />
-                                จองง่าย สะดวก รวดเร็ว ถึงที่บ้านคุณ
-                            </p>
-                            
-                            {/* Debug Logs for iOS Handshake */}
-                            {!isStandalone && (activeSafariBridgeId || syncLogs.length > 0) && (
-                                <div style={{ 
-                                    marginTop: 30, 
-                                    padding: 15, 
-                                    background: 'rgba(255,255,255,0.05)', 
-                                    borderRadius: 12, 
-                                    fontSize: '0.75rem', 
-                                    textAlign: 'left',
-                                    fontFamily: 'monospace',
-                                    color: 'rgba(255,255,255,0.4)',
-                                    border: '1px solid rgba(255,255,255,0.1)'
-                                }}>
-                                    <div style={{ color: '#06c755', marginBottom: 5 }}>[Handshake Status]: {syncStatus}</div>
-                                    {syncLogs.map((log, idx) => (
-                                        <div key={idx} style={{ marginBottom: 2 }}>{log}</div>
-                                    ))}
-                                    {syncStatus === 'error' && (
-                                        <button 
-                                            onClick={() => window.location.reload()}
-                                            style={{ marginTop: 10, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', padding: '4px 8px', borderRadius: 4 }}
-                                        >
-                                            RETRY
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-                        </div>
+                        <p className={styles.subheadline}>
+                            บริการล้างรถและดูแลรักษาพรีเมียม<br />
+                            จองง่าย สะดวก รวดเร็ว ถึงที่บ้านคุณ
+                        </p>
                     )}
                 </div>
 
