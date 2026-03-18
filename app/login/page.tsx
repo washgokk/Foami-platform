@@ -48,10 +48,11 @@ export default function GlobalLogin() {
             
             try {
                 const { default: liff } = await import('@line/liff')
+                console.log('[LIFF] Initializing...')
                 await liff.init({ liffId })
                 
                 if (liff.isLoggedIn()) {
-                    console.log('User is logged in via LINE. Fetching profile...')
+                    console.log('[LIFF] Logged in. Fetching profile...')
                     const profile = await liff.getProfile()
                     localStorage.setItem('liff_line_user_id', profile.userId)
                     localStorage.setItem('liff_display_name', profile.displayName)
@@ -64,55 +65,44 @@ export default function GlobalLogin() {
 
                     const customerData = data || { line_user_id: profile.userId, full_name: profile.displayName };
 
-                    // IF returned with bridgeId, sync to backend and show success
+                    // IF returned with bridgeId, sync to backend
                     if (activeSafariBridgeId) {
+                        setSyncLoading(true)
+                        setError('กำลังซิงค์ข้อมูล... กรุณารอสักครู่') // Visible status
+                        
                         try {
-                            console.log('--- Bridge Sync Debug ---')
-                            console.log('Bridge ID Found:', activeSafariBridgeId)
-                            console.log('Customer Data ready for sync')
-                            
-                            setSyncLoading(true)
-                            
-                            // Retry logic (up to 3 times)
+                            console.log('[Bridge] Syncing ID:', activeSafariBridgeId)
                             let success = false;
                             for (let i = 0; i < 3; i++) {
                                 try {
-                                    console.log(`Sync attempt ${i+1}...`)
                                     const res = await fetch('/api/auth/bridge/sync', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ bridgeId: activeSafariBridgeId, customerData })
                                     })
-                                    
                                     if (res.ok) {
-                                        console.log('Sync Successful on attempt', i+1)
                                         success = true;
                                         break;
-                                    } else {
-                                        const errData = await res.json()
-                                        console.error('Sync Attempt Failed:', errData)
-                                        if (i === 2) setError(`การเชื่อมต่อล้มเหลว: ${errData.error || 'ถอดรหัสล้มเหลว'}`)
                                     }
-                                } catch (e) {
-                                    console.warn(`Attempt ${i+1} exception:`, e)
-                                    if (i === 2) throw e;
                                     await new Promise(r => setTimeout(r, 1000));
+                                } catch (e) {
+                                    if (i === 2) throw e;
                                 }
                             }
 
                             if (success) {
                                 setIsBridgeSuccess(true)
                                 localStorage.removeItem('safari_bridge_id')
-                                
-                                // AUTO-JUMP
                                 setTimeout(() => {
                                     try { window.close(); } catch (e) {}
                                     window.location.href = '/';
-                                }, 1500);
+                                }, 2000);
+                            } else {
+                                setError('การส่งข้อมูลล้มเหลว กรุณาลองใหม่อีกครั้ง')
                             }
                         } catch (e: any) { 
-                            console.error('Final bridge sync error:', e)
-                            setError(`เกิดข้อผิดพลาดในการเชื่อมต่อ: ${e.message}`)
+                            console.error('[Bridge] Sync Error:', e)
+                            setError(`ข้อผิดพลาดการซิงค์: ${e.message}`)
                         } finally {
                             setSyncLoading(false)
                         }
@@ -120,14 +110,16 @@ export default function GlobalLogin() {
 
                     if (data) {
                         localStorage.setItem('liff_customer', JSON.stringify(data))
-                        // Only redirect if NOT in bridge mode (or if we want to also close Safari)
                         if (!bridgeIdParam) router.replace('/search')
                     } else {
                         if (!bridgeIdParam) router.replace('/register')
                     }
+                } else {
+                    // If we have a bridgeId but NOT logged in, we might need a manual click or auto-trigger
+                    console.log('[LIFF] Not logged in on return page.')
                 }
             } catch (err) {
-                console.error('LIFF Auto-init Error:', err)
+                console.error('[LIFF] Error during auto-init:', err)
             } finally {
                 setLoading(false)
             }
@@ -136,20 +128,18 @@ export default function GlobalLogin() {
         autoInit()
 
         // --- STUCK LOADING WATCHDOG ---
-        // User requested: "Reload if stuck on loading for 2s"
+        // As requested: Reload if stuck on loading for ~2-3 seconds
         const loadingTimer = setTimeout(() => {
-            // If still loading (liff init not done) or sync not started after 5s
-            // and we have a bridge ID (from LINE return), try once to refresh
             const searchParams = new URLSearchParams(window.location.search)
-            if (searchParams.has('bridgeId') && !isBridgeSuccess && !syncLoading) {
-                console.log('Detected hang during bridge return - refreshing...');
-                // Avoid infinite refresh loop by checking a flag
-                if (!sessionStorage.getItem('last_refresh_attempt')) {
-                    sessionStorage.setItem('last_refresh_attempt', '1');
+            // If we have returned from LINE but it's still "Loading" or syncing, try a soft refresh
+            if (searchParams.has('bridgeId') && !isBridgeSuccess && !localStorage.getItem('liff_customer')) {
+                console.warn('Login process stuck - attempting auto-reload...');
+                if (!sessionStorage.getItem('login_refresh_attempt')) {
+                    sessionStorage.setItem('login_refresh_attempt', '1');
                     window.location.reload();
                 }
             }
-        }, 5000) // Increased to 5s for stability, but handles the "stuck" case
+        }, 3000) 
 
         return () => clearTimeout(loadingTimer)
     }, [router, isBridgeSuccess, syncLoading])

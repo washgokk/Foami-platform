@@ -1,38 +1,16 @@
-// SW Version: 2026-03-18-v3-Robust
-self.addEventListener('install', (event) => {
-    self.skipWaiting();
-});
-
-self.addEventListener('activate', (event) => {
-    console.log('Foami Service Worker v3 Activated');
-    event.waitUntil(clients.claim());
-});
-
-self.addEventListener('message', (event) => {
-    if (event.data && event.data.type === 'SKIP_WAITING') {
-        self.skipWaiting();
-    }
-});
-
-self.addEventListener('fetch', (event) => {
-    // Standard fetch handler to satisfy PWA requirements
-    // For now, just pass through to network
-    event.respondWith(fetch(event.request));
-});
-
+// SW Version: 2026-03-18-v4-Final
 self.addEventListener('push', function (event) {
-    console.log('[SW] Push Received');
+    console.log('[SW] Push Received V4');
     
     const promise = (async () => {
         let data = { 
             title: 'Foami Wash & Delivery', 
-            body: 'คุณมีข้อความใหม่จาก Foami ครับ', 
+            body: 'คุณมีการแจ้งเตือนใหม่ กรุณาเปิดแอปเพื่อตรวจสอบครับ', 
             url: '/' 
         };
 
         if (event.data) {
             try {
-                // Try parsing as JSON
                 const json = event.data.json();
                 console.log('[SW] Push JSON:', json);
                 if (json && typeof json === 'object') {
@@ -41,9 +19,8 @@ self.addEventListener('push', function (event) {
                     if (json.url) data.url = String(json.url);
                 }
             } catch (e) {
-                // Fallback to text
                 const text = event.data.text();
-                console.log('[SW] Push Text Fallback:', text);
+                console.log('[SW] Push Text:', text);
                 if (text) {
                     try {
                         const parsed = JSON.parse(text);
@@ -65,18 +42,15 @@ self.addEventListener('push', function (event) {
             data: {
                 url: data.url || '/'
             },
-            // Use a unique tag to avoid collapsing different notifications, 
-            // but use the same tag if it's the same URL to update it.
             tag: 'foami-notif-' + (data.url || 'default').replace(/[^a-z0-9]/gi, '-'),
             renotify: true
         };
 
-        console.log('[SW] Showing notification:', data.title);
         return self.registration.showNotification(data.title, options);
     })().catch(err => {
-        console.error('[SW] Critical Push Error:', err);
-        return self.registration.showNotification('Foami Wash & Delivery', {
-            body: 'คุณมีการแจ้งเตือนใหม่ กรุณาเปิดแอปเพื่อตรวจสอบครับ',
+        console.error('[SW] Push Error:', err);
+        return self.registration.showNotification('Foami: การแจ้งเตือนใหม่', {
+            body: 'กรุณาแตะที่นี่เพื่อตรวจสอบรายละเอียดในแอปครับ',
             icon: '/icon.svg'
         });
     });
