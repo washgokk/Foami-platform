@@ -21,6 +21,7 @@ export default function GlobalLogin() {
     // Logging for iPad Debugging
     const [syncStatus, setSyncStatus] = useState<'initial' | 'init_liff' | 'liff_done' | 'fetching_profile' | 'syncing' | 'completed' | 'error'>('initial')
     const [syncLogs, setSyncLogs] = useState<string[]>([])
+    const [assignedPwaBridgeId, setAssignedPwaBridgeId] = useState<string | null>(null)
     const syncLock = useRef(false)
 
     const addLog = (msg: string) => {
@@ -58,9 +59,15 @@ export default function GlobalLogin() {
             localStorage.setItem('safari_bridge_id', bridgeIdParam)
             addLog(`Captured Bridge ID from URL: ${bridgeIdParam}`)
         }
-        
-        if (activeSafariBridgeId && !isStandalone) {
-            setDebugInfo(`Active Bridge: ${activeSafariBridgeId}`)
+
+        // PWA ID Generation
+        if (isStandalone && !assignedPwaBridgeId) {
+            let pid = localStorage.getItem('pwa_bridge_id')
+            if (!pid) {
+                pid = Math.random().toString(36).substring(2, 12)
+                localStorage.setItem('pwa_bridge_id', pid)
+            }
+            setAssignedPwaBridgeId(pid)
         }
 
         // ─── Phase 2: Handle Returning from Direct OAuth (Code + State) ───
@@ -261,34 +268,31 @@ export default function GlobalLogin() {
 
     // ─── Phase 3: PWA Polling (for iOS) ───
     useEffect(() => {
-        const searchParams = new URLSearchParams(window.location.search)
-        const urlId = searchParams.get('pwaBridgeId')
-        const storageId = localStorage.getItem('pwa_bridge_id')
-        const activeBridgeId = urlId || storageId
+        if (!isStandalone || !assignedPwaBridgeId) return
         
-        if (!activeBridgeId || !isStandalone) return
-
-        if (urlId && !storageId) localStorage.setItem('pwa_bridge_id', urlId)
-
-        let pollInterval: any = setInterval(async () => {
+        addLog(`PWA Polling active for ID: ${assignedPwaBridgeId}`)
+        
+        const interval = setInterval(async () => {
             try {
-                const res = await fetch(`/api/auth/bridge/status?id=${activeBridgeId}`)
+                // Use 'bridgeId' as the query param to match our API
+                const res = await fetch(`/api/auth/bridge/status?bridgeId=${assignedPwaBridgeId}`)
+                if (!res.ok) return
+
                 const result = await res.json()
                 if (result.status === 'completed' && result.customerData) {
-                    addLog('Poll Detect Success!')
-                    clearInterval(pollInterval)
+                    addLog('Poll Detect Success! Handshake complete.')
+                    clearInterval(interval)
                     localStorage.removeItem('pwa_bridge_id')
                     localStorage.setItem('liff_customer', JSON.stringify(result.customerData))
-                    localStorage.setItem('liff_line_user_id', result.customerData.line_user_id)
-                    router.replace('/search')
+                    window.location.href = '/search'
                 }
             } catch (e) {
-                console.error('Polling error:', e)
+                // Silently retry
             }
         }, 2000)
-
-        return () => clearInterval(pollInterval)
-    }, [router, isStandalone])
+        
+        return () => clearInterval(interval)
+    }, [isStandalone, assignedPwaBridgeId])
 
     // --- iPad/iOS PWA Specific ---
     const [iosPwaBridgeUrl, setIosPwaBridgeUrl] = useState<string | null>(null);
@@ -297,26 +301,25 @@ export default function GlobalLogin() {
 
     useEffect(() => {
         if (isIOS && isStandalone) {
-            const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID;
-            const bridgeId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
-                ? crypto.randomUUID() 
-                : Math.random().toString(36).substring(2) + Date.now().toString(36);
+            let bridgeId = localStorage.getItem('pwa_bridge_id');
+            if (!bridgeId) {
+                bridgeId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
+                    ? crypto.randomUUID() 
+                    : Math.random().toString(36).substring(2, 12) + Date.now().toString(36).substring(0, 4);
+                localStorage.setItem('pwa_bridge_id', bridgeId);
+            }
+            setAssignedPwaBridgeId(bridgeId);
             
+            const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID;
             if (liffId && liffId !== 'your_liff_id') {
-                // Extract Channel ID (Numeric) from LIFF ID (String)
                 const channelId = liffId.includes('-') ? liffId.split('-')[0] : liffId;
-                
-                // STATIC REDIRECT URI: This must be registered in LINE Developers Console
-                // We use the state parameter to carry the dynamic bridgeId
                 const staticRedirectUri = encodeURIComponent(`${window.location.origin}/login`);
                 const oauthUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${staticRedirectUri}&state=${bridgeId}&scope=profile%20openid`;
                 
                 setIosPwaBridgeUrl(oauthUrl);
-                addLog('iPad Breakout via Direct OAuth prepared');
-            } else {
-                setIosPwaBridgeUrl(`${window.location.origin}/login?bridgeId=${bridgeId}`);
+                addLog(`Breakout URL ready: ${bridgeId.substring(0, 6)}...`);
             }
-            setDebugInfo(`Prepared Bridge ID: ${bridgeId}`);
+            setDebugInfo(`Sync ID: ${bridgeId}`);
         }
     }, [isIOS, isStandalone]);
 
@@ -417,25 +420,44 @@ export default function GlobalLogin() {
                                 [Debug ID: {typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('bridgeId') || localStorage.getItem('safari_bridge_id')) : ''}]
                             </p>
                         </div>
-                    ) : (typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id'))) ? (
-                         <div className={styles.waitingBox}>
+                    ) : assignedPwaBridgeId ? (
+                         <div className={styles.syncBox}>
                             <div className="spinner-blue" style={{ width: 40, height: 40, margin: '0 auto 15px' }} />
-                            <p style={{ color: 'var(--text-primary)', fontSize: '1.1rem', fontWeight: 600 }}>กำลังรอการเข้าสู่ระบบ...</p>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', marginBottom: 20 }}>กรุณาเข้าสู่ระบบใน Safari ที่เปิดขึ้นมา</p>
-                            
-                            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem', marginBottom: 15 }}>
-                                [Session ID: {typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id')) : ''}]
+                            <h2 style={{ color: 'var(--text-primary)', fontSize: '1.4rem', marginBottom: 12 }}>กำลังเตรียมการเข้าสู่ระบบ...</h2>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', marginBottom: 24 }}>
+                                ระบบจะพาคุณไปยืนยันตัวตนที่ Safari โดยอัตโนมัติ<br/>
+                                หากไม่มีอะไรเกิดขึ้น กรุณากดปุ่มด้านล่างครับ
                             </p>
+                            
+                            <a 
+                                href={iosPwaBridgeUrl || '#'} 
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={styles.loginBtn}
+                                style={{ 
+                                    textDecoration: 'none', 
+                                    display: 'inline-flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center',
+                                    gap: 10,
+                                    padding: '16px 32px'
+                                }}
+                            >
+                                🚀 เปิดการยืนยันตัวตน (Safari)
+                            </a>
+
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: 20 }}>
+                                ID: {assignedPwaBridgeId}
+                            </p>
+
                             <button 
-                                className={styles.retryBtn} 
                                 onClick={() => {
                                     localStorage.removeItem('pwa_bridge_id');
-                                    sessionStorage.removeItem('sync_refresh_attempt');
-                                    window.location.href = '/login';
+                                    window.location.reload();
                                 }}
-                                style={{ marginTop: 20 }}
+                                style={{ background: 'none', border: 'none', color: '#999', fontSize: '0.75rem', textDecoration: 'underline', marginTop: 24 }}
                             >
-                                ยกเลิกและลองใหม่
+                                หากค้างนานเกินไป กรุณากดเพื่อลองใหม่
                             </button>
                          </div>
                     ) : (
