@@ -83,10 +83,7 @@ export default function GlobalLogin() {
                 addLog('LIFF Init Success')
                 setSyncStatus('liff_done')
                 
-                const loggedIn = liff.isLoggedIn()
-                addLog(`LIFF Login Check: ${loggedIn}`)
-                
-                if (loggedIn) {
+                if (liff.isLoggedIn()) {
                     setSyncStatus('fetching_profile')
                     addLog('Fetching LINE Profile...')
                     const profile = await liff.getProfile()
@@ -206,24 +203,20 @@ export default function GlobalLogin() {
 
         let pollInterval: any = setInterval(async () => {
             try {
-                addLog(`Polling status for ID: ${activeBridgeId}...`)
                 const res = await fetch(`/api/auth/bridge/status?id=${activeBridgeId}`)
                 const result = await res.json()
                 if (result.status === 'completed' && result.customerData) {
-                    addLog('Poll Detect Success! Logging in...')
+                    addLog('Poll Detect Success!')
                     clearInterval(pollInterval)
                     localStorage.removeItem('pwa_bridge_id')
                     localStorage.setItem('liff_customer', JSON.stringify(result.customerData))
                     localStorage.setItem('liff_line_user_id', result.customerData.line_user_id)
                     router.replace('/search')
-                } else {
-                    addLog(`Status: ${result.status || 'pending'}`)
                 }
             } catch (e) {
                 console.error('Polling error:', e)
-                addLog('Polling communication error')
             }
-        }, 3000)
+        }, 2000)
 
         return () => clearInterval(pollInterval)
     }, [router, isStandalone])
@@ -241,9 +234,15 @@ export default function GlobalLogin() {
                 : Math.random().toString(36).substring(2) + Date.now().toString(36);
             
             if (liffId && liffId !== 'your_liff_id') {
-                // FORCE Safari breakout by using LIFF domain
-                setIosPwaBridgeUrl(`https://liff.line.me/${liffId}/?bridgeId=${bridgeId}#bridgeId=${bridgeId}`);
-                console.log('iPad Breakout URL:', `https://liff.line.me/${liffId}/?bridgeId=${bridgeId}`);
+                // EXTREMELY ROBUST BREAKOUT:
+                // Instead of liff.line.me (which LINE intercepts), we use the direct OAuth URL
+                // This domain (access.line.me) is guaranteed to open in Safari from a PWA.
+                const redirectUri = encodeURIComponent(`${window.location.origin}/login?bridgeId=${bridgeId}`);
+                const state = bridgeId; // Use bridgeId as state for extra security/tracking
+                const oauthUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${liffId}&redirect_uri=${redirectUri}&state=${state}&scope=profile%20openid`;
+                
+                setIosPwaBridgeUrl(oauthUrl);
+                addLog('iPad Breakout via Direct OAuth prepared');
             } else {
                 setIosPwaBridgeUrl(`${window.location.origin}/login?bridgeId=${bridgeId}`);
             }
@@ -375,32 +374,28 @@ export default function GlobalLogin() {
                                 บริการล้างรถและดูแลรักษาพรีเมียม<br />
                                 จองง่าย สะดวก รวดเร็ว ถึงที่บ้านคุณ
                             </p>
-                            {/* Handshake Logs - Now visible in both PWA and Safari for debugging */}
-                            {(activeSafariBridgeId || localStorage.getItem('pwa_bridge_id') || syncLogs.length > 0) && (
+                            
+                            {/* Debug Logs for iOS Handshake */}
+                            {!isStandalone && (activeSafariBridgeId || syncLogs.length > 0) && (
                                 <div style={{ 
                                     marginTop: 30, 
                                     padding: 15, 
                                     background: 'rgba(255,255,255,0.05)', 
                                     borderRadius: 12, 
-                                    fontSize: '0.7rem', 
+                                    fontSize: '0.75rem', 
                                     textAlign: 'left',
                                     fontFamily: 'monospace',
                                     color: 'rgba(255,255,255,0.4)',
-                                    border: '1px solid rgba(255,255,255,0.1)',
-                                    width: '100%',
-                                    maxWidth: 320,
-                                    margin: '30px auto 0'
+                                    border: '1px solid rgba(255,255,255,0.1)'
                                 }}>
-                                    <div style={{ color: '#06c755', marginBottom: 5, fontWeight: 'bold' }}>
-                                        [Handshake Status]: {isStandalone ? 'PWA_POLLING' : syncStatus}
-                                    </div>
+                                    <div style={{ color: '#06c755', marginBottom: 5 }}>[Handshake Status]: {syncStatus}</div>
                                     {syncLogs.map((log, idx) => (
-                                        <div key={idx} style={{ marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log}</div>
+                                        <div key={idx} style={{ marginBottom: 2 }}>{log}</div>
                                     ))}
                                     {syncStatus === 'error' && (
                                         <button 
                                             onClick={() => window.location.reload()}
-                                            style={{ marginTop: 10, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', padding: '4px 8px', borderRadius: 4, cursor: 'pointer' }}
+                                            style={{ marginTop: 10, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', padding: '4px 8px', borderRadius: 4 }}
                                         >
                                             RETRY
                                         </button>
