@@ -184,8 +184,7 @@ export default function LiffEntry() {
             const channelId = liffId.includes('-') ? liffId.split('-')[0] : liffId;
             const staticRedirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
             const oauthUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${staticRedirectUri}&state=${bridgeId}&scope=profile%20openid`;
-            const breakoutUrl = `${window.location.origin}/api/auth/breakout?url=${encodeURIComponent(oauthUrl)}`;
-            return [breakoutUrl, bridgeId];
+            return [oauthUrl, bridgeId];
         }
         return [null, null];
     })() : [null, null];
