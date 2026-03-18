@@ -21,6 +21,8 @@ export default function GlobalLogin() {
     // Logging for iPad Debugging
     const [syncStatus, setSyncStatus] = useState<'initial' | 'init_liff' | 'liff_done' | 'fetching_profile' | 'syncing' | 'completed' | 'error'>('initial')
     const [syncLogs, setSyncLogs] = useState<string[]>([])
+    const syncLock = useRef(false)
+
     const addLog = (msg: string) => {
         console.log(`[Handshake] ${msg}`)
         setSyncLogs(prev => [...prev.slice(-3), `${new Date().toLocaleTimeString()}: ${msg}`])
@@ -61,9 +63,7 @@ export default function GlobalLogin() {
             setDebugInfo(`Active Bridge: ${activeSafariBridgeId}`)
         }
 
-    const syncLock = useRef(false)
-
-    // ─── Phase 2: Handle Returning from Direct OAuth (Code + State) ───
+        // ─── Phase 2: Handle Returning from Direct OAuth (Code + State) ───
     const handleDirectSync = async (code: string, state: string) => {
         if (syncLock.current) return
         syncLock.current = true
