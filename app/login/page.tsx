@@ -189,7 +189,7 @@ export default function GlobalLogin() {
         }, 5000) 
 
         return () => clearTimeout(loadingTimer)
-    }, [router, isBridgeSuccess])
+    }, [router, isBridgeSuccess, activeSafariBridgeId])
 
     // ─── Phase 3: PWA Polling (for iOS) ───
     useEffect(() => {
