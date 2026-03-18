@@ -8,6 +8,11 @@ export default function LiffEntry() {
     const router = useRouter()
 
     const syncLock = useRef(false)
+    const isBridgeSuccess = useRef(false) // Use ref for polling check
+
+    // Detect standalone mode (PWA)
+    const isStandalone = typeof window !== 'undefined' && 
+        ((window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches);
 
     useEffect(() => {
         const searchParams = new URLSearchParams(window.location.search)
@@ -18,7 +23,6 @@ export default function LiffEntry() {
 
         // ─── Phase 1: Handle Direct OAuth Sync (Manual Handshake) ───
         const handleDirectSync = async (targetCode: string, targetBridgeId: string) => {
-            // sessionStorage lock to prevent double-processing
             const processedCodes = JSON.parse(sessionStorage.getItem('processed_line_codes') || '[]')
             if (processedCodes.includes(targetCode)) return true 
 
@@ -26,7 +30,8 @@ export default function LiffEntry() {
             syncLock.current = true
 
             try {
-                const currentRedirectUri = `${window.location.origin}/login`
+                // v22: Use the current page URL as redirectUri
+                const currentRedirectUri = window.location.origin + window.location.pathname
                 const res = await fetch('/api/auth/bridge/sync-with-code', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -37,7 +42,6 @@ export default function LiffEntry() {
                     processedCodes.push(targetCode)
                     sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
                     
-                    // On success, close window and return to PWA
                     setTimeout(() => {
                         try { window.close() } catch (e) {}
                         window.location.href = `/${branchSlug}/menu`
@@ -50,7 +54,7 @@ export default function LiffEntry() {
                         sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
                     }
                     syncLock.current = false
-                    return true // Return true because we are "handling" this code even if it fails
+                    return true 
                 }
             } catch (e) {
                 console.error('Handshake error:', e)
@@ -69,21 +73,15 @@ export default function LiffEntry() {
 
         // ─── Phase 2: Execution Logic ───
         const main = async () => {
-            // v20: ONLY do manual sync if we have BOTH code and bridgeId
-            // If only code is present, it's a standard LIFF login - let LIFF handle it
             if (code && (state || searchParams.get('bridgeId'))) {
                 await handleDirectSync(code, bridgeId || 'unknown')
                 return
             }
 
-            // Normal LIFF logic
             if (!liffId || liffId === 'your_liff_id' || liffId === '') {
                 const stored = localStorage.getItem('liff_customer')
-                if (stored) {
-                    router.replace(`/${branchSlug}/menu`)
-                } else {
-                    router.replace('/login')
-                }
+                if (stored) router.replace(`/${branchSlug}/menu`)
+                else router.replace('/login')
                 return
             }
 
@@ -92,6 +90,8 @@ export default function LiffEntry() {
                 await liff.init({ liffId })
                 
                 if (!liff.isLoggedIn()) {
+                    if (isStandalone) return; // Wait for breakout button click 
+                    
                     if (bridgeId) liff.login({ redirectUri: window.location.href })
                     else liff.login()
                     return
@@ -100,7 +100,6 @@ export default function LiffEntry() {
                 localStorage.setItem('liff_line_user_id', profile.userId)
                 localStorage.setItem('liff_display_name', profile.displayName)
 
-                // Check if customer exists
                 const { data } = await supabase
                     .from('customers')
                     .select('*')
@@ -109,7 +108,6 @@ export default function LiffEntry() {
 
                 const customerData = data || { line_user_id: profile.userId, full_name: profile.displayName };
 
-                // If somehow we land here with a bridgeId but no code (standard LIFF login)
                 if (bridgeId) {
                     try {
                         await fetch('/api/auth/bridge/sync', {
@@ -142,6 +140,54 @@ export default function LiffEntry() {
         return () => clearTimeout(loadingTimer)
     }, [router, branchSlug])
 
+    // ─── Phase 3: PWA Polling (Ported from login/page.tsx) ───
+    useEffect(() => {
+        const searchParams = new URLSearchParams(window.location.search)
+        const urlId = searchParams.get('pwaBridgeId')
+        const storageId = localStorage.getItem('pwa_bridge_id')
+        const activeBridgeId = urlId || storageId
+        
+        if (!activeBridgeId || !isStandalone) return
+
+        if (urlId && !storageId) localStorage.setItem('pwa_bridge_id', urlId)
+
+        let pollInterval: any = setInterval(async () => {
+            try {
+                const res = await fetch(`/api/auth/bridge/status?id=${activeBridgeId}`)
+                const result = await res.json()
+                if (result.status === 'completed' && result.customerData) {
+                    clearInterval(pollInterval)
+                    localStorage.removeItem('pwa_bridge_id')
+                    localStorage.setItem('liff_customer', JSON.stringify(result.customerData))
+                    localStorage.setItem('liff_line_user_id', result.customerData.line_user_id)
+                    router.replace(`/${branchSlug}/menu`)
+                }
+            } catch (e) {
+                console.error('Polling error:', e)
+            }
+        }, 2000)
+
+        return () => clearInterval(pollInterval)
+    }, [router, isStandalone, branchSlug])
+
+    // --- iPad Breakout Prep (Ported from login/page.tsx) ---
+    const [iosPwaBridgeUrl, setIosPwaBridgeUrl] = (typeof window !== 'undefined') ? (() => {
+        const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID;
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        
+        if (isIOS && isStandalone && liffId && liffId !== 'your_liff_id') {
+            const bridgeId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+            const channelId = liffId.includes('-') ? liffId.split('-')[0] : liffId;
+            const staticRedirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
+            const oauthUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${staticRedirectUri}&state=${bridgeId}&scope=profile%20openid`;
+            return [oauthUrl, bridgeId];
+        }
+        return [null, null];
+    })() : [null, null];
+
+    const isWaiting = typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id'));
+
     return (
         <div style={{
             minHeight: '100vh', display: 'flex', flexDirection: 'column',
@@ -156,8 +202,52 @@ export default function LiffEntry() {
                 style={{ width: '100%', maxWidth: '240px', height: 'auto', filter: 'brightness(0) invert(1)' }}
             />
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                <div className="spinner" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)', width: 32, height: 32 }} />
-                <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.85rem', fontWeight: 500, letterSpacing: '0.05em' }}>กำลังโหลด...</p>
+                {isWaiting ? (
+                    <>
+                        <div className="spinner" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)', width: 32, height: 32 }} />
+                        <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.85rem', fontWeight: 500, letterSpacing: '0.05em' }}>กำลังรอการเข้าสู่ระบบ...</p>
+                        <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', marginTop: '10px', textAlign: 'center' }}>
+                            หาก Safari ไม่เด้งขึ้นมา <br /> กรุณาลองกดล็อคอินที่หน้า Safari ปกติครับ
+                        </p>
+                        <button 
+                            onClick={() => {
+                                localStorage.removeItem('pwa_bridge_id');
+                                window.location.reload();
+                            }}
+                            style={{ 
+                                marginTop: '15px', background: 'transparent', border: '1px solid rgba(255,255,255,0.3)',
+                                color: '#fff', padding: '6px 16px', borderRadius: '20px', fontSize: '0.75rem'
+                            }}
+                        >ยกเลิก</button>
+                    </>
+                ) : (iosPwaBridgeUrl && isStandalone) ? (
+                    <a 
+                        href={iosPwaBridgeUrl[0]}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => {
+                            if (iosPwaBridgeUrl && iosPwaBridgeUrl[1]) {
+                                localStorage.setItem('pwa_bridge_id', iosPwaBridgeUrl[1]);
+                                const nextUrl = new URL(window.location.href);
+                                nextUrl.searchParams.set('pwaBridgeId', iosPwaBridgeUrl[1]);
+                                window.history.replaceState({}, '', nextUrl.toString());
+                            }
+                        }}
+                        style={{
+                            background: '#06C755', color: '#fff', border: 'none', padding: '12px 24px',
+                            borderRadius: '30px', fontWeight: 600, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '10px',
+                            textDecoration: 'none'
+                        }}
+                    >
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg" alt="LINE" style={{ width: 20 }} />
+                        เข้าสู่ระบบด้วย LINE
+                    </a>
+                ) : (
+                    <>
+                        <div className="spinner" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)', width: 32, height: 32 }} />
+                        <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.85rem', fontWeight: 500, letterSpacing: '0.05em' }}>กำลังโหลด...</p>
+                    </>
+                )}
             </div>
         </div>
     )

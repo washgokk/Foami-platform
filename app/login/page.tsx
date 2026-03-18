@@ -79,7 +79,7 @@ export default function GlobalLogin() {
         setSyncLoading(true)
         addLog(`Code detected. Exchanging for profile...`)
         try {
-            const currentRedirectUri = `${window.location.origin}/login`
+            const currentRedirectUri = window.location.origin + window.location.pathname
             const res = await fetch('/api/auth/bridge/sync-with-code', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -407,7 +407,10 @@ export default function GlobalLogin() {
                     {isBridgeSuccess ? (
                         <div className={styles.successBox}>
                             <div className={styles.checkIcon}>
-                                <Logo width={80} />
+                                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="12" cy="12" r="11" stroke="var(--primary)" strokeWidth="1.5"/>
+                                    <path d="M7 12.5L10.5 16L17 9" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
                             </div>
                             <h2 style={{ color: 'var(--text-primary)', fontSize: '1.5rem', marginBottom: 10 }}>เข้าสู่ระบบสำเร็จ!</h2>
                             <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem' }}>กรุณากลับไปที่แอป Foami เพื่อใช้งานต่อครับ</p>
@@ -452,26 +455,24 @@ export default function GlobalLogin() {
                 </div>
 
                 {/* --- Action Buttons --- */}
-                {!(typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id'))) && (
+                {!(typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id'))) && !syncLoading && (
                     iosPwaBridgeUrl ? (
-                        <button 
+                        <a 
+                            href={iosPwaBridgeUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className={styles.lineBtn}
-                            onClick={(e) => {
-                                e.preventDefault();
-                                // v21: Reliable Bridge ID extraction from the OAuth URL
+                            onClick={() => {
+                                // v24: Preparation for breakout
                                 const url = new URL(iosPwaBridgeUrl);
                                 const bId = url.searchParams.get('state') || url.searchParams.get('bridgeId');
                                 
                                 if (bId) {
                                     localStorage.setItem('pwa_bridge_id', bId);
                                     setLoading(true); 
-                                    
                                     const nextUrl = new URL(window.location.href);
                                     nextUrl.searchParams.set('pwaBridgeId', bId);
                                     window.history.replaceState({}, '', nextUrl.toString());
-                                    
-                                    // Force breakout via window.open
-                                    window.open(iosPwaBridgeUrl, '_blank');
                                 }
                             }}
                         >
@@ -479,7 +480,7 @@ export default function GlobalLogin() {
                                 <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg" alt="LINE" className={styles.lineIcon} />
                             </div>
                             <span>เข้าสู่ระบบด้วย LINE</span>
-                        </button>
+                        </a>
                     ) : (
                         <button 
                             className={styles.lineBtn} 

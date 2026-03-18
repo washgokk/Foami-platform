@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
             .from('customers')
             .upsert({ line_user_id: profile.userId, full_name: profile.displayName })
             .select()
-            .single()
+            .maybeSingle()
 
         if (custError) {
             console.error('Customer Sync Error:', custError)
