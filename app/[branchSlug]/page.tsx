@@ -8,10 +8,20 @@ export default function LiffEntry() {
     const router = useRouter()
 
     useEffect(() => {
-        // Check if using real LIFF or mock mode
+        const searchParams = new URLSearchParams(window.location.search)
+        const bridgeId = searchParams.get('state') || searchParams.get('bridgeId')
         const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID
+
+        // Stuck Watchdog
+        const loadingTimer = setTimeout(() => {
+            if (bridgeId && !sessionStorage.getItem('sync_refresh_attempt')) {
+                sessionStorage.setItem('sync_refresh_attempt', '1')
+                window.location.reload()
+            }
+        }, 5000)
+
+        // Mock mode handling
         if (!liffId || liffId === 'your_liff_id' || liffId === '') {
-            // Development mock: use stored customer or redirect to register
             const stored = localStorage.getItem('liff_customer')
             if (stored) {
                 router.replace(`/${branchSlug}/menu`)
@@ -25,7 +35,9 @@ export default function LiffEntry() {
         import('@line/liff').then(({ default: liff }) => {
             liff.init({ liffId }).then(async () => {
                 if (!liff.isLoggedIn()) {
-                    liff.login()
+                    // If we have a bridgeId, we should force login so it returns with the code
+                    if (bridgeId) liff.login({ redirectUri: window.location.href })
+                    else liff.login()
                     return
                 }
                 const profile = await liff.getProfile()
@@ -39,15 +51,37 @@ export default function LiffEntry() {
                     .eq('line_user_id', profile.userId)
                     .single()
 
+                const customerData = data || { line_user_id: profile.userId, full_name: profile.displayName };
+
+                // ─── Bridge Sync ───
+                if (bridgeId) {
+                    try {
+                        await fetch('/api/auth/bridge/sync', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ bridgeId, customerData })
+                        })
+                        // Give some time for sync to finish before closing/redirecting
+                        setTimeout(() => {
+                            try { window.close() } catch (e) {}
+                            window.location.href = `/${branchSlug}/menu`
+                        }, 2000)
+                    } catch (e) {
+                        console.error('Bridge sync error:', e)
+                    }
+                }
+
                 if (data) {
                     localStorage.setItem('liff_customer', JSON.stringify(data))
-                    router.replace(`/${branchSlug}/menu`)
+                    if (!bridgeId) router.replace(`/${branchSlug}/menu`)
                 } else {
-                    localStorage.setItem('last_branch_slug', branchSlug) // Remember where they came from
-                    router.replace('/register')
+                    localStorage.setItem('last_branch_slug', branchSlug)
+                    if (!bridgeId) router.replace('/register')
                 }
             })
         })
+
+        return () => clearTimeout(loadingTimer)
     }, [router, branchSlug])
 
     return (
