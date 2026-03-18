@@ -73,8 +73,11 @@ export default function LiffEntry() {
 
         // ─── Phase 2: Execution Logic ───
         const main = async () => {
-            if (code && (state || searchParams.get('bridgeId'))) {
-                await handleDirectSync(code, bridgeId || 'unknown')
+            const pwaBridgeId = typeof window !== 'undefined' ? localStorage.getItem('pwa_bridge_id') : null
+            
+            // v25: STRICT condition. Only hijack if this is a breakout return.
+            if (code && state && state === pwaBridgeId) {
+                await handleDirectSync(code, pwaBridgeId)
                 return
             }
 

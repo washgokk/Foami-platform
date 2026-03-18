@@ -128,10 +128,11 @@ export default function GlobalLogin() {
             
             const code = searchParams.get('code')
             const state = searchParams.get('state')
+            const pwaBridgeId = typeof window !== 'undefined' ? localStorage.getItem('pwa_bridge_id') : null
             
-            // v20: ONLY use direct sync if we have BOTH code and bridgeId (state)
-            // If we only have code, it's a standard LIFF login - let LIFF handle it to avoid redirect_uri mismatch
-            if (code && state) {
+            // v25: STRICT condition. Only hijack if the state matches our PWA Bridge ID.
+            // This prevents hijacking standard LIFF logins that use their own state.
+            if (code && state && state === pwaBridgeId) {
                 handleDirectSync(code, state)
                 return 
             }
@@ -455,7 +456,7 @@ export default function GlobalLogin() {
                 </div>
 
                 {/* --- Action Buttons --- */}
-                {!(typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id'))) && !syncLoading && (
+                {!(typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id'))) && !syncLoading && !loading && (
                     iosPwaBridgeUrl ? (
                         <a 
                             href={iosPwaBridgeUrl}
@@ -463,7 +464,7 @@ export default function GlobalLogin() {
                             rel="noopener noreferrer"
                             className={styles.lineBtn}
                             onClick={() => {
-                                // v24: Preparation for breakout
+                                // v25: Preparation for breakout
                                 const url = new URL(iosPwaBridgeUrl);
                                 const bId = url.searchParams.get('state') || url.searchParams.get('bridgeId');
                                 
