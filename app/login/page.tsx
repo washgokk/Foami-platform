@@ -33,6 +33,7 @@ export default function GlobalLogin() {
     // Detect active bridge for Safari-side (syncing phase)
     const activeSafariBridgeId = typeof window !== 'undefined' 
         ? (new URLSearchParams(window.location.search).get('bridgeId') || 
+           new URLSearchParams(window.location.search).get('state') || 
            new URLSearchParams(window.location.hash.slice(1)).get('bridgeId') || 
            localStorage.getItem('safari_bridge_id'))
         : null;
@@ -48,8 +49,8 @@ export default function GlobalLogin() {
         const searchParams = new URLSearchParams(window.location.search)
         const hashParams = new URLSearchParams(window.location.hash.slice(1)) // Check fragment too
         
-        // Priority: URL Param > Hash > Storage
-        const bridgeIdParam = searchParams.get('bridgeId') || hashParams.get('bridgeId')
+        // Priority: URL Param > State > Hash > Storage
+        const bridgeIdParam = searchParams.get('bridgeId') || searchParams.get('state') || hashParams.get('bridgeId')
         
         if (bridgeIdParam && !isStandalone) {
             localStorage.setItem('safari_bridge_id', bridgeIdParam)
@@ -235,14 +236,12 @@ export default function GlobalLogin() {
             
             if (liffId && liffId !== 'your_liff_id') {
                 // Extract Channel ID (Numeric) from LIFF ID (String)
-                // Example: '2008070087-A60Oam01' -> '2008070087'
                 const channelId = liffId.includes('-') ? liffId.split('-')[0] : liffId;
                 
-                // EXTREMELY ROBUST BREAKOUT:
-                // Instead of liff.line.me (which LINE intercepts), we use the direct OAuth URL
-                const redirectUri = encodeURIComponent(`${window.location.origin}/login?bridgeId=${bridgeId}`);
-                const state = bridgeId; 
-                const oauthUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${redirectUri}&state=${state}&scope=profile%20openid`;
+                // STATIC REDIRECT URI: This must be registered in LINE Developers Console
+                // We use the state parameter to carry the dynamic bridgeId
+                const staticRedirectUri = encodeURIComponent(`${window.location.origin}/login`);
+                const oauthUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${staticRedirectUri}&state=${bridgeId}&scope=profile%20openid`;
                 
                 setIosPwaBridgeUrl(oauthUrl);
                 addLog('iPad Breakout via Direct OAuth prepared');
