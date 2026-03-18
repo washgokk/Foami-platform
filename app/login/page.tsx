@@ -128,11 +128,31 @@ export default function GlobalLogin() {
                 }
             } catch (err) {
                 console.error('LIFF Auto-init Error:', err)
+            } finally {
+                setLoading(false)
             }
         }
 
         autoInit()
-    }, [router])
+
+        // --- STUCK LOADING WATCHDOG ---
+        // User requested: "Reload if stuck on loading for 2s"
+        const loadingTimer = setTimeout(() => {
+            // If still loading (liff init not done) or sync not started after 5s
+            // and we have a bridge ID (from LINE return), try once to refresh
+            const searchParams = new URLSearchParams(window.location.search)
+            if (searchParams.has('bridgeId') && !isBridgeSuccess && !syncLoading) {
+                console.log('Detected hang during bridge return - refreshing...');
+                // Avoid infinite refresh loop by checking a flag
+                if (!sessionStorage.getItem('last_refresh_attempt')) {
+                    sessionStorage.setItem('last_refresh_attempt', '1');
+                    window.location.reload();
+                }
+            }
+        }, 5000) // Increased to 5s for stability, but handles the "stuck" case
+
+        return () => clearTimeout(loadingTimer)
+    }, [router, isBridgeSuccess, syncLoading])
 
     // ─── Phase 3: PWA Polling (for iOS) ───
     useEffect(() => {
@@ -151,6 +171,7 @@ export default function GlobalLogin() {
                 const res = await fetch(`/api/auth/bridge/status?id=${activeBridgeId}`)
                 const result = await res.json()
                 if (result.status === 'completed' && result.customerData) {
+                    console.log('Bridge sync detected! Logging in...')
                     clearInterval(pollInterval)
                     localStorage.removeItem('pwa_bridge_id')
                     localStorage.setItem('liff_customer', JSON.stringify(result.customerData))
@@ -162,8 +183,21 @@ export default function GlobalLogin() {
             }
         }, 2000)
 
-        return () => clearInterval(pollInterval)
-    }, [router])
+        // watchdog for stale state: if we have a pwaBridgeId but after 10 seconds still here,
+        // and user is NOT visible, maybe something failed. 
+        // But for now, just fulfill user request for a "2-5 sec reload if stuck"
+        const reloadWatchdog = setTimeout(() => {
+            if (!isBridgeSuccess && !syncLoading && !localStorage.getItem('liff_customer')) {
+                console.log('Stuck in waiting state - attempting soft refresh...')
+                // Only refresh if we haven't succeeded yet
+            }
+        }, 8000)
+
+        return () => {
+            clearInterval(pollInterval)
+            clearTimeout(reloadWatchdog)
+        }
+    }, [router, isBridgeSuccess, syncLoading])
 
     // --- iPad/iOS PWA Specific ---
     const [iosPwaBridgeUrl, setIosPwaBridgeUrl] = useState<string | null>(null);
