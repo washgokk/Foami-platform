@@ -99,9 +99,13 @@ export default function GlobalLogin() {
                     setSyncStatus('completed')
                     setIsBridgeSuccess(true)
                     localStorage.removeItem('safari_bridge_id')
+                    
+                    // v35: Notify other tabs (Auto-Refresh)
+                    localStorage.setItem('liff_login_success', Date.now().toString());
+
                     setTimeout(() => {
                         try { window.close() } catch (e) { }
-                        window.location.href = '/'
+                        window.location.href = '/search'
                     }, 2500)
                 } else {
                     // If it was already invalid, we might have succeeded in a previous render
@@ -205,7 +209,7 @@ export default function GlobalLogin() {
                                 localStorage.removeItem('safari_bridge_id')
                                 setTimeout(() => {
                                     try { window.close(); } catch (e) { }
-                                    window.location.href = '/';
+                                    window.location.href = '/search';
                                 }, 2500);
                             } else {
                                 setSyncStatus('error')
@@ -260,9 +264,19 @@ export default function GlobalLogin() {
                     window.location.reload();
                 }
             }
-        }, 3000)
+        }, 5000)
 
-        return () => clearTimeout(loadingTimer)
+        const handleStorage = (e: StorageEvent) => {
+            if (e.key === 'liff_login_success') {
+                router.replace('/search');
+            }
+        };
+        window.addEventListener('storage', handleStorage);
+
+        return () => {
+            clearTimeout(loadingTimer);
+            window.removeEventListener('storage', handleStorage);
+        }
     }, [router, isBridgeSuccess, activeSafariBridgeId])
 
     // ─── Phase 3: PWA Polling (for iOS) ───
@@ -302,27 +316,21 @@ export default function GlobalLogin() {
         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 
     useEffect(() => {
+        const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID;
+        
         if (isIOS && isStandalone) {
-            const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID;
-            const bridgeId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-                ? crypto.randomUUID()
-                : Math.random().toString(36).substring(2) + Date.now().toString(36);
-
             if (liffId && liffId !== 'your_liff_id') {
-                // Extract Channel ID (Numeric) from LIFF ID (String)
-                const channelId = liffId.includes('-') ? liffId.split('-')[0] : liffId;
+                const bridgeId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+                    ? crypto.randomUUID()
+                    : Math.random().toString(36).substring(2) + Date.now().toString(36);
 
-                // STATIC REDIRECT URI: This must be registered in LINE Developers Console
-                // We use the state parameter to carry the dynamic bridgeId
-                const staticRedirectUri = encodeURIComponent(`${window.location.origin}/login`);
-                const oauthUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${staticRedirectUri}&state=${bridgeId}&scope=profile%20openid`;
-
-                setIosPwaBridgeUrl(oauthUrl);
-                addLog('iPad Breakout via Direct OAuth prepared');
-            } else {
-                setIosPwaBridgeUrl(`${window.location.origin}/login?bridgeId=${bridgeId}`);
+                // v34: Use official LIFF App URL for breakout instead of raw access.line.me
+                // This is much more stable and avoids "Unable to login" (400) errors.
+                const liffUrl = `https://liff.line.me/${liffId}?pwaBridgeId=${bridgeId}`;
+                const breakoutUrl = `${window.location.origin}/api/auth/breakout?url=${encodeURIComponent(liffUrl)}`;
+                
+                setIosPwaBridgeUrl(breakoutUrl);
             }
-            setDebugInfo(`Prepared Bridge ID: ${bridgeId}`);
         }
     }, [isIOS, isStandalone]);
 

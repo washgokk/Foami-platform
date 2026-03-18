@@ -41,6 +41,9 @@ export default function LiffEntry() {
                 if (res.ok) {
                     processedCodes.push(targetCode)
                     sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
+                    
+                    // v35: Notify original tab (Auto-Refresh)
+                    localStorage.setItem('liff_login_success', Date.now().toString());
 
                     setTimeout(() => {
                         try { window.close() } catch (e) { }
@@ -120,6 +123,7 @@ export default function LiffEntry() {
                         })
                         setTimeout(() => {
                             try { window.close() } catch (e) { }
+                            // v35.2: Explicitly go to the correct branch menu
                             window.location.href = `/${branchSlug}/menu`
                         }, 2000)
                     } catch (e) {
@@ -139,8 +143,18 @@ export default function LiffEntry() {
             }
         }
 
+        const handleStorage = (e: StorageEvent) => {
+            if (e.key === 'liff_login_success') {
+                window.location.href = `/${branchSlug}/menu`;
+            }
+        };
+        window.addEventListener('storage', handleStorage);
+
         main()
-        return () => clearTimeout(loadingTimer)
+        return () => {
+            clearTimeout(loadingTimer);
+            window.removeEventListener('storage', handleStorage);
+        }
     }, [router, branchSlug])
 
     // ─── Phase 3: PWA Polling (Ported from login/page.tsx) ───
@@ -181,10 +195,10 @@ export default function LiffEntry() {
 
         if (isIOS && isStandalone && liffId && liffId !== 'your_liff_id') {
             const bridgeId = Math.random().toString(36).substring(2) + Date.now().toString(36);
-            const channelId = liffId.includes('-') ? liffId.split('-')[0] : liffId;
-            const staticRedirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
-            const oauthUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${staticRedirectUri}&state=${bridgeId}&scope=profile%20openid`;
-            return [oauthUrl, bridgeId];
+            // v34: Use LIFF App URL for breakout instead of raw access.line.me
+            const liffUrl = `https://liff.line.me/${liffId}?pwaBridgeId=${bridgeId}`;
+            const breakoutUrl = `${window.location.origin}/api/auth/breakout?url=${encodeURIComponent(liffUrl)}`;
+            return [breakoutUrl, bridgeId];
         }
         return [null, null];
     })() : [null, null];
