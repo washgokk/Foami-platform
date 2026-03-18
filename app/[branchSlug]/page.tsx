@@ -17,25 +17,24 @@ export default function LiffEntry() {
         const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID
 
         // ─── Phase 1: Handle Direct OAuth Sync (Manual Handshake) ───
-        const handleDirectSync = async (code: string, bridgeId: string) => {
+        const handleDirectSync = async (targetCode: string, targetBridgeId: string) => {
             // sessionStorage lock to prevent double-processing
             const processedCodes = JSON.parse(sessionStorage.getItem('processed_line_codes') || '[]')
-            if (processedCodes.includes(code)) return
+            if (processedCodes.includes(targetCode)) return true 
 
-            if (syncLock.current) return
+            if (syncLock.current) return true
             syncLock.current = true
 
             try {
-                // IMPORTANT: Use /login as the redirectUri because that's where the breakout was authorized
                 const currentRedirectUri = `${window.location.origin}/login`
                 const res = await fetch('/api/auth/bridge/sync-with-code', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code, bridgeId, redirectUri: currentRedirectUri })
+                    body: JSON.stringify({ code: targetCode, bridgeId: targetBridgeId, redirectUri: currentRedirectUri })
                 })
                 const result = await res.json()
                 if (res.ok) {
-                    processedCodes.push(code)
+                    processedCodes.push(targetCode)
                     sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
                     
                     // On success, close window and return to PWA
@@ -43,18 +42,20 @@ export default function LiffEntry() {
                         try { window.close() } catch (e) {}
                         window.location.href = `/${branchSlug}/menu`
                     }, 2000)
+                    return true
                 } else {
                     console.error('Handshake failed:', result.error)
-                    // If it was already invalid, we might have succeeded in a previous render
                     if (result.error?.includes('invalid authorization code')) {
-                        processedCodes.push(code)
+                        processedCodes.push(targetCode)
                         sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
                     }
                     syncLock.current = false
+                    return true // Return true because we are "handling" this code even if it fails
                 }
             } catch (e) {
                 console.error('Handshake error:', e)
                 syncLock.current = false
+                return false
             }
         }
 
@@ -64,13 +65,13 @@ export default function LiffEntry() {
                 sessionStorage.setItem('sync_refresh_attempt', '1')
                 window.location.reload()
             }
-        }, 8000) // Slightly longer timeout for insurance
+        }, 8000)
 
         // ─── Phase 2: Execution Logic ───
         const main = async () => {
-            // Check for direct sync first
-            if (code && bridgeId) {
-                await handleDirectSync(code, bridgeId)
+            // Strict Isolation: If code is present, NEVER touch LIFF SDK
+            if (code) {
+                await handleDirectSync(code, bridgeId || 'unknown')
                 return
             }
 
