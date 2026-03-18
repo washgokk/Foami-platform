@@ -1,0 +1,87 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createServiceClient } from '@/lib/supabase'
+
+export async function POST(req: NextRequest) {
+    try {
+        const { code, bridgeId } = await req.json()
+        const liffId = process.env.NEXT_PUBLIC_LIFF_ID || process.env.NEXT_PUBLIC_LINE_LIFF_ID
+        const channelSecret = process.env.LINE_CHANNEL_SECRET
+        
+        if (!code || !bridgeId) {
+            return NextResponse.json({ error: 'Missing code or bridgeId' }, { status: 400 })
+        }
+
+        if (!liffId || !channelSecret) {
+            return NextResponse.json({ error: 'System configuration missing (LIFF/Secret)' }, { status: 500 })
+        }
+
+        const channelId = liffId.includes('-') ? liffId.split('-')[0] : liffId;
+        const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'https://foami-app.vercel.app'}/login`
+
+        // 1. Exchange Code for Token
+        const tokenParams = new URLSearchParams()
+        tokenParams.append('grant_type', 'authorization_code')
+        tokenParams.append('code', code)
+        tokenParams.append('redirect_uri', redirectUri)
+        tokenParams.append('client_id', channelId)
+        tokenParams.append('client_secret', channelSecret)
+
+        const tokenRes = await fetch('https://api.line.me/oauth2/v2.1/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: tokenParams
+        })
+
+        const tokenData = await tokenRes.json()
+        if (!tokenRes.ok) {
+            console.error('LINE Token Error:', tokenData)
+            return NextResponse.json({ error: tokenData.error_description || 'Failed to exchange token' }, { status: 401 })
+        }
+
+        // 2. Get User Profile
+        const profileRes = await fetch('https://api.line.me/v2/profile', {
+            headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+        })
+        const profile = await profileRes.json()
+        if (!profileRes.ok) {
+            return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 401 })
+        }
+
+        // 3. Sync to Supabase
+        const supabase = createServiceClient()
+        const customerData = { 
+            line_user_id: profile.userId, 
+            full_name: profile.displayName,
+            picture_url: profile.pictureUrl
+        }
+
+        // Upsert customer
+        const { data: customer, error: custError } = await supabase
+            .from('customers')
+            .upsert({ line_user_id: profile.userId, full_name: profile.displayName })
+            .select()
+            .single()
+
+        if (custError) {
+            console.error('Customer Sync Error:', custError)
+        }
+
+        // Sync to bridge
+        const { error: bridgeError } = await supabase
+            .from('pwa_auth_bridges')
+            .upsert({ 
+                id: bridgeId, 
+                customer_data: customer || customerData,
+                created_at: new Date().toISOString()
+            })
+
+        if (bridgeError) {
+            return NextResponse.json({ error: bridgeError.message }, { status: 500 })
+        }
+
+        return NextResponse.json({ success: true, displayName: profile.displayName })
+    } catch (err: any) {
+        console.error('Sync Code Error:', err)
+        return NextResponse.json({ error: err.message }, { status: 500 })
+    }
+}

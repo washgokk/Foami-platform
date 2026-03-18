@@ -61,10 +61,49 @@ export default function GlobalLogin() {
             setDebugInfo(`Active Bridge: ${activeSafariBridgeId}`)
         }
 
-        // ─── Phase 2: Auto-init LIFF to handle returning from redirect ───
+        // ─── Phase 2: Handle Returning from Direct OAuth (Code + State) ───
+        const handleDirectSync = async (code: string, state: string) => {
+            setSyncStatus('syncing')
+            setSyncLoading(true)
+            addLog(`Code detected. Exchanging for profile...`)
+            try {
+                const res = await fetch('/api/auth/bridge/sync-with-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code, bridgeId: state })
+                })
+                const result = await res.json()
+                if (res.ok) {
+                    addLog(`Handshake complete for: ${result.displayName}`)
+                    setSyncStatus('completed')
+                    setIsBridgeSuccess(true)
+                    localStorage.removeItem('safari_bridge_id')
+                    setTimeout(() => {
+                        try { window.close() } catch (e) {}
+                        window.location.href = '/'
+                    }, 2500)
+                } else {
+                    addLog(`Handshake failed: ${result.error}`)
+                    setError(`ผิดพลาด: ${result.error}`)
+                }
+            } catch (e: any) {
+                addLog(`Network Error: ${e.message}`)
+            } finally {
+                setSyncLoading(false)
+            }
+        }
+
+        // ─── Phase 2.5: Auto-init LIFF (Only if NOT doing direct sync) ───
         const autoInit = async () => {
-            if (isStandalone) return; // PWA only polls, doesn't init LIFF for sync
+            if (isStandalone) return; 
             
+            const code = searchParams.get('code')
+            const state = searchParams.get('state')
+            if (code && state) {
+                handleDirectSync(code, state)
+                return // Skip LIFF if we have an OAuth code
+            }
+
             const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID
             if (!liffId || liffId === 'your_liff_id' || liffId === '') {
                 addLog('No LIFF ID found in env')
