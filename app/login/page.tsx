@@ -67,35 +67,51 @@ export default function GlobalLogin() {
                     // IF returned with bridgeId, sync to backend and show success
                     if (activeSafariBridgeId) {
                         try {
-                            console.log('Syncing for Bridge ID:', activeSafariBridgeId)
-                            setSyncLoading(true)
-                            const res = await fetch('/api/auth/bridge/sync', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ bridgeId: activeSafariBridgeId, customerData })
-                            })
+                            console.log('--- Bridge Sync Debug ---')
+                            console.log('Bridge ID Found:', activeSafariBridgeId)
+                            console.log('Customer Data ready for sync')
                             
-                            if (res.ok) {
-                                console.log('Sync Successful!')
+                            setSyncLoading(true)
+                            
+                            // Retry logic (up to 3 times)
+                            let success = false;
+                            for (let i = 0; i < 3; i++) {
+                                try {
+                                    console.log(`Sync attempt ${i+1}...`)
+                                    const res = await fetch('/api/auth/bridge/sync', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ bridgeId: activeSafariBridgeId, customerData })
+                                    })
+                                    
+                                    if (res.ok) {
+                                        console.log('Sync Successful on attempt', i+1)
+                                        success = true;
+                                        break;
+                                    } else {
+                                        const errData = await res.json()
+                                        console.error('Sync Attempt Failed:', errData)
+                                        if (i === 2) setError(`การเชื่อมต่อล้มเหลว: ${errData.error || 'ถอดรหัสล้มเหลว'}`)
+                                    }
+                                } catch (e) {
+                                    console.warn(`Attempt ${i+1} exception:`, e)
+                                    if (i === 2) throw e;
+                                    await new Promise(r => setTimeout(r, 1000));
+                                }
+                            }
+
+                            if (success) {
                                 setIsBridgeSuccess(true)
                                 localStorage.removeItem('safari_bridge_id')
                                 
-                                // --- AUTO-JUMP LOGIC ---
-                                // 1. Attempt to close window (works if it was opened via window.open)
-                                // 2. Otherwise redirect to root to trigger iOS App Banner
+                                // AUTO-JUMP
                                 setTimeout(() => {
-                                    try {
-                                        window.close();
-                                    } catch (e) {}
+                                    try { window.close(); } catch (e) {}
                                     window.location.href = '/';
-                                }, 1500); 
-                            } else {
-                                const errData = await res.json()
-                                console.error('Sync Failed:', errData)
-                                setError(`การเชื่อมต่อล้มเหลว: ${errData.error || 'Unknown error'}`)
+                                }, 1500);
                             }
                         } catch (e: any) { 
-                            console.error('Bridge sync exception:', e)
+                            console.error('Final bridge sync error:', e)
                             setError(`เกิดข้อผิดพลาดในการเชื่อมต่อ: ${e.message}`)
                         } finally {
                             setSyncLoading(false)
