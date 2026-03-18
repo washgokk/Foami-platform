@@ -172,12 +172,21 @@ export default function GlobalLogin() {
 
     useEffect(() => {
         if (isIOS && isStandalone) {
-            // Pre-generate a bridge ID so we can use a real <a> tag for the jump
+            const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID;
+            
+            // Pre-generate a bridge ID
             const bridgeId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
                 ? crypto.randomUUID() 
                 : Math.random().toString(36).substring(2) + Date.now().toString(36);
             
-            setIosPwaBridgeUrl(`${window.location.origin}/login?bridgeId=${bridgeId}`);
+            if (liffId && liffId !== 'your_liff_id') {
+                // Using liff.line.me domain FORCES Safari to open because it's an external domain
+                setIosPwaBridgeUrl(`https://liff.line.me/${liffId}?bridgeId=${bridgeId}`);
+                console.log('iPad Breakout URL (External):', `https://liff.line.me/${liffId}?bridgeId=${bridgeId}`);
+            } else {
+                // Fallback to internal if no LIFF ID
+                setIosPwaBridgeUrl(`${window.location.origin}/login?bridgeId=${bridgeId}`);
+            }
             setDebugInfo(`Prepared Bridge ID: ${bridgeId}`);
         }
     }, [isIOS, isStandalone]);
@@ -317,11 +326,12 @@ export default function GlobalLogin() {
                             className={styles.lineBtn}
                             onClick={() => {
                                 // Extract bridgeId from url to set polling state
+                                // The ID is in the query param of the LIFF URL or internal URL
                                 const url = new URL(iosPwaBridgeUrl);
                                 const bId = url.searchParams.get('bridgeId');
                                 if (bId) {
                                     localStorage.setItem('pwa_bridge_id', bId);
-                                    // Force a small state update to trigger re-render to waiting screen
+                                    // Set loading to true locally to show spinner/waiting UI immediately
                                     setLoading(true); 
                                     const nextUrl = new URL(window.location.href);
                                     nextUrl.searchParams.set('pwaBridgeId', bId);
