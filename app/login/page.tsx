@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import styles from './login.module.css'
@@ -61,37 +61,49 @@ export default function GlobalLogin() {
             setDebugInfo(`Active Bridge: ${activeSafariBridgeId}`)
         }
 
-        // ─── Phase 2: Handle Returning from Direct OAuth (Code + State) ───
-        const handleDirectSync = async (code: string, state: string) => {
-            setSyncStatus('syncing')
-            setSyncLoading(true)
-            addLog(`Code detected. Exchanging for profile...`)
-            try {
-                const res = await fetch('/api/auth/bridge/sync-with-code', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code, bridgeId: state })
+    const syncLock = useRef(false)
+
+    // ─── Phase 2: Handle Returning from Direct OAuth (Code + State) ───
+    const handleDirectSync = async (code: string, state: string) => {
+        if (syncLock.current) return
+        syncLock.current = true
+
+        setSyncStatus('syncing')
+        setSyncLoading(true)
+        addLog(`Code detected. Exchanging for profile...`)
+        try {
+            const currentRedirectUri = `${window.location.origin}/login`
+            const res = await fetch('/api/auth/bridge/sync-with-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    code, 
+                    bridgeId: state,
+                    redirectUri: currentRedirectUri
                 })
-                const result = await res.json()
-                if (res.ok) {
-                    addLog(`Handshake complete for: ${result.displayName}`)
-                    setSyncStatus('completed')
-                    setIsBridgeSuccess(true)
-                    localStorage.removeItem('safari_bridge_id')
-                    setTimeout(() => {
-                        try { window.close() } catch (e) {}
-                        window.location.href = '/'
-                    }, 2500)
-                } else {
-                    addLog(`Handshake failed: ${result.error}`)
-                    setError(`ผิดพลาด: ${result.error}`)
-                }
-            } catch (e: any) {
-                addLog(`Network Error: ${e.message}`)
-            } finally {
-                setSyncLoading(false)
+            })
+            const result = await res.json()
+            if (res.ok) {
+                addLog(`Handshake complete for: ${result.displayName}`)
+                setSyncStatus('completed')
+                setIsBridgeSuccess(true)
+                localStorage.removeItem('safari_bridge_id')
+                setTimeout(() => {
+                    try { window.close() } catch (e) {}
+                    window.location.href = '/'
+                }, 2500)
+            } else {
+                addLog(`Handshake failed: ${result.error}`)
+                setError(`ผิดพลาด: ${result.error}`)
+                syncLock.current = false // Allow retry if it was a real error
             }
+        } catch (e: any) {
+            addLog(`Network Error: ${e.message}`)
+            syncLock.current = false
+        } finally {
+            setSyncLoading(false)
         }
+    }
 
         // ─── Phase 2.5: Auto-init LIFF (Only if NOT doing direct sync) ───
         const autoInit = async () => {

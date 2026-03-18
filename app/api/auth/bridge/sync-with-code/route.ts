@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
     try {
-        const { code, bridgeId } = await req.json()
+        const { code, bridgeId, redirectUri: clientRedirectUri } = await req.json()
         const liffId = process.env.NEXT_PUBLIC_LIFF_ID || process.env.NEXT_PUBLIC_LINE_LIFF_ID
         const channelSecret = process.env.LINE_CHANNEL_SECRET
         
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
         }
 
         const channelId = liffId.includes('-') ? liffId.split('-')[0] : liffId;
-        const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'https://foami-app.vercel.app'}/login`
+        const redirectUri = clientRedirectUri || `${process.env.NEXT_PUBLIC_APP_URL || 'https://foami-app.vercel.app'}/login`
 
         // 1. Exchange Code for Token
         const tokenParams = new URLSearchParams()
