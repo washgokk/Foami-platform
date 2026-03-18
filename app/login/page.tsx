@@ -29,15 +29,15 @@ export default function GlobalLogin() {
     }
 
     // Detect standalone mode (PWA)
-    const isStandalone = typeof window !== 'undefined' && 
+    const isStandalone = typeof window !== 'undefined' &&
         ((window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches);
 
     // Detect active bridge for Safari-side (syncing phase)
-    const activeSafariBridgeId = typeof window !== 'undefined' 
-        ? (new URLSearchParams(window.location.search).get('bridgeId') || 
-           new URLSearchParams(window.location.search).get('state') || 
-           new URLSearchParams(window.location.hash.slice(1)).get('bridgeId') || 
-           localStorage.getItem('safari_bridge_id'))
+    const activeSafariBridgeId = typeof window !== 'undefined'
+        ? (new URLSearchParams(window.location.search).get('bridgeId') ||
+            new URLSearchParams(window.location.search).get('state') ||
+            new URLSearchParams(window.location.hash.slice(1)).get('bridgeId') ||
+            localStorage.getItem('safari_bridge_id'))
         : null;
 
     // ─── Phase 1: Check existing session ───
@@ -50,91 +50,91 @@ export default function GlobalLogin() {
 
         const searchParams = new URLSearchParams(window.location.search)
         const hashParams = new URLSearchParams(window.location.hash.slice(1)) // Check fragment too
-        
+
         // Priority: URL Param > State > Hash > Storage
         const bridgeIdParam = searchParams.get('bridgeId') || searchParams.get('state') || hashParams.get('bridgeId')
-        
+
         if (bridgeIdParam && !isStandalone) {
             localStorage.setItem('safari_bridge_id', bridgeIdParam)
             addLog(`Captured Bridge ID from URL: ${bridgeIdParam}`)
         }
-        
+
         if (activeSafariBridgeId && !isStandalone) {
             setDebugInfo(`Active Bridge: ${activeSafariBridgeId}`)
         }
 
         // ─── Phase 2: Handle Returning from Direct OAuth (Code + State) ───
-    const handleDirectSync = async (code: string, state: string) => {
-        // Check if this specific code was already processed in this session
-        const processedCodes = JSON.parse(sessionStorage.getItem('processed_line_codes') || '[]')
-        if (processedCodes.includes(code)) {
-            addLog(`Code already processed. Skipping redundant attempt.`)
-            return
-        }
+        const handleDirectSync = async (code: string, state: string) => {
+            // Check if this specific code was already processed in this session
+            const processedCodes = JSON.parse(sessionStorage.getItem('processed_line_codes') || '[]')
+            if (processedCodes.includes(code)) {
+                addLog(`Code already processed. Skipping redundant attempt.`)
+                return
+            }
 
-        if (syncLock.current) return
-        syncLock.current = true
+            if (syncLock.current) return
+            syncLock.current = true
 
-        setSyncStatus('syncing')
-        setSyncLoading(true)
-        addLog(`Code detected. Exchanging for profile...`)
-        try {
-            const currentRedirectUri = window.location.origin + window.location.pathname
-            const res = await fetch('/api/auth/bridge/sync-with-code', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    code, 
-                    bridgeId: state,
-                    redirectUri: currentRedirectUri
+            setSyncStatus('syncing')
+            setSyncLoading(true)
+            addLog(`Code detected. Exchanging for profile...`)
+            try {
+                const currentRedirectUri = window.location.origin + window.location.pathname
+                const res = await fetch('/api/auth/bridge/sync-with-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        code,
+                        bridgeId: state,
+                        redirectUri: currentRedirectUri
+                    })
                 })
-            })
-            const result = await res.json()
-            if (res.ok) {
-                // Mark this code as processed
-                processedCodes.push(code)
-                sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
-                
-                addLog(`Handshake complete for: ${result.displayName}`)
-                setSyncStatus('completed')
-                setIsBridgeSuccess(true)
-                localStorage.removeItem('safari_bridge_id')
-                setTimeout(() => {
-                    try { window.close() } catch (e) {}
-                    window.location.href = '/'
-                }, 2500)
-            } else {
-                // If it was already invalid, we might have succeeded in a previous render
-                if (result.error?.includes('invalid authorization code')) {
+                const result = await res.json()
+                if (res.ok) {
+                    // Mark this code as processed
                     processedCodes.push(code)
                     sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
+
+                    addLog(`Handshake complete for: ${result.displayName}`)
+                    setSyncStatus('completed')
+                    setIsBridgeSuccess(true)
+                    localStorage.removeItem('safari_bridge_id')
+                    setTimeout(() => {
+                        try { window.close() } catch (e) { }
+                        window.location.href = '/'
+                    }, 2500)
+                } else {
+                    // If it was already invalid, we might have succeeded in a previous render
+                    if (result.error?.includes('invalid authorization code')) {
+                        processedCodes.push(code)
+                        sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
+                    }
+
+                    addLog(`Handshake failed: ${result.error}`)
+                    setError(`ผิดพลาด: ${result.error}`)
+                    syncLock.current = false
                 }
-                
-                addLog(`Handshake failed: ${result.error}`)
-                setError(`ผิดพลาด: ${result.error}`)
-                syncLock.current = false 
+            } catch (e: any) {
+                addLog(`Network Error: ${e.message}`)
+                syncLock.current = false
+            } finally {
+                setSyncLoading(false)
             }
-        } catch (e: any) {
-            addLog(`Network Error: ${e.message}`)
-            syncLock.current = false
-        } finally {
-            setSyncLoading(false)
         }
-    }
 
         // ─── Phase 2.5: Auto-init LIFF (Only if NOT doing direct sync) ───
         const autoInit = async () => {
-            if (isStandalone) return; 
-            
+            if (isStandalone) return;
+
             const code = searchParams.get('code')
             const state = searchParams.get('state')
             const pwaBridgeId = typeof window !== 'undefined' ? localStorage.getItem('pwa_bridge_id') : null
-            
+
             // v25: STRICT condition. Only hijack if the state matches our PWA Bridge ID.
             // This prevents hijacking standard LIFF logins that use their own state.
             if (code && state && state === pwaBridgeId) {
                 handleDirectSync(code, state)
-                return 
+                return
             }
 
             const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID
@@ -142,20 +142,20 @@ export default function GlobalLogin() {
                 addLog('No LIFF ID found in env')
                 return
             }
-            
+
             try {
                 setSyncStatus('init_liff')
                 addLog('Starting LIFF Init...')
                 const { default: liff } = await import('@line/liff')
-                
+
                 // Add Timeout for LIFF Init (Sometimes iPad hangs here)
                 const initPromise = liff.init({ liffId })
                 const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('LIFF_TIMEOUT')), 10000))
-                
+
                 await Promise.race([initPromise, timeoutPromise])
                 addLog('LIFF Init Success')
                 setSyncStatus('liff_done')
-                
+
                 if (liff.isLoggedIn()) {
                     setSyncStatus('fetching_profile')
                     addLog('Fetching LINE Profile...')
@@ -177,7 +177,7 @@ export default function GlobalLogin() {
                         setSyncStatus('syncing')
                         setSyncLoading(true)
                         addLog(`Attempting DB Sync for ${activeSafariBridgeId}...`)
-                        
+
                         try {
                             let success = false;
                             for (let i = 0; i < 3; i++) {
@@ -191,7 +191,7 @@ export default function GlobalLogin() {
                                         success = true;
                                         break;
                                     }
-                                    addLog(`Sync Attempt ${i+1} failed, retrying...`)
+                                    addLog(`Sync Attempt ${i + 1} failed, retrying...`)
                                     await new Promise(r => setTimeout(r, 1000));
                                 } catch (e) {
                                     if (i === 2) throw e;
@@ -204,7 +204,7 @@ export default function GlobalLogin() {
                                 addLog('SYNC SUCCESS! Closing in 2s...')
                                 localStorage.removeItem('safari_bridge_id')
                                 setTimeout(() => {
-                                    try { window.close(); } catch (e) {}
+                                    try { window.close(); } catch (e) { }
                                     window.location.href = '/';
                                 }, 2500);
                             } else {
@@ -212,7 +212,7 @@ export default function GlobalLogin() {
                                 addLog('Database Sync Failed')
                                 setError('การซิงค์ข้อมูลล้มเหลว กรุณาลองใหม่อีกครั้ง')
                             }
-                        } catch (e: any) { 
+                        } catch (e: any) {
                             setSyncStatus('error')
                             addLog(`Sync Error: ${e.message}`)
                             console.error('[Bridge] Sync Error:', e)
@@ -229,10 +229,12 @@ export default function GlobalLogin() {
                     }
                 } else {
                     addLog('LIFF Not Logged In')
-                    if (activeSafariBridgeId) {
-                        // If we have an ID but not logged in, force login redirect
-                        addLog('Forcing Login Redirect...')
+                    if (searchParams.get('bridgeId') || searchParams.get('state')) {
+                        // v33: Only auto-login if we just arrived from PWA (params present)
+                        addLog('PWA Breakout detected. Forcing Login Redirect...')
                         liff.login()
+                    } else {
+                        addLog('Direct browsing. Waiting for button click.')
                     }
                 }
             } catch (err: any) {
@@ -258,7 +260,7 @@ export default function GlobalLogin() {
                     window.location.reload();
                 }
             }
-        }, 5000) 
+        }, 3000)
 
         return () => clearTimeout(loadingTimer)
     }, [router, isBridgeSuccess, activeSafariBridgeId])
@@ -269,7 +271,7 @@ export default function GlobalLogin() {
         const urlId = searchParams.get('pwaBridgeId')
         const storageId = localStorage.getItem('pwa_bridge_id')
         const activeBridgeId = urlId || storageId
-        
+
         if (!activeBridgeId || !isStandalone) return
 
         if (urlId && !storageId) localStorage.setItem('pwa_bridge_id', urlId)
@@ -296,27 +298,27 @@ export default function GlobalLogin() {
 
     // --- iPad/iOS PWA Specific ---
     const [iosPwaBridgeUrl, setIosPwaBridgeUrl] = useState<string | null>(null);
-    const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+    const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 
     useEffect(() => {
         if (isIOS && isStandalone) {
             const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID;
-            const bridgeId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
-                ? crypto.randomUUID() 
+            const bridgeId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+                ? crypto.randomUUID()
                 : Math.random().toString(36).substring(2) + Date.now().toString(36);
-            
+
             if (liffId && liffId !== 'your_liff_id') {
                 // Extract Channel ID (Numeric) from LIFF ID (String)
                 const channelId = liffId.includes('-') ? liffId.split('-')[0] : liffId;
-                
+
                 // STATIC REDIRECT URI: This must be registered in LINE Developers Console
                 // We use the state parameter to carry the dynamic bridgeId
                 const staticRedirectUri = encodeURIComponent(`${window.location.origin}/login`);
                 const oauthUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${staticRedirectUri}&state=${bridgeId}&scope=profile%20openid`;
-                const breakoutUrl = `${window.location.origin}/api/auth/breakout?url=${encodeURIComponent(oauthUrl)}`;
-                setIosPwaBridgeUrl(breakoutUrl);
-                addLog('iPad Breakout via Redirector prepared');
+
+                setIosPwaBridgeUrl(oauthUrl);
+                addLog('iPad Breakout via Direct OAuth prepared');
             } else {
                 setIosPwaBridgeUrl(`${window.location.origin}/login?bridgeId=${bridgeId}`);
             }
@@ -342,7 +344,7 @@ export default function GlobalLogin() {
             }
             console.log('LIFF ID not found. Using Mock Login...')
             await new Promise(r => setTimeout(r, 800))
-            const mockId = 'mock_user_123' 
+            const mockId = 'mock_user_123'
             localStorage.setItem('liff_line_user_id', mockId)
             localStorage.setItem('liff_display_name', 'Mock User')
 
@@ -364,7 +366,7 @@ export default function GlobalLogin() {
 
             if (!liff.isLoggedIn()) {
                 liff.login()
-                return 
+                return
             }
 
             const profile = await liff.getProfile()
@@ -409,8 +411,8 @@ export default function GlobalLogin() {
                         <div className={styles.successBox}>
                             <div className={styles.checkIcon}>
                                 <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="12" cy="12" r="11" stroke="var(--primary)" strokeWidth="1.5"/>
-                                    <path d="M7 12.5L10.5 16L17 9" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <circle cx="12" cy="12" r="11" stroke="var(--primary)" strokeWidth="1.5" />
+                                    <path d="M7 12.5L10.5 16L17 9" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                                 </svg>
                             </div>
                             <h2 style={{ color: 'var(--text-primary)', fontSize: '1.5rem', marginBottom: 10 }}>เข้าสู่ระบบสำเร็จ!</h2>
@@ -427,16 +429,16 @@ export default function GlobalLogin() {
                             </p>
                         </div>
                     ) : (typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id'))) ? (
-                         <div className={styles.waitingBox}>
+                        <div className={styles.waitingBox}>
                             <div className="spinner-blue" style={{ width: 40, height: 40, margin: '0 auto 15px' }} />
                             <p style={{ color: 'var(--text-primary)', fontSize: '1.1rem', fontWeight: 600 }}>กำลังรอการเข้าสู่ระบบ...</p>
                             <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', marginBottom: 20 }}>กรุณาเข้าสู่ระบบใน Safari ที่เปิดขึ้นมา</p>
-                            
+
                             <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem', marginBottom: 15 }}>
                                 [Session ID: {typeof window !== 'undefined' ? (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id')) : ''}]
                             </p>
-                            <button 
-                                className={styles.retryBtn} 
+                            <button
+                                className={styles.retryBtn}
                                 onClick={() => {
                                     localStorage.removeItem('pwa_bridge_id');
                                     sessionStorage.removeItem('sync_refresh_attempt');
@@ -446,7 +448,7 @@ export default function GlobalLogin() {
                             >
                                 ยกเลิกและลองใหม่
                             </button>
-                         </div>
+                        </div>
                     ) : (
                         <p className={styles.subheadline}>
                             บริการล้างรถและดูแลรักษาพรีเมียม<br />
@@ -458,7 +460,7 @@ export default function GlobalLogin() {
                 {/* --- Action Buttons --- */}
                 {!(typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id'))) && !syncLoading && !loading && (
                     iosPwaBridgeUrl ? (
-                        <a 
+                        <a
                             href={iosPwaBridgeUrl}
                             target="_blank"
                             rel="noopener noreferrer"
@@ -467,10 +469,10 @@ export default function GlobalLogin() {
                                 // v25: Preparation for breakout
                                 const url = new URL(iosPwaBridgeUrl);
                                 const bId = url.searchParams.get('state') || url.searchParams.get('bridgeId');
-                                
+
                                 if (bId) {
                                     localStorage.setItem('pwa_bridge_id', bId);
-                                    setLoading(true); 
+                                    setLoading(true);
                                     const nextUrl = new URL(window.location.href);
                                     nextUrl.searchParams.set('pwaBridgeId', bId);
                                     window.history.replaceState({}, '', nextUrl.toString());
@@ -483,8 +485,8 @@ export default function GlobalLogin() {
                             <span>เข้าสู่ระบบด้วย LINE</span>
                         </a>
                     ) : (
-                        <button 
-                            className={styles.lineBtn} 
+                        <button
+                            className={styles.lineBtn}
                             onClick={handleLineLogin}
                             disabled={loading}
                         >

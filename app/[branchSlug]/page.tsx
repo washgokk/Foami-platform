@@ -11,7 +11,7 @@ export default function LiffEntry() {
     const isBridgeSuccess = useRef(false) // Use ref for polling check
 
     // Detect standalone mode (PWA)
-    const isStandalone = typeof window !== 'undefined' && 
+    const isStandalone = typeof window !== 'undefined' &&
         ((window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches);
 
     useEffect(() => {
@@ -24,7 +24,7 @@ export default function LiffEntry() {
         // ─── Phase 1: Handle Direct OAuth Sync (Manual Handshake) ───
         const handleDirectSync = async (targetCode: string, targetBridgeId: string) => {
             const processedCodes = JSON.parse(sessionStorage.getItem('processed_line_codes') || '[]')
-            if (processedCodes.includes(targetCode)) return true 
+            if (processedCodes.includes(targetCode)) return true
 
             if (syncLock.current) return true
             syncLock.current = true
@@ -41,9 +41,9 @@ export default function LiffEntry() {
                 if (res.ok) {
                     processedCodes.push(targetCode)
                     sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
-                    
+
                     setTimeout(() => {
-                        try { window.close() } catch (e) {}
+                        try { window.close() } catch (e) { }
                         window.location.href = `/${branchSlug}/menu`
                     }, 2000)
                     return true
@@ -54,7 +54,7 @@ export default function LiffEntry() {
                         sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
                     }
                     syncLock.current = false
-                    return true 
+                    return true
                 }
             } catch (e) {
                 console.error('Handshake error:', e)
@@ -69,12 +69,12 @@ export default function LiffEntry() {
                 sessionStorage.setItem('sync_refresh_attempt', '1')
                 window.location.reload()
             }
-        }, 8000)
+        }, 3000)
 
         // ─── Phase 2: Execution Logic ───
         const main = async () => {
             const pwaBridgeId = typeof window !== 'undefined' ? localStorage.getItem('pwa_bridge_id') : null
-            
+
             // v25: STRICT condition. Only hijack if this is a breakout return.
             if (code && state && state === pwaBridgeId) {
                 await handleDirectSync(code, pwaBridgeId)
@@ -91,10 +91,10 @@ export default function LiffEntry() {
             try {
                 const { default: liff } = await import('@line/liff')
                 await liff.init({ liffId })
-                
+
                 if (!liff.isLoggedIn()) {
                     if (isStandalone) return; // Wait for breakout button click 
-                    
+
                     if (bridgeId) liff.login({ redirectUri: window.location.href })
                     else liff.login()
                     return
@@ -119,7 +119,7 @@ export default function LiffEntry() {
                             body: JSON.stringify({ bridgeId, customerData })
                         })
                         setTimeout(() => {
-                            try { window.close() } catch (e) {}
+                            try { window.close() } catch (e) { }
                             window.location.href = `/${branchSlug}/menu`
                         }, 2000)
                     } catch (e) {
@@ -149,7 +149,7 @@ export default function LiffEntry() {
         const urlId = searchParams.get('pwaBridgeId')
         const storageId = localStorage.getItem('pwa_bridge_id')
         const activeBridgeId = urlId || storageId
-        
+
         if (!activeBridgeId || !isStandalone) return
 
         if (urlId && !storageId) localStorage.setItem('pwa_bridge_id', urlId)
@@ -176,9 +176,9 @@ export default function LiffEntry() {
     // --- iPad Breakout Prep (Ported from login/page.tsx) ---
     const [iosPwaBridgeUrl, setIosPwaBridgeUrl] = (typeof window !== 'undefined') ? (() => {
         const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID;
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
         if (isIOS && isStandalone && liffId && liffId !== 'your_liff_id') {
             const bridgeId = Math.random().toString(36).substring(2) + Date.now().toString(36);
             const channelId = liffId.includes('-') ? liffId.split('-')[0] : liffId;
@@ -200,9 +200,9 @@ export default function LiffEntry() {
             gap: '24px',
             padding: 'var(--space-6)'
         }}>
-            <img 
-                src="/logo - lanscape.svg" 
-                alt="Foami Logo" 
+            <img
+                src="/logo - lanscape.svg"
+                alt="Foami Logo"
                 style={{ width: '100%', maxWidth: '240px', height: 'auto', filter: 'brightness(0) invert(1)' }}
             />
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
@@ -213,19 +213,19 @@ export default function LiffEntry() {
                         <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', marginTop: '10px', textAlign: 'center' }}>
                             หาก Safari ไม่เด้งขึ้นมา <br /> กรุณาลองกดล็อคอินที่หน้า Safari ปกติครับ
                         </p>
-                        <button 
+                        <button
                             onClick={() => {
                                 localStorage.removeItem('pwa_bridge_id');
                                 window.location.reload();
                             }}
-                            style={{ 
+                            style={{
                                 marginTop: '15px', background: 'transparent', border: '1px solid rgba(255,255,255,0.3)',
                                 color: '#fff', padding: '6px 16px', borderRadius: '20px', fontSize: '0.75rem'
                             }}
                         >ยกเลิก</button>
                     </>
                 ) : (iosPwaBridgeUrl && isStandalone) ? (
-                    <a 
+                    <a
                         href={iosPwaBridgeUrl[0]}
                         target="_blank"
                         rel="noopener noreferrer"
