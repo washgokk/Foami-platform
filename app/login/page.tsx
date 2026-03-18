@@ -30,6 +30,13 @@ export default function GlobalLogin() {
     const isStandalone = typeof window !== 'undefined' && 
         ((window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches);
 
+    // Detect active bridge for Safari-side (syncing phase)
+    const activeSafariBridgeId = typeof window !== 'undefined' 
+        ? (new URLSearchParams(window.location.search).get('bridgeId') || 
+           new URLSearchParams(window.location.hash.slice(1)).get('bridgeId') || 
+           localStorage.getItem('safari_bridge_id'))
+        : null;
+
     // ─── Phase 1: Check existing session ───
     useEffect(() => {
         const stored = localStorage.getItem('liff_customer')
@@ -49,7 +56,6 @@ export default function GlobalLogin() {
             addLog(`Captured Bridge ID from URL: ${bridgeIdParam}`)
         }
         
-        const activeSafariBridgeId = bridgeIdParam || localStorage.getItem('safari_bridge_id')
         if (activeSafariBridgeId && !isStandalone) {
             setDebugInfo(`Active Bridge: ${activeSafariBridgeId}`)
         }
