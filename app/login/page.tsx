@@ -26,18 +26,19 @@ export default function GlobalLogin() {
     const isStandalone = typeof window !== 'undefined' &&
         ((window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches);
 
-    // v42: Detect if this is a PWA-to-Safari handshake flow
+    // v43: Strict URL-based Handshake Identification
     const bridgeParam = (typeof window !== 'undefined')
         ? (new URLSearchParams(window.location.search).get('bridgeId') ||
             new URLSearchParams(window.location.search).get('state') ||
             new URLSearchParams(window.location.hash.slice(1)).get('bridgeId'))
         : null;
 
-    const activeSafariBridgeId = (typeof window !== 'undefined')
-        ? (bridgeParam?.startsWith('bridge_') ? bridgeParam : localStorage.getItem('safari_bridge_id'))
-        : null;
+    // Only identify as handshake if current URL has bridge_ prefix
+    const isHandshakeFlow = !!bridgeParam?.startsWith('bridge_');
 
-    const isHandshakeFlow = !!activeSafariBridgeId?.startsWith('bridge_');
+    const activeSafariBridgeId = (typeof window !== 'undefined')
+        ? (isHandshakeFlow ? bridgeParam : localStorage.getItem('safari_bridge_id'))
+        : null;
 
     // ─── Phase 1: Check existing session ───
     useEffect(() => {
@@ -76,8 +77,8 @@ export default function GlobalLogin() {
         const handleDirectSync = async (code: string, state: string) => {
             if (!code || !state) return;
             
-            // v41: Persistent Processed Code Guard
-            const processedCodes = JSON.parse(sessionStorage.getItem('processed_line_codes') || '[]')
+            // v43: Persistent Code Guard (using localStorage for cross-tab Safari)
+            const processedCodes = JSON.parse(localStorage.getItem('foami_processed_codes') || '[]')
             if (processedCodes.includes(code)) {
                 // If already success and we are still here, redirect again
                 const storedUrl = localStorage.getItem('liff_login_success_url') || '/search';
@@ -88,8 +89,9 @@ export default function GlobalLogin() {
             if (syncLock.current) return
             syncLock.current = true
 
+            // v43: Standardize loading feedback
             setSyncLoading(true)
-            addLog(`Code detected. Synchronizing...`)
+            addLog(`Auth code detected. Processing...`)
             
             try {
                 const currentRedirectUri = window.location.origin + window.location.pathname
@@ -105,31 +107,41 @@ export default function GlobalLogin() {
                 const result = await res.json()
                 
                 if (res.ok) {
-                    // Mark as processed immediately
+                    // Mark as processed in persistent storage
                     processedCodes.push(code)
-                    sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
+                    localStorage.setItem('foami_processed_codes', JSON.stringify(processedCodes))
 
                     addLog(`Handshake complete for: ${result.displayName}`)
                     setIsBridgeSuccess(true)
                     
-                    // v42: Faster close for handshake, standard redirect for others
+                    // v43: Universal Self-Destruct for Redundant Tabs
                     setTimeout(() => {
                         const isProbablyPopup = !isStandalone && (window.opener || window.history.length === 1);
-                        if (isProbablyPopup && isHandshakeFlow) {
+                        
+                        // v43: Set global success flags (Cross-tab sync)
+                        localStorage.setItem('foami_login_success', 'true');
+                        localStorage.setItem('foami_customer', JSON.stringify(result.customerData));
+
+                        if (isProbablyPopup) {
+                            // If it's a breakout tab (from PWA or Safari-New-Tab), close it and let the original handle it
+                            addLog(`Redundant tab detected. Closing...`)
                             try { 
                                 window.open('', '_self');
                                 window.close(); 
                             } catch (e) { }
                         }
+                        
+                        // Even if close() fails or doesn't run, redirect to be safe
                         resolveAndRedirect(result.customerData);
-                    }, isHandshakeFlow ? 100 : 500)
+                    }, isHandshakeFlow ? 100 : 800)
                 } else {
-                    // v41: Silent ignore for 'already used' codes to prevent red error box flicker
+                    // v43: Silent ignore for 'already used' codes to prevent flicker on new tabs
                     const isAlreadyUsed = result.error?.includes('invalid authorization code') || result.error?.includes('used');
                     if (isAlreadyUsed) {
                         processedCodes.push(code)
-                        sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
-                        // If we have a session, just redirect
+                        localStorage.setItem('foami_processed_codes', JSON.stringify(processedCodes))
+                        
+                        // If we have a session in this tab/storage, just redirect
                         if (localStorage.getItem('liff_customer')) {
                             const storedUrl = localStorage.getItem('liff_login_success_url') || '/search';
                             window.location.href = storedUrl;
