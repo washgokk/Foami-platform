@@ -147,33 +147,46 @@ export function usePushNotifications(
             }
 
             let newSubscription;
-            try {
-                newSubscription = await registration.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey: urlBase64ToUint8Array(base64String)
-                })
-            } catch (pSubErr: any) {
-                console.error('Initial push subscribe attempt failed:', pSubErr)
-                
-                // If it's a push service error, try self-healing once
-                if (pSubErr.message?.toLowerCase().includes('push service error') || pSubErr.name === 'AbortError') {
-                    console.warn('Push service error detected. Attempting to reset Service Worker and retry...')
-                    const regs = await navigator.serviceWorker.getRegistrations()
-                    for (const r of regs) await r.unregister()
-                    
-                    // Re-register
-                    const newReg = await navigator.serviceWorker.register('/sw.js', { scope })
-                    await navigator.serviceWorker.ready
-                    
-                    // Retry subscribe
-                    newSubscription = await newReg.pushManager.subscribe({
+            let retryCount = 0;
+            const maxRetries = 1;
+
+            const attemptSubscribe = async (reg: ServiceWorkerRegistration): Promise<PushSubscription> => {
+                try {
+                    return await reg.pushManager.subscribe({
                         userVisibleOnly: true,
                         applicationServerKey: urlBase64ToUint8Array(base64String)
-                    })
-                } else {
-                    throw pSubErr
+                    });
+                } catch (err: any) {
+                    console.error(`Subscribe attempt ${retryCount + 1} failed:`, err);
+                    
+                    // Specific handling for common Android/Browser errors
+                    if (err.name === 'NotAllowedError' || Notification.permission === 'denied') {
+                        throw new Error('เบราว์เซอร์ถูกปฏิเสธการเข้าถึงการแจ้งเตือน (Permission Denied) กรุณาเปิดสิทธิ์ในหน้าตั้งค่าของเบราว์เซอร์ครับ');
+                    }
+                    
+                    if (retryCount < maxRetries && (err.message?.toLowerCase().includes('push service error') || err.name === 'AbortError')) {
+                        retryCount++;
+                        console.warn('Push service error detected. Attempting self-healing...');
+                        
+                        // 1. Unregister everything
+                        const regs = await navigator.serviceWorker.getRegistrations();
+                        for (const r of regs) await r.unregister();
+                        
+                        // 2. Wait a bit for the browser to catch up
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        
+                        // 3. Re-register
+                        const newReg = await navigator.serviceWorker.register('/sw.js', { scope });
+                        await navigator.serviceWorker.ready;
+                        
+                        // 4. Recursive retry
+                        return attemptSubscribe(newReg);
+                    }
+                    throw err;
                 }
-            }
+            };
+
+            newSubscription = await attemptSubscribe(registration);
 
             if (!newSubscription) throw new Error('Could not create push subscription')
 

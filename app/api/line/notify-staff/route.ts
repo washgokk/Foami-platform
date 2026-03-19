@@ -18,21 +18,47 @@ export async function POST(req: NextRequest) {
                         altText: message,
                         contents: {
                             type: 'bubble',
+                            size: 'mega',
                             header: {
                                 type: 'box', layout: 'vertical',
-                                backgroundColor: '#3B5FCC',
-                                paddingAll: '16px',
-                                contents: [{ type: 'text', text: '🫧 Foami — งานใหม่!', color: '#FFFFFF', weight: 'bold', size: 'lg' }]
+                                backgroundColor: '#1A2340',
+                                paddingAll: '20px',
+                                contents: [
+                                    {
+                                        type: 'box', layout: 'horizontal',
+                                        contents: [
+                                            { type: 'text', text: '🫧', size: 'xl', flex: 0, margin: 'none' },
+                                            { type: 'text', text: 'FOAMI STAFF', color: '#FFFFFF', weight: 'bold', size: 'md', margin: 'md', gravity: 'center' }
+                                        ]
+                                    },
+                                    { type: 'text', text: 'ได้รับงานใหม่!', color: '#F1BFDB', size: 'xs', margin: 'xs', weight: 'bold' }
+                                ]
                             },
                             body: {
-                                type: 'box', layout: 'vertical', paddingAll: '16px',
+                                type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: '#FFFFFF',
                                 contents: [
-                                    { type: 'text', text: message, wrap: true, size: 'sm', color: '#1A2340' },
                                     {
-                                        type: 'button', style: 'primary', color: '#3B5FCC',
-                                        margin: 'lg',
-                                        action: { type: 'uri', label: '📋 ดูรายละเอียดงาน', uri: `${process.env.NEXT_PUBLIC_APP_URL}/staff/jobs/${booking_id}` }
+                                        type: 'box', layout: 'vertical', spacing: 'sm',
+                                        contents: [
+                                            { type: 'text', text: 'รายละเอียดการจอง', size: 'xs', color: '#5A6589', weight: 'bold' },
+                                            { type: 'text', text: message, wrap: true, size: 'md', color: '#1A2340', weight: 'bold', margin: 'sm' }
+                                        ]
+                                    },
+                                    {
+                                        type: 'box', layout: 'vertical', margin: 'xl', spacing: 'sm',
+                                        contents: [
+                                            {
+                                                type: 'button', style: 'primary', color: '#315EC3', height: 'md',
+                                                action: { type: 'uri', label: '📋 ตรวจสอบและรับงาน', uri: `${process.env.NEXT_PUBLIC_APP_URL}/staff/jobs/${booking_id}` }
+                                            }
+                                        ]
                                     }
+                                ]
+                            },
+                            footer: {
+                                type: 'box', layout: 'vertical', backgroundColor: '#F8FAFC', paddingAll: 'xs',
+                                contents: [
+                                    { type: 'text', text: 'Foami Wash & Delivery Service', size: 'xxs', color: '#94A3B8', align: 'center' }
                                 ]
                             }
                         }

@@ -45,6 +45,7 @@ export async function PATCH(
                     line_user_id: data.customers.line_user_id,
                     message: NOTIFY_STATUSES[status],
                     booking_id: id,
+                    notif_type: status, // Pass status as type
                 }),
             })
         } catch { /* Non-critical */ }
