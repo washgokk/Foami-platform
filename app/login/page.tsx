@@ -44,7 +44,17 @@ export default function GlobalLogin() {
     useEffect(() => {
         const stored = localStorage.getItem('liff_customer')
         if (stored) {
-            router.replace('/search')
+            try {
+                const customer = JSON.parse(stored);
+                // v38: Always favor the last known branch from DB/Storage
+                if (customer.last_branch_slug) {
+                    router.replace(`/${customer.last_branch_slug}/menu`);
+                } else {
+                    router.replace('/search');
+                }
+            } catch (e) {
+                router.replace('/search');
+            }
             return
         }
 
@@ -98,9 +108,11 @@ export default function GlobalLogin() {
                     addLog(`Handshake complete for: ${result.displayName}`)
                     setSyncStatus('completed')
                     setIsBridgeSuccess(true)
-                    // v37: Determine Destination (Dynamic Signal)
-                    const lastBranch = localStorage.getItem('last_branch_slug');
-                    const targetUrl = lastBranch ? `/${lastBranch}/menu` : '/search';
+                    // v38: Determine Destination (DB-Driven Signal)
+                    const dbBranch = result.customerData?.last_branch_slug;
+                    const localBranch = localStorage.getItem('last_branch_slug');
+                    const targetBranch = dbBranch || localBranch;
+                    const targetUrl = targetBranch ? `/${targetBranch}/menu` : '/search';
                     
                     if (result.customerData) {
                         localStorage.setItem('liff_customer', JSON.stringify(result.customerData));

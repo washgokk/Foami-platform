@@ -49,19 +49,24 @@ export async function POST(req: NextRequest) {
 
         // 3. Sync to Supabase
         const supabase = createServiceClient()
-        const customerData = { 
+        const { branchSlug } = await req.json().catch(() => ({})); // Optional branch from request
+
+        // Upsert customer with last branch memory
+        const upsertData: any = { 
             line_user_id: profile.userId, 
             full_name: profile.displayName,
             picture_url: profile.pictureUrl
         }
+        if (branchSlug) {
+            upsertData.last_branch_slug = branchSlug;
+        }
 
-        // Upsert customer
         const { data: customer, error: custError } = await supabase
             .from('customers')
-            .upsert({ line_user_id: profile.userId, full_name: profile.displayName })
+            .upsert(upsertData)
             .select()
             .maybeSingle()
-
+ 
         if (custError) {
             console.error('Customer Sync Error:', custError)
         }
@@ -71,7 +76,7 @@ export async function POST(req: NextRequest) {
             .from('pwa_auth_bridges')
             .upsert({ 
                 id: bridgeId, 
-                customer_data: customer || customerData,
+                customer_data: customer || { ...upsertData, line_user_id: profile.userId },
                 created_at: new Date().toISOString()
             })
 
@@ -82,7 +87,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ 
             success: true, 
             displayName: profile.displayName,
-            customerData: customer || customerData 
+            customerData: customer || { ...upsertData, line_user_id: profile.userId }
         })
     } catch (err: any) {
         console.error('Sync Code Error:', err)

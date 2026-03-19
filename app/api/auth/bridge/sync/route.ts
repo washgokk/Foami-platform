@@ -10,15 +10,24 @@ export async function POST(req: NextRequest) {
         }
 
         const supabase = createServiceClient()
+        const { branchSlug } = await req.json().catch(() => ({})); 
 
         console.log(`[Bridge Sync] Attempting to sync ID: ${bridgeId} for user: ${customerData.line_user_id}`)
 
-        // Upsert the data into the bridge table
+        // 1. Update Customer's Last Branch in DB
+        if (branchSlug) {
+            await supabase
+                .from('customers')
+                .update({ last_branch_slug: branchSlug })
+                .eq('line_user_id', customerData.line_user_id)
+        }
+
+        // 2. Upsert the data into the bridge table
         const { error } = await supabase
             .from('pwa_auth_bridges')
             .upsert({ 
                 id: bridgeId, 
-                customer_data: customerData,
+                customer_data: { ...customerData, last_branch_slug: branchSlug || customerData.last_branch_slug },
                 created_at: new Date().toISOString()
             })
 
