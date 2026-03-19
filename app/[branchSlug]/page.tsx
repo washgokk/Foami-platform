@@ -146,8 +146,8 @@ export default function LiffEntry() {
                                 if (!window.opener && window.length <= 1) {
                                     window.location.href = targetUrl;
                                 }
-                            }, 500);
-                        }, 1000)
+                            }, 300);
+                        }, 300)
                     } catch (e) {
                         console.error('Bridge sync error:', e)
                     }
