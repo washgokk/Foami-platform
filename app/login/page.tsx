@@ -111,28 +111,27 @@ export default function GlobalLogin() {
                     localStorage.setItem('liff_login_success_url', targetUrl);
                     localStorage.setItem('liff_login_success', Date.now().toString());
 
-                    // v37.2: Enhanced Close (Safari Protection)
-                    // If we can't close, we stay on the success screen but don't redirect
-                    // to prevent the "Dual Tab" issue where the first tab also redirected.
-                    addLog(`Success! Signaling background tab to move to ${targetUrl}...`)
-                    setTimeout(() => {
-                        try { 
-                            // Power-close trick for Safari
-                            window.open('', '_self');
-                            window.close(); 
-                        } catch (e) { }
-                        
-                        // v37.2: If still open, tell user it's safe to close or wait 2s
+                    // v36.4: Add 1s delay to ensure storage/DB commit
+                    // v37.2: ONLY close if not in Standalone (PWA) mode. 
+                    // Android PWA returns in the same window, so close() kills the app.
+                    if (!isStandalone) {
+                        addLog(`Handshake sync done. Signalling and closing...`)
                         setTimeout(() => {
-                            if (window.opener || window.length > 1) {
-                                // If we're likely a sub-window, just stop. 
-                                // Redirecting here creates the "Duplicate Tab" problem.
-                                addLog("Please close this tab manully to return.")
-                            } else {
-                                window.location.href = targetUrl;
-                            }
-                        }, 500);
-                    }, 1000)
+                            try { 
+                                // Aggressive closing trick for some browsers
+                                window.open('', '_self'); 
+                                window.close(); 
+                            } catch (e) { }
+                            
+                            // Last resort fallback
+                            setTimeout(() => {
+                                if (!window.closed) window.location.href = targetUrl;
+                            }, 500);
+                        }, 1000)
+                    } else {
+                        addLog(`PWA sync done. Redirecting to ${targetUrl}...`)
+                        window.location.href = targetUrl;
+                    }
                 } else {
                     // If it was already invalid, we might have succeeded in a previous render
                     if (result.error?.includes('invalid authorization code')) {
@@ -537,8 +536,8 @@ export default function GlobalLogin() {
                                     window.history.replaceState({}, '', nextUrl.toString());
                                 }
                                 
-                                // v37.2: Open in NEW TAB to ensure closure is allowed later
-                                window.open(iosPwaBridgeUrl, '_blank');
+                                // FORCE JUMP to Safari
+                                window.location.href = iosPwaBridgeUrl;
                             }}
                         >
                             <div className={styles.lineIconWrapper}>

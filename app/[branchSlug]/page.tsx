@@ -41,7 +41,7 @@ export default function LiffEntry() {
                 if (res.ok) {
                     processedCodes.push(targetCode)
                     sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
-                    
+
                     // v35: Notify original tab (Auto-Refresh)
                     localStorage.setItem('liff_login_success', Date.now().toString());
 
@@ -121,7 +121,7 @@ export default function LiffEntry() {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ bridgeId, customerData })
                         })
-                        
+
                         // v36.4: Save locally then notify
                         const targetUrl = `/${branchSlug}/menu`;
                         if (customerData) {
@@ -129,25 +129,31 @@ export default function LiffEntry() {
                             localStorage.setItem('liff_line_user_id', customerData.line_user_id);
                             localStorage.setItem('last_branch_slug', branchSlug);
                         }
-                        
+
                         // v37: Signal specific branch destination
                         localStorage.setItem('liff_login_success_url', targetUrl);
                         localStorage.setItem('liff_login_success', Date.now().toString());
+
+                        console.log(`[Handshake] Sync success! Signaling target: ${targetUrl}`)
                         
-                        console.log(`[Handshake] Sync success! Closing and signaling target: ${targetUrl}`)
-                        setTimeout(() => {
-                            try { 
-                                window.open('', '_self');
-                                window.close(); 
-                            } catch (e) { }
-                            
+                        // v37.2: ONLY close if not in Standalone (PWA) mode.
+                        if (!isStandalone) {
                             setTimeout(() => {
-                                // If still alive, only redirect if we aren't a popup
-                                if (!window.opener && window.length <= 1) {
-                                    window.location.href = targetUrl;
-                                }
-                            }, 500);
-                        }, 1000)
+                                try {
+                                    window.open('', '_self');
+                                    window.close();
+                                } catch (e) { }
+
+                                setTimeout(() => {
+                                    // If still alive, only redirect if we aren't a popup
+                                    if (!window.opener && window.length <= 1) {
+                                        window.location.href = targetUrl;
+                                    }
+                                }, 300);
+                            }, 300);
+                        } else {
+                            window.location.href = targetUrl;
+                        }
                     } catch (e) {
                         console.error('Bridge sync error:', e)
                     }
