@@ -1,61 +1,57 @@
-// SW Version: 2026-03-18-v4-Final
+// SW Version: 2026-03-20-v5
 self.addEventListener('push', function (event) {
-    console.log('[SW] Push Received V4');
-    
-    const promise = (async () => {
-        let data = { 
-            title: 'Foami Wash & Delivery', 
-            body: 'คุณมีการแจ้งเตือนใหม่ กรุณาเปิดแอปเพื่อตรวจสอบครับ', 
-            url: '/' 
-        };
+    console.log('[SW] Push Received V5');
 
-        if (event.data) {
+    // Parse data SYNCHRONOUSLY before any async calls
+    // This prevents race conditions against the browser push event timeout
+    let title = 'Foami Wash & Delivery';
+    let body = 'คุณมีการแจ้งเตือนใหม่ กรุณาเปิดแอปครับ';
+    let url = '/';
+    let icon = '/icon.svg';
+
+    if (event.data) {
+        try {
+            const json = event.data.json();
+            console.log('[SW] Push data:', json);
+            if (json.title) title = json.title;
+            if (json.body)  body  = json.body;
+            if (json.url)   url   = json.url;
+            if (json.icon)  icon  = json.icon;
+        } catch (e) {
             try {
-                const json = event.data.json();
-                console.log('[SW] Push JSON:', json);
-                if (json && typeof json === 'object') {
-                    if (json.title) data.title = String(json.title);
-                    if (json.body) data.body = String(json.body);
-                    if (json.url) data.url = String(json.url);
-                }
-            } catch (e) {
                 const text = event.data.text();
-                console.log('[SW] Push Text:', text);
-                if (text) {
-                    try {
-                        const parsed = JSON.parse(text);
-                        if (parsed.title) data.title = parsed.title;
-                        if (parsed.body) data.body = parsed.body;
-                        if (parsed.url) data.url = parsed.url;
-                    } catch (innerE) {
-                        data.body = text;
-                    }
-                }
+                const parsed = JSON.parse(text);
+                if (parsed.title) title = parsed.title;
+                if (parsed.body)  body  = parsed.body;
+                if (parsed.url)   url   = parsed.url;
+            } catch (e2) {
+                console.warn('[SW] Could not parse push data', e2);
             }
         }
+    }
 
-        const options = {
-            body: data.body,
-            icon: '/icon.svg',
-            badge: '/icon.svg',
-            vibrate: [100, 50, 100],
-            data: {
-                url: data.url || '/'
-            },
-            tag: 'foami-notif-' + (data.url || 'default').replace(/[^a-z0-9]/gi, '-'),
-            renotify: true
-        };
+    const notifOptions = {
+        body,
+        icon,
+        badge: '/icon.svg',
+        vibrate: [200, 100, 200],
+        data: { url },
+        tag: 'foami-' + url.replace(/[^a-z0-9]/gi, '-'),
+        renotify: true,
+        requireInteraction: false,
+    };
 
-        return self.registration.showNotification(data.title, options);
-    })().catch(err => {
-        console.error('[SW] Push Error:', err);
-        return self.registration.showNotification('Foami: การแจ้งเตือนใหม่', {
-            body: 'กรุณาแตะที่นี่เพื่อตรวจสอบรายละเอียดในแอปครับ',
-            icon: '/icon.svg'
-        });
-    });
-
-    event.waitUntil(promise);
+    // showNotification is synchronous in terms of event.waitUntil resolution
+    event.waitUntil(
+        self.registration.showNotification(title, notifOptions)
+            .catch(function(err) {
+                console.error('[SW] showNotification failed:', err);
+                return self.registration.showNotification('Foami: การแจ้งเตือนใหม่', {
+                    body: 'กรุณาเปิดแอปเพื่อตรวจสอบสถานะครับ',
+                    icon: '/icon.svg'
+                });
+            })
+    );
 });
 
 self.addEventListener('notificationclick', function (event) {

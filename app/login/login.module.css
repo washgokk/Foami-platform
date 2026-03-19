@@ -199,15 +199,3 @@
     border-color: #cbd5e1;
     transform: translateY(-1px);
 }
-
-/* iPad / iOS Safari: date input overflows without this */
-@supports (-webkit-touch-callout: none) {
-    input[type="date"].form-input,
-    input[type="date"] {
-        box-sizing: border-box;
-        width: 100%;
-        max-width: 100%;
-        -webkit-appearance: none;
-        appearance: none;
-    }
-}

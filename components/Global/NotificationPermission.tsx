@@ -47,15 +47,18 @@ export default function NotificationPermission() {
         if (!userId) return
         if (typeof window === 'undefined') return
         if (!('Notification' in window)) return
-        if (!('serviceWorker' in navigator)) return
 
-        // Already decided → don't show
+        // Clear the OLD silent-request flag from the previous component version.
+        // That component used to request permission silently without a banner,
+        // setting foami_notif_requested=true which blocked the new banner forever.
+        localStorage.removeItem('foami_notif_requested')
+
+        // Already permanently dismissed by user → don't show
         const dismissed = localStorage.getItem('foami_notif_dismissed')
-        const requested = localStorage.getItem('foami_notif_requested')
-        if (dismissed || requested) return
+        if (dismissed) return
 
-        // Already granted or denied → no need to ask
-        if (Notification.permission !== 'default') return
+        // Already subscribed → no need to ask again
+        if (Notification.permission === 'granted') return
 
         // Show banner after 4 seconds
         const timer = setTimeout(() => setShow(true), 4000)
