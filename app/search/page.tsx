@@ -56,6 +56,31 @@ export default function BranchSearchPage() {
             return 0
         })
 
+    const handleBranchClick = async (slug: string) => {
+        // v40: Active Tracking
+        localStorage.setItem('last_branch_slug', slug);
+        
+        const stored = localStorage.getItem('liff_customer');
+        if (stored) {
+            try {
+                const customer = JSON.parse(stored);
+                if (customer.line_user_id) {
+                    // Update DB immediately
+                    await supabase
+                        .from('customers')
+                        .update({ last_branch_slug: slug })
+                        .eq('line_user_id', customer.line_user_id);
+                    
+                    // Update local copy
+                    customer.last_branch_slug = slug;
+                    localStorage.setItem('liff_customer', JSON.stringify(customer));
+                }
+            } catch (e) { }
+        }
+        
+        router.push(`/${slug}/menu`);
+    }
+
     return (
         <div className={styles.page}>
             <div className={styles.header}>
@@ -81,7 +106,7 @@ export default function BranchSearchPage() {
             ) : (
                 <div className={styles.grid}>
                     {filteredBranches.map(b => (
-                        <Link href={`/${b.slug}/menu`} key={b.id} className={styles.branchCard}>
+                        <div key={b.id} onClick={() => handleBranchClick(b.slug)} className={styles.branchCard} style={{ cursor: 'pointer' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div className={styles.branchName}>{b.name}</div>
                                 {b.distance !== null && (
@@ -98,7 +123,7 @@ export default function BranchSearchPage() {
                                     {b.address.includes('จ.') ? b.address.split('จ.')[1].split(' ')[0] : (b.address.includes('จังหวัด') ? b.address.split('จังหวัด')[1].split(' ')[0] : 'อื่นๆ')}
                                 </span>
                             </div>
-                        </Link>
+                        </div>
                     ))}
                     {filteredBranches.length === 0 && (
                         <div className={styles.empty}>ไม่พบสาขาที่คุณค้นหา</div>
