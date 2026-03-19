@@ -129,7 +129,7 @@ export default function LiffEntry() {
                         }
                         localStorage.setItem('liff_login_success', Date.now().toString());
                         
-                        addLog(`Sync success! Closing in 1s...`)
+                        console.log(`[Handshake] Sync success! Closing in 1s...`)
                         setTimeout(() => {
                             try { window.close() } catch (e) { }
                             window.location.href = `/${branchSlug}/menu`
