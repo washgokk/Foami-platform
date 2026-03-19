@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
             upsertData.last_branch_slug = branchSlug;
         }
 
-        const { data: customer, error: custError } = await supabase
+        const { data: upsertedCustomer, error: custError } = await supabase
             .from('customers')
             .upsert(upsertData, { onConflict: 'line_user_id' })
             .select()
@@ -73,12 +73,30 @@ export async function POST(req: NextRequest) {
             console.error('Customer Sync Error:', custError)
         }
 
+        // If upsert returned no data (no-change upsert), fetch the existing row
+        let customer = upsertedCustomer
+        if (!customer) {
+            const { data: existingCustomer } = await supabase
+                .from('customers')
+                .select('*')
+                .eq('line_user_id', profile.userId)
+                .maybeSingle()
+            customer = existingCustomer
+        }
+
+        const customerData = customer || { 
+            line_user_id: profile.userId,
+            full_name: profile.displayName,
+            picture_url: profile.pictureUrl,
+            ...(branchSlug ? { last_branch_slug: branchSlug } : {})
+        }
+
         // Sync to bridge
         const { error: bridgeError } = await supabase
             .from('pwa_auth_bridges')
             .upsert({ 
                 id: bridgeId, 
-                customer_data: customer || { ...upsertData, line_user_id: profile.userId },
+                customer_data: customerData,
                 created_at: new Date().toISOString()
             }, { onConflict: 'id' })
 
@@ -89,7 +107,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ 
             success: true, 
             displayName: profile.displayName,
-            customerData: customer || { ...upsertData, line_user_id: profile.userId }
+            customerData
         })
     } catch (err: any) {
         console.error('Sync Code Error:', err)
