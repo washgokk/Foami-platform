@@ -103,10 +103,11 @@ export default function GlobalLogin() {
                     // v35: Notify other tabs (Auto-Refresh)
                     localStorage.setItem('liff_login_success', Date.now().toString());
 
-                    setTimeout(() => {
-                        try { window.close() } catch (e) { }
-                        window.location.href = '/search'
-                    }, 2500)
+                    // v36.3: Close INSTANTLY
+                    try { window.close() } catch (e) { }
+                    
+                    // Fallback redirect in case window.close is blocked
+                    window.location.href = '/search'
                 } else {
                     // If it was already invalid, we might have succeeded in a previous render
                     if (result.error?.includes('invalid authorization code')) {
@@ -134,9 +135,11 @@ export default function GlobalLogin() {
             const state = searchParams.get('state')
             const pwaBridgeId = typeof window !== 'undefined' ? localStorage.getItem('pwa_bridge_id') : null
 
-            // v25: STRICT condition. Only hijack if the state matches our PWA Bridge ID.
-            // This prevents hijacking standard LIFF logins that use their own state.
-            if (code && state && state === pwaBridgeId) {
+            // v36.3: Safari/PWA Handshake Recovery.
+            // Since Safari and PWA don't share LocalStorage, we can't check 'pwaBridgeId'.
+            // If we have code+state and it's not a standalone app, it's definitely a handshake.
+            if (code && state && !isStandalone) {
+                addLog(`Handshake Return detected (State: ${state}). Starting Sync...`)
                 handleDirectSync(code, state)
                 return
             }
@@ -484,13 +487,11 @@ export default function GlobalLogin() {
                 {/* --- Action Buttons --- */}
                 {!(typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id'))) && !syncLoading && !loading && (
                     iosPwaBridgeUrl ? (
-                        <a
-                            href={iosPwaBridgeUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                        <button
                             className={styles.lineBtn}
-                            onClick={() => {
-                                // v25: Preparation for breakout
+                            onClick={(e) => {
+                                // v36.3: Programmatic jump often breaks out of PWA more cleanly than <a>
+                                e.preventDefault();
                                 const url = new URL(iosPwaBridgeUrl);
                                 const bId = url.searchParams.get('state') || url.searchParams.get('bridgeId');
 
@@ -501,13 +502,16 @@ export default function GlobalLogin() {
                                     nextUrl.searchParams.set('pwaBridgeId', bId);
                                     window.history.replaceState({}, '', nextUrl.toString());
                                 }
+                                
+                                // FORCE JUMP to Safari
+                                window.location.href = iosPwaBridgeUrl;
                             }}
                         >
                             <div className={styles.lineIconWrapper}>
                                 <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg" alt="LINE" className={styles.lineIcon} />
                             </div>
                             <span>เข้าสู่ระบบด้วย LINE</span>
-                        </a>
+                        </button>
                     ) : (
                         <button
                             className={styles.lineBtn}

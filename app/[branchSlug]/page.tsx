@@ -121,11 +121,9 @@ export default function LiffEntry() {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ bridgeId, customerData })
                         })
-                        setTimeout(() => {
-                            try { window.close() } catch (e) { }
-                            // v35.2: Explicitly go to the correct branch menu
-                            window.location.href = `/${branchSlug}/menu`
-                        }, 2000)
+                        // v36.3: Close instantly
+                        try { window.close() } catch (e) { }
+                        window.location.href = `/${branchSlug}/menu`
                     } catch (e) {
                         console.error('Bridge sync error:', e)
                     }
