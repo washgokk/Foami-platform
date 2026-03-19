@@ -134,26 +134,23 @@ export default function LiffEntry() {
                         localStorage.setItem('liff_login_success_url', targetUrl);
                         localStorage.setItem('liff_login_success', Date.now().toString());
 
-                        console.log(`[Handshake] Sync success! Signaling target: ${targetUrl}`)
-                        
-                        // v37.2: ONLY close if not in Standalone (PWA) mode.
-                        if (!isStandalone) {
-                            setTimeout(() => {
-                                try {
+                        console.log(`[Handshake] Sync success! Closing and signaling target: ${targetUrl}`)
+                        setTimeout(() => {
+                            // v37.2: Safe closure
+                            const isProbablyPopup = (window.opener || window.history.length === 1);
+                            
+                            if (!isStandalone && isProbablyPopup) {
+                                try { 
                                     window.open('', '_self');
-                                    window.close();
+                                    window.close(); 
                                 } catch (e) { }
+                            }
 
-                                setTimeout(() => {
-                                    // If still alive, only redirect if we aren't a popup
-                                    if (!window.opener && window.length <= 1) {
-                                        window.location.href = targetUrl;
-                                    }
-                                }, 300);
-                            }, 300);
-                        } else {
-                            window.location.href = targetUrl;
-                        }
+                            setTimeout(() => {
+                                // Fallback redirect
+                                window.location.href = targetUrl;
+                            }, 500);
+                        }, 1000)
                     } catch (e) {
                         console.error('Bridge sync error:', e)
                     }

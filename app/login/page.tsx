@@ -112,26 +112,23 @@ export default function GlobalLogin() {
                     localStorage.setItem('liff_login_success', Date.now().toString());
 
                     // v36.4: Add 1s delay to ensure storage/DB commit
-                    // v37.2: ONLY close if not in Standalone (PWA) mode. 
-                    // Android PWA returns in the same window, so close() kills the app.
-                    if (!isStandalone) {
-                        addLog(`Handshake sync done. Signalling and closing...`)
-                        setTimeout(() => {
+                    addLog(`Success! Redirecting to ${targetUrl}...`)
+                    setTimeout(() => {
+                        // v37.2: Safe Closure Detection
+                        // Only close if it's a genuine popup or a fresh handshake-only tab.
+                        // Standalone PWAs and existing linear tabs (Desktop Chrome) should NOT close.
+                        const isProbablyPopup = !isStandalone && (window.opener || window.history.length === 1);
+                        
+                        if (isProbablyPopup) {
                             try { 
-                                // Aggressive closing trick for some browsers
-                                window.open('', '_self'); 
+                                window.open('', '_self');
                                 window.close(); 
                             } catch (e) { }
-                            
-                            // Last resort fallback
-                            setTimeout(() => {
-                                if (!window.closed) window.location.href = targetUrl;
-                            }, 500);
-                        }, 1000)
-                    } else {
-                        addLog(`PWA sync done. Redirecting to ${targetUrl}...`)
+                        }
+                        
+                        // Fallback/Standard Redirect
                         window.location.href = targetUrl;
-                    }
+                    }, 1000)
                 } else {
                     // If it was already invalid, we might have succeeded in a previous render
                     if (result.error?.includes('invalid authorization code')) {
