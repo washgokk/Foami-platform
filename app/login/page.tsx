@@ -98,16 +98,22 @@ export default function GlobalLogin() {
                     addLog(`Handshake complete for: ${result.displayName}`)
                     setSyncStatus('completed')
                     setIsBridgeSuccess(true)
-                    localStorage.removeItem('safari_bridge_id')
+                    // v36.4: MUST save customer data in the handshake tab's storage too
+                    // so the original tab can pick it up immediately.
+                    if (result.customerData) {
+                        localStorage.setItem('liff_customer', JSON.stringify(result.customerData));
+                        localStorage.setItem('liff_line_user_id', result.customerData.line_user_id);
+                    }
                     
-                    // v35: Notify other tabs (Auto-Refresh)
+                    // Notify other tabs
                     localStorage.setItem('liff_login_success', Date.now().toString());
 
-                    // v36.3: Close INSTANTLY
-                    try { window.close() } catch (e) { }
-                    
-                    // Fallback redirect in case window.close is blocked
-                    window.location.href = '/search'
+                    // v36.4: Add 1s delay to ensure storage/DB commit
+                    addLog(`Success! Refreshing all tabs...`)
+                    setTimeout(() => {
+                        try { window.close() } catch (e) { }
+                        window.location.href = '/search'
+                    }, 1000)
                 } else {
                     // If it was already invalid, we might have succeeded in a previous render
                     if (result.error?.includes('invalid authorization code')) {

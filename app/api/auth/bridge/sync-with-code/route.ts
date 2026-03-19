@@ -79,7 +79,11 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: bridgeError.message }, { status: 500 })
         }
 
-        return NextResponse.json({ success: true, displayName: profile.displayName })
+        return NextResponse.json({ 
+            success: true, 
+            displayName: profile.displayName,
+            customerData: customer || customerData 
+        })
     } catch (err: any) {
         console.error('Sync Code Error:', err)
         return NextResponse.json({ error: err.message }, { status: 500 })

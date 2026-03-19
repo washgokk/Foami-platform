@@ -121,9 +121,19 @@ export default function LiffEntry() {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ bridgeId, customerData })
                         })
-                        // v36.3: Close instantly
-                        try { window.close() } catch (e) { }
-                        window.location.href = `/${branchSlug}/menu`
+                        
+                        // v36.4: Save locally then notify
+                        if (customerData) {
+                            localStorage.setItem('liff_customer', JSON.stringify(customerData));
+                            localStorage.setItem('liff_line_user_id', customerData.line_user_id);
+                        }
+                        localStorage.setItem('liff_login_success', Date.now().toString());
+                        
+                        addLog(`Sync success! Closing in 1s...`)
+                        setTimeout(() => {
+                            try { window.close() } catch (e) { }
+                            window.location.href = `/${branchSlug}/menu`
+                        }, 1000)
                     } catch (e) {
                         console.error('Bridge sync error:', e)
                     }
