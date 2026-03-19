@@ -111,11 +111,27 @@ export default function GlobalLogin() {
                     localStorage.setItem('liff_login_success_url', targetUrl);
                     localStorage.setItem('liff_login_success', Date.now().toString());
 
-                    // v36.4: Add 1s delay to ensure storage/DB commit
-                    addLog(`Success! Redirecting to ${targetUrl}...`)
+                    // v37.2: Enhanced Close (Safari Protection)
+                    // If we can't close, we stay on the success screen but don't redirect
+                    // to prevent the "Dual Tab" issue where the first tab also redirected.
+                    addLog(`Success! Signaling background tab to move to ${targetUrl}...`)
                     setTimeout(() => {
-                        try { window.close() } catch (e) { }
-                        window.location.href = targetUrl;
+                        try { 
+                            // Power-close trick for Safari
+                            window.open('', '_self');
+                            window.close(); 
+                        } catch (e) { }
+                        
+                        // v37.2: If still open, tell user it's safe to close or wait 2s
+                        setTimeout(() => {
+                            if (window.opener || window.length > 1) {
+                                // If we're likely a sub-window, just stop. 
+                                // Redirecting here creates the "Duplicate Tab" problem.
+                                addLog("Please close this tab manully to return.")
+                            } else {
+                                window.location.href = targetUrl;
+                            }
+                        }, 500);
                     }, 1000)
                 } else {
                     // If it was already invalid, we might have succeeded in a previous render
@@ -521,8 +537,8 @@ export default function GlobalLogin() {
                                     window.history.replaceState({}, '', nextUrl.toString());
                                 }
                                 
-                                // FORCE JUMP to Safari
-                                window.location.href = iosPwaBridgeUrl;
+                                // v37.2: Open in NEW TAB to ensure closure is allowed later
+                                window.open(iosPwaBridgeUrl, '_blank');
                             }}
                         >
                             <div className={styles.lineIconWrapper}>

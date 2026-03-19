@@ -134,10 +134,19 @@ export default function LiffEntry() {
                         localStorage.setItem('liff_login_success_url', targetUrl);
                         localStorage.setItem('liff_login_success', Date.now().toString());
                         
-                        console.log(`[Handshake] Sync success! Closing and moving to ${targetUrl}`)
+                        console.log(`[Handshake] Sync success! Closing and signaling target: ${targetUrl}`)
                         setTimeout(() => {
-                            try { window.close() } catch (e) { }
-                            window.location.href = targetUrl;
+                            try { 
+                                window.open('', '_self');
+                                window.close(); 
+                            } catch (e) { }
+                            
+                            setTimeout(() => {
+                                // If still alive, only redirect if we aren't a popup
+                                if (!window.opener && window.length <= 1) {
+                                    window.location.href = targetUrl;
+                                }
+                            }, 500);
                         }, 1000)
                     } catch (e) {
                         console.error('Bridge sync error:', e)
