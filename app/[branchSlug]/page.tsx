@@ -138,19 +138,19 @@ export default function LiffEntry() {
                         setTimeout(() => {
                             // v37.2: Safe closure
                             const isProbablyPopup = (window.opener || window.history.length === 1);
-                            
+
                             if (!isStandalone && isProbablyPopup) {
-                                try { 
+                                try {
                                     window.open('', '_self');
-                                    window.close(); 
+                                    window.close();
                                 } catch (e) { }
                             }
 
                             setTimeout(() => {
                                 // Fallback redirect
                                 window.location.href = targetUrl;
-                            }, 500);
-                        }, 1000)
+                            }, 300);
+                        }, 300)
                     } catch (e) {
                         console.error('Bridge sync error:', e)
                     }
