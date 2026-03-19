@@ -3,7 +3,9 @@ import { createServiceClient } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
     try {
-        const { code, bridgeId, redirectUri: clientRedirectUri } = await req.json()
+        // v42: Parse body ONCE to avoid req.json() double-read bug
+        const body = await req.json()
+        const { code, bridgeId, redirectUri: clientRedirectUri, branchSlug } = body
         const liffId = process.env.NEXT_PUBLIC_LIFF_ID || process.env.NEXT_PUBLIC_LINE_LIFF_ID
         const channelSecret = process.env.LINE_CHANNEL_SECRET
         
@@ -49,7 +51,7 @@ export async function POST(req: NextRequest) {
 
         // 3. Sync to Supabase
         const supabase = createServiceClient()
-        const { branchSlug } = await req.json().catch(() => ({})); // Optional branch from request
+        // branchSlug already parsed from body above (v42 fix)
 
         // Upsert customer with last branch memory
         const upsertData: any = { 

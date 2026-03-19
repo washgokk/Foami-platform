@@ -22,35 +22,29 @@ export default function GlobalLogin() {
         console.log(`[Handshake] ${msg}`)
     }
 
-    // v44: Singleton-like lock to handle Strict Mode and re-mounts
-    if (typeof window !== 'undefined' && !(window as any).foami_sync_lock) {
-        (window as any).foami_sync_lock = false;
-    }
-
     // Detect standalone mode (PWA)
     const isStandalone = typeof window !== 'undefined' &&
         ((window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches);
 
-    // v43: Strict URL-based Handshake Identification
-    const bridgeParam = (typeof window !== 'undefined')
+    // Detect active bridge for Safari-side (syncing phase)
+    // v42: MUST validate UUID — LIFF's own state param is NOT a UUID.
+    // Accepting state unconditionally caused Chrome/Safari to enter bridge sync mode.
+    const isUUIDLike = (s: string | null) => !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+    const rawStateParam = typeof window !== 'undefined'
         ? (new URLSearchParams(window.location.search).get('bridgeId') ||
             new URLSearchParams(window.location.search).get('state') ||
-            new URLSearchParams(window.location.hash.slice(1)).get('bridgeId'))
+            new URLSearchParams(window.location.hash.slice(1)).get('bridgeId') ||
+            localStorage.getItem('safari_bridge_id'))
         : null;
+    const activeSafariBridgeId = isUUIDLike(rawStateParam) ? rawStateParam : null;
 
-    // Only identify as handshake if current URL has bridge_ prefix
-    const isHandshakeFlow = !!bridgeParam?.startsWith('bridge_');
-
-    const activeSafariBridgeId = (typeof window !== 'undefined')
-        ? (isHandshakeFlow ? bridgeParam : localStorage.getItem('safari_bridge_id'))
-        : null;
-
-    // ─── Phase 1: Check existing session & Sync Logic ───
+    // ─── Phase 1: Check existing session ───
     useEffect(() => {
         const stored = localStorage.getItem('liff_customer')
         if (stored) {
             try {
                 const customer = JSON.parse(stored);
+                // v38: Always favor the last known branch from DB/Storage
                 if (customer.last_branch_slug) {
                     router.replace(`/${customer.last_branch_slug}/menu`);
                 } else {
@@ -63,157 +57,227 @@ export default function GlobalLogin() {
         }
 
         const searchParams = new URLSearchParams(window.location.search)
-        const hashParams = new URLSearchParams(window.location.hash.slice(1))
+        const hashParams = new URLSearchParams(window.location.hash.slice(1)) // Check fragment too
 
-        // v39: Capture manual branch hint
+        // v39: Capture manual branch hint if provided
         const branchHint = searchParams.get('branch');
         if (branchHint) {
             localStorage.setItem('last_branch_slug', branchHint);
         }
 
-        if (bridgeParam?.startsWith('bridge_') && !isStandalone) {
-            localStorage.setItem('safari_bridge_id', bridgeParam)
-            addLog(`Captured Bridge ID: ${bridgeParam}`)
+        // Priority: URL Param > State > Hash > Storage
+        const bridgeIdParam = searchParams.get('bridgeId') || searchParams.get('state') || hashParams.get('bridgeId')
+
+        if (bridgeIdParam && !isStandalone) {
+            localStorage.setItem('safari_bridge_id', bridgeIdParam)
+            addLog(`Captured Bridge ID from URL: ${bridgeIdParam}`)
         }
 
-        // ─── Phase 2: Handle Returning from Direct OAuth ───
+
+        // ─── Phase 2: Handle Returning from Direct OAuth (Code + State) ───
         const handleDirectSync = async (code: string, state: string) => {
             if (!code || !state) return;
             
-            // v44: Global instance lock to prevent race conditions (Strict Mode, re-mounts)
-            if (typeof window !== 'undefined') {
-                if ((window as any).foami_sync_active) return;
-                (window as any).foami_sync_active = true;
+            // v41: Persistent Processed Code Guard
+            const processedCodes = JSON.parse(sessionStorage.getItem('processed_line_codes') || '[]')
+            if (processedCodes.includes(code)) {
+                // If already success and we are still here, redirect again
+                const storedUrl = localStorage.getItem('liff_login_success_url') || '/search';
+                window.location.href = storedUrl;
+                return
             }
 
-            // v43+: Persistent Code Guard
-            const processedCodes = JSON.parse(localStorage.getItem('foami_processed_codes') || '[]')
-            if (processedCodes.includes(code)) {
-                addLog('Code already processed. Checking if we can redirect...')
-                const storedCustomer = localStorage.getItem('liff_customer') || localStorage.getItem('foami_customer');
-                if (storedCustomer) {
-                    resolveAndRedirect(JSON.parse(storedCustomer));
-                    return;
-                }
-                setSyncLoading(true);
-                return;
-            }
+            if (syncLock.current) return
+            syncLock.current = true
 
             setSyncLoading(true)
-            addLog(`Auth code detected (ID: ${state}). Processing...`)
+            addLog(`Code detected. Synchronizing...`)
             
             try {
                 const currentRedirectUri = window.location.origin + window.location.pathname
                 const res = await fetch('/api/auth/bridge/sync-with-code', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code, bridgeId: state, redirectUri: currentRedirectUri })
+                    body: JSON.stringify({
+                        code,
+                        bridgeId: state,
+                        redirectUri: currentRedirectUri
+                    })
                 })
                 const result = await res.json()
                 
                 if (res.ok) {
+                    // Mark as processed immediately
                     processedCodes.push(code)
-                    localStorage.setItem('foami_processed_codes', JSON.stringify(processedCodes))
-                    localStorage.setItem('foami_login_success', 'true');
-                    localStorage.setItem('foami_customer', JSON.stringify(result.customerData));
+                    sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
+
+                    addLog(`Handshake complete for: ${result.displayName}`)
                     setIsBridgeSuccess(true)
                     
+                    // v41: Use Centralized Resolver for Handshake too
                     setTimeout(() => {
                         const isProbablyPopup = !isStandalone && (window.opener || window.history.length === 1);
                         if (isProbablyPopup) {
-                            addLog(`Closing breakout tab...`)
-                            try { window.open('', '_self'); window.close(); } catch (e) { }
+                            try { 
+                                window.open('', '_self');
+                                window.close(); 
+                            } catch (e) { }
                         }
                         resolveAndRedirect(result.customerData);
-                    }, isHandshakeFlow ? 150 : 800)
+                    }, 500)
                 } else {
-                    // v44: SILENT on transient errors. 
-                    const errorMsg = (result.error || '').toLowerCase();
-                    const isTransient = errorMsg.includes('invalid') || errorMsg.includes('used') || errorMsg.includes('code') || errorMsg.includes('already');
-                    
-                    if (isTransient) {
-                        addLog(`Transient sync error silenced: ${errorMsg}`)
-                        const storedCustomer = localStorage.getItem('liff_customer') || localStorage.getItem('foami_customer');
-                        if (storedCustomer) {
-                            resolveAndRedirect(JSON.parse(storedCustomer));
+                    // v41: Silent ignore for 'already used' codes to prevent red error box flicker
+                    const isAlreadyUsed = result.error?.includes('invalid authorization code') || result.error?.includes('used');
+                    if (isAlreadyUsed) {
+                        processedCodes.push(code)
+                        sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
+                        // If we have a session, just redirect
+                        if (localStorage.getItem('liff_customer')) {
+                            const storedUrl = localStorage.getItem('liff_login_success_url') || '/search';
+                            window.location.href = storedUrl;
+                            return;
                         }
-                        return;
                     }
 
                     addLog(`Handshake failed: ${result.error}`)
                     setError(`ผิดพลาด: ${result.error}`)
-                    if (typeof window !== 'undefined') (window as any).foami_sync_active = false;
+                    syncLock.current = false
                 }
             } catch (e: any) {
                 addLog(`Network Error: ${e.message}`)
-                if (typeof window !== 'undefined') (window as any).foami_sync_active = false;
+                syncLock.current = false
             } finally {
                 setSyncLoading(false)
             }
         }
 
-        const code = searchParams.get('code')
-        const state = searchParams.get('state')
+        // ─── Phase 2.5: Auto-init LIFF (Only if NOT doing direct sync) ───
+        const autoInit = async () => {
+            if (isStandalone) return;
 
-        // Priority Logic: Don't do LIFF Init if sync is happening
-        if (code && state && !isStandalone) {
-            handleDirectSync(code, state)
-            // No return here - let watchdog start
-        } else {
-            // Only auto-init LIFF if we are NOT at a direct callback step
-            const autoInit = async () => {
-                if (isStandalone) return;
-                const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID
-                if (!liffId || liffId === 'your_liff_id' || liffId === '') return;
+            const code = searchParams.get('code')
+            const state = searchParams.get('state')
+            const pwaBridgeId = typeof window !== 'undefined' ? localStorage.getItem('pwa_bridge_id') : null
 
-                try {
-                    addLog('Starting LIFF Init...')
-                    const { default: liff } = await import('@line/liff')
-                    await liff.init({ liffId })
-                    if (liff.isLoggedIn()) {
-                        const profile = await liff.getProfile()
-                        const { data } = await supabase.from('customers').select('*').eq('line_user_id', profile.userId).maybeSingle()
-                        const customerData = data || { line_user_id: profile.userId, full_name: profile.displayName };
+            // v42: Strict Bridge ID Detection.
+            // Only treat as a Foami PWA handshake if state is a UUID (which WE created).
+            // LINE's own LIFF SDK also uses code+state — but its state is NOT a UUID.
+            // Without this check, Chrome/Safari login always hits handleDirectSync and fails.
+            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(state || '')
+            if (code && state && isUUID && !isStandalone) {
+                addLog(`Bridge Handshake Return detected (UUID State: ${state}). Starting Sync...`)
+                handleDirectSync(code, state)
+                return
+            }
+            // If not UUID state, fall through to LIFF SDK which handles native LINE OAuth
 
-                        if (activeSafariBridgeId) {
-                            addLog(`Syncing active bridge: ${activeSafariBridgeId}`)
-                            const res = await fetch('/api/auth/bridge/sync', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ bridgeId: activeSafariBridgeId, customerData })
-                            })
-                            if (res.ok) {
+            const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID
+            if (!liffId || liffId === 'your_liff_id' || liffId === '') {
+                addLog('No LIFF ID found in env')
+                return
+            }
+
+            try {
+                addLog('Starting LIFF Init...')
+                const { default: liff } = await import('@line/liff')
+
+                // Add Timeout for LIFF Init (Sometimes iPad hangs here)
+                const initPromise = liff.init({ liffId })
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('LIFF_TIMEOUT')), 10000))
+
+                await Promise.race([initPromise, timeoutPromise])
+                addLog('LIFF Init Success')
+
+                if (liff.isLoggedIn()) {
+                    addLog('Fetching LINE Profile...')
+                    const profile = await liff.getProfile()
+                    localStorage.setItem('liff_line_user_id', profile.userId)
+                    localStorage.setItem('liff_display_name', profile.displayName)
+
+                    const { data } = await supabase
+                        .from('customers')
+                        .select('*')
+                        .eq('line_user_id', profile.userId)
+                        .maybeSingle()
+
+                    const customerData = data || { line_user_id: profile.userId, full_name: profile.displayName };
+                    addLog(`Profile Loaded: ${profile.displayName}`)
+
+                    // IF returned with bridgeId, sync to backend
+                    if (activeSafariBridgeId) {
+                        addLog(`Attempting DB Sync for ${activeSafariBridgeId}...`)
+
+                        try {
+                            let success = false;
+                            for (let i = 0; i < 3; i++) {
+                                try {
+                                    const res = await fetch('/api/auth/bridge/sync', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ bridgeId: activeSafariBridgeId, customerData })
+                                    })
+                                    if (res.ok) {
+                                        success = true;
+                                        break;
+                                    }
+                                    addLog(`Sync Attempt ${i + 1} failed, retrying...`)
+                                    await new Promise(r => setTimeout(r, 1000));
+                                } catch (e) {
+                                    if (i === 2) throw e;
+                                }
+                            }
+
+                            if (success) {
+                                addLog('SYNC SUCCESS! Closing in 2s...')
                                 localStorage.removeItem('safari_bridge_id')
                                 setTimeout(() => {
-                                    try { window.open('', '_self'); window.close(); } catch (e) { }
-                                    resolveAndRedirect(customerData);
-                                }, 200);
-                                return;
+                                    try { window.close(); } catch (e) { }
+                                    window.location.href = '/search';
+                                }, 2500);
+                            } else {
+                                addLog('Database Sync Failed')
+                                setError('การซิงค์ข้อมูลล้มเหลว กรุณาลองใหม่อีกครั้ง')
                             }
+                        } catch (e: any) {
+                            addLog(`Sync Error: ${e.message}`)
+                            console.error('[Bridge] Sync Error:', e)
+                        } finally {
+                            setSyncLoading(false)
                         }
-                        if (data && !activeSafariBridgeId) {
-                            resolveAndRedirect(data);
-                        } else if (!data && !activeSafariBridgeId) {
-                            router.replace('/register')
-                        }
-                    } else if (searchParams.get('bridgeId') || searchParams.get('state')) {
-                        addLog('Triggering Auto Login...')
-                        const finalState = searchParams.get('bridgeId') || searchParams.get('state') || '';
-                        (liff.login as any)({ redirectUri: window.location.origin + window.location.pathname, state: finalState })
                     }
-                } catch (e: any) {
-                    addLog(`LIFF Error: ${e.message}`)
-                } finally {
-                    setLoading(false)
+
+                    if (data && !activeSafariBridgeId) {
+                        resolveAndRedirect(data);
+                    } else if (!data && !activeSafariBridgeId) {
+                        router.replace('/register')
+                    }
+                } else {
+                    addLog('LIFF Not Logged In')
+                    if (searchParams.get('bridgeId') || searchParams.get('state')) {
+                        // v33: Only auto-login if we just arrived from PWA (params present)
+                        addLog('PWA Breakout detected. Forcing Login Redirect...')
+                        liff.login()
+                    } else {
+                        addLog('Direct browsing. Waiting for button click.')
+                    }
                 }
+            } catch (err: any) {
+                addLog(`LIFF Error: ${err.message}`)
+                console.error('[LIFF] Error during auto-init:', err)
+                // If it's a timeout or init error on iPad, user might need a reload
+            } finally {
+                setLoading(false)
             }
-            autoInit()
         }
 
-        // ─── Watchdogs ───
+        autoInit()
+
+        // --- STUCK LOADING WATCHDOG ---
+        // As requested by user: reload if stuck on loading for ~3 seconds
         const loadingTimer = setTimeout(() => {
             const hasId = searchParams.has('bridgeId') || hashParams.has('bridgeId') || !!localStorage.getItem('safari_bridge_id')
             if (hasId && !isStandalone && !isBridgeSuccess) {
+                addLog('Watchdog: Still loading after 5s - refreshing once...')
                 if (!sessionStorage.getItem('sync_refresh_attempt')) {
                     sessionStorage.setItem('sync_refresh_attempt', '1');
                     window.location.reload();
@@ -221,32 +285,42 @@ export default function GlobalLogin() {
             }
         }, 5000)
 
-        const watchdog = setInterval(() => {
-            const hasSuccess = localStorage.getItem('foami_login_success') || localStorage.getItem('liff_login_success');
-            const successUrl = localStorage.getItem('liff_login_success_url');
-            const hasCustomer = localStorage.getItem('liff_customer') || localStorage.getItem('foami_customer');
-            
-            if (hasSuccess && hasCustomer) {
-                addLog('Watchdog: Cross-tab success detected!')
-                clearInterval(watchdog);
-                resolveAndRedirect(JSON.parse(hasCustomer));
-            }
-        }, 1000);
-
         const handleStorage = (e: StorageEvent) => {
-            if (e.key === 'foami_login_success' || e.key === 'liff_login_success') {
-                const customer = localStorage.getItem('liff_customer') || localStorage.getItem('foami_customer');
-                if (customer) resolveAndRedirect(JSON.parse(customer));
+            if (e.key === 'liff_login_success') {
+                const successUrl = localStorage.getItem('liff_login_success_url') || '/search';
+                addLog(`Cross-tab success detected! Moving to ${successUrl}...`)
+                localStorage.removeItem('liff_login_success_url');
+                window.location.href = successUrl;
             }
         };
         window.addEventListener('storage', handleStorage);
+
+        // v36: Universal Watchdog Polling (Every 1s)
+        // This handles cases where Safari "freezes" background tabs, 
+        // ensuring the page refreshes even if the StorageEvent was throttled.
+        const watchdog = setInterval(() => {
+            const hasSuccess = localStorage.getItem('liff_login_success');
+            const successUrl = localStorage.getItem('liff_login_success_url');
+            const hasCustomer = localStorage.getItem('liff_customer');
+            
+            if (hasSuccess || hasCustomer) {
+                addLog('Watchdog: Success detected! Refreshing...');
+                localStorage.removeItem('liff_login_success'); 
+                
+                // v37: Follow the specific target if provided, else default to search
+                const finalTarget = successUrl || '/search';
+                localStorage.removeItem('liff_login_success_url');
+                
+                window.location.href = finalTarget;
+            }
+        }, 1000);
 
         return () => {
             clearTimeout(loadingTimer);
             clearInterval(watchdog);
             window.removeEventListener('storage', handleStorage);
         }
-    }, [router, isStandalone, isHandshakeFlow, activeSafariBridgeId, isBridgeSuccess]);
+    }, [router, isBridgeSuccess, activeSafariBridgeId])
 
     // ─── Phase 3: PWA Polling (for iOS) ───
     useEffect(() => {
@@ -261,14 +335,14 @@ export default function GlobalLogin() {
 
         let pollInterval: any = setInterval(async () => {
             try {
-                addLog(`Polling bridge status for: ${activeBridgeId}...`)
                 const res = await fetch(`/api/auth/bridge/status?id=${activeBridgeId}`)
                 const result = await res.json()
                 if (result.status === 'completed' && result.customerData) {
-                    addLog('Poll Detect Success! v44')
+                    addLog('Poll Detect Success!')
                     clearInterval(pollInterval)
                     localStorage.removeItem('pwa_bridge_id')
-                    resolveAndRedirect(result.customerData);
+                    // v42: Use resolveAndRedirect so PWA lands on last branch, not /search
+                    resolveAndRedirect(result.customerData)
                 }
             } catch (e) {
                 console.error('Polling error:', e)
@@ -288,9 +362,9 @@ export default function GlobalLogin() {
         
         if (isIOS && isStandalone) {
             if (liffId && liffId !== 'your_liff_id') {
-                const bridgeId = 'bridge_' + ((typeof crypto !== 'undefined' && crypto.randomUUID)
+                const bridgeId = (typeof crypto !== 'undefined' && crypto.randomUUID)
                     ? crypto.randomUUID()
-                    : Math.random().toString(36).substring(2) + Date.now().toString(36));
+                    : Math.random().toString(36).substring(2) + Date.now().toString(36);
 
                 // v36: Revert to Raw OAuth (access.line.me) to force iOS Breakout
                 // This is more aggressive at forcing the "Open in Safari" behavior.
@@ -410,9 +484,7 @@ export default function GlobalLogin() {
                     ) : syncLoading ? (
                         <div className={styles.syncBox}>
                             <div className="spinner-blue" style={{ width: 40, height: 40, margin: '0 auto 15px' }} />
-                            <h2 style={{ color: 'var(--text-primary)', fontSize: '1.3rem', marginBottom: 10 }}>
-                                {isHandshakeFlow ? 'กำลังส่งข้อมูลไปยังแอป...' : 'กำลังเข้าสู่ระบบ...'}
-                            </h2>
+                            <h2 style={{ color: 'var(--text-primary)', fontSize: '1.3rem', marginBottom: 10 }}>กำลังซิงค์ข้อมูล...</h2>
                             <p style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>กรุณารอสักครู่ครับ</p>
                         </div>
                     ) : (typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id'))) ? (
