@@ -61,6 +61,12 @@ export default function GlobalLogin() {
         const searchParams = new URLSearchParams(window.location.search)
         const hashParams = new URLSearchParams(window.location.hash.slice(1)) // Check fragment too
 
+        // v39: Capture manual branch hint if provided
+        const branchHint = searchParams.get('branch');
+        if (branchHint) {
+            localStorage.setItem('last_branch_slug', branchHint);
+        }
+
         // Priority: URL Param > State > Hash > Storage
         const bridgeIdParam = searchParams.get('bridgeId') || searchParams.get('state') || hashParams.get('bridgeId')
 
