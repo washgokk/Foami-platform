@@ -6,9 +6,6 @@ import { supabase } from '@/lib/supabase'
 import { Bath, ClipboardList, Settings, Bike, ChevronRight, Search, User } from 'lucide-react'
 import Logo from '@/components/Branding/Logo'
 import styles from './menu.module.css'
-import dynamic from 'next/dynamic'
-
-const PushPromptBanner = dynamic(() => import('@/components/Global/PushPromptBanner'), { ssr: false })
 
 export default function MenuPage() {
     const { branchSlug } = useParams<{ branchSlug: string }>()
@@ -228,9 +225,6 @@ export default function MenuPage() {
                     </div>
                 </div>
             )}
-
-            {/* Push Notification Prompt */}
-            {customer && <PushPromptBanner userId={customer.id} platform="customer" />}
 
         </div>
     )
