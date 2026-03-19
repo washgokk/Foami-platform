@@ -109,3 +109,33 @@
     padding: var(--space-10) 0;
     color: var(--text-muted);
 }
+
+.locBtn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 9px 16px;
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: var(--font-main);
+    transition: all 0.2s ease;
+    width: 100%;
+    justify-content: center;
+}
+
+.locBtn:hover:not(:disabled) {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-ghost);
+}
+
+.locBtn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

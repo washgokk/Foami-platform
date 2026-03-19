@@ -354,6 +354,15 @@ select {
   border-color: var(--danger);
 }
 
+/* iPad / iOS Safari: type=date overflows its container without these */
+input[type="date"] {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 .form-error {
   font-size: 0.8rem;
   color: var(--danger);

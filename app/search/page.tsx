@@ -1,20 +1,22 @@
 'use client'
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { MapPin, Search as SearchIcon, Navigation } from 'lucide-react'
+import { MapPin, Search as SearchIcon, Navigation, LocateFixed } from 'lucide-react'
 import styles from './search.module.css'
+import dynamic from 'next/dynamic'
+
+const PushPromptBanner = dynamic(() => import('@/components/Global/PushPromptBanner'), { ssr: false })
 
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-    const R = 6371 // Earth radius in km
+    const R = 6371
     const dLat = (lat2 - lat1) * Math.PI / 180
     const dLon = (lon2 - lon1) * Math.PI / 180
-    const a = 
-        Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-        Math.sin(dLon/2) * Math.sin(dLon/2)
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
     return R * c
 }
 
@@ -23,7 +25,10 @@ export default function BranchSearchPage() {
     const [branches, setBranches] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
-    const [userLoc, setUserLoc] = useState<{lat: number, lng: number} | null>(null)
+    const [userLoc, setUserLoc] = useState<{ lat: number, lng: number } | null>(null)
+    const [locLoading, setLocLoading] = useState(false)
+    const [locError, setLocError] = useState('')
+    const [userId, setUserId] = useState<string | undefined>(undefined)
 
     useEffect(() => {
         const loadBranches = async () => {
@@ -33,21 +38,39 @@ export default function BranchSearchPage() {
         }
         loadBranches()
 
-        // Try geolocation
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                (err) => console.log('Geolocation error:', err)
-            )
+        // Load user ID for push banner
+        const stored = localStorage.getItem('liff_customer')
+        if (stored) {
+            try { setUserId(JSON.parse(stored)?.id) } catch { }
         }
     }, [])
+
+    const handleGetLocation = () => {
+        if (!navigator.geolocation) {
+            setLocError('เบราว์เซอร์ไม่รองรับ GPS')
+            return
+        }
+        setLocLoading(true)
+        setLocError('')
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+                setLocLoading(false)
+            },
+            (err) => {
+                setLocError('ไม่สามารถดึงตำแหน่งได้ กรุณาอนุญาตการเข้าถึง GPS')
+                setLocLoading(false)
+            },
+            { timeout: 8000 }
+        )
+    }
 
     const filteredBranches = branches
         .map(b => ({
             ...b,
             distance: userLoc ? calculateDistance(userLoc.lat, userLoc.lng, b.lat, b.lng) : null
         }))
-        .filter(b => 
+        .filter(b =>
             b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             b.address.toLowerCase().includes(searchTerm.toLowerCase())
         )
@@ -57,28 +80,19 @@ export default function BranchSearchPage() {
         })
 
     const handleBranchClick = async (slug: string) => {
-        // v40: Active Tracking
-        localStorage.setItem('last_branch_slug', slug);
-        
-        const stored = localStorage.getItem('liff_customer');
+        localStorage.setItem('last_branch_slug', slug)
+        const stored = localStorage.getItem('liff_customer')
         if (stored) {
             try {
-                const customer = JSON.parse(stored);
+                const customer = JSON.parse(stored)
                 if (customer.line_user_id) {
-                    // Update DB immediately
-                    await supabase
-                        .from('customers')
-                        .update({ last_branch_slug: slug })
-                        .eq('line_user_id', customer.line_user_id);
-                    
-                    // Update local copy
-                    customer.last_branch_slug = slug;
-                    localStorage.setItem('liff_customer', JSON.stringify(customer));
+                    await supabase.from('customers').update({ last_branch_slug: slug }).eq('line_user_id', customer.line_user_id)
+                    customer.last_branch_slug = slug
+                    localStorage.setItem('liff_customer', JSON.stringify(customer))
                 }
             } catch (e) { }
         }
-        
-        router.push(`/${slug}/menu`);
+        router.push(`/${slug}/menu`)
     }
 
     return (
@@ -89,16 +103,33 @@ export default function BranchSearchPage() {
             </div>
 
             <div className={styles.searchContainer}>
+                {/* Search Input */}
                 <div style={{ position: 'relative' }}>
                     <SearchIcon style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={20} />
-                    <input 
-                        className={styles.searchInput} 
+                    <input
+                        className={styles.searchInput}
                         style={{ paddingLeft: 48 }}
-                        placeholder="ค้นหาชื่อสาขา หรือ จังหวัด..." 
+                        placeholder="ค้นหาชื่อสาขา หรือ จังหวัด..."
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                     />
                 </div>
+
+                {/* Location Button */}
+                <button
+                    onClick={handleGetLocation}
+                    disabled={locLoading}
+                    className={styles.locBtn}
+                    style={{ borderColor: userLoc ? 'var(--primary)' : undefined, color: userLoc ? 'var(--primary)' : undefined, background: userLoc ? 'var(--primary-ghost)' : undefined }}
+                >
+                    {locLoading ? (
+                        <div className="spinner" style={{ width: 16, height: 16 }} />
+                    ) : (
+                        <LocateFixed size={16} />
+                    )}
+                    {userLoc ? 'ใช้ตำแหน่งของฉัน (เรียงตามระยะทาง)' : 'ใช้ตำแหน่งปัจจุบัน'}
+                </button>
+                {locError && <p style={{ fontSize: '0.78rem', color: 'var(--danger)', marginTop: 6, paddingLeft: 4 }}>{locError}</p>}
             </div>
 
             {loading ? (
@@ -130,6 +161,9 @@ export default function BranchSearchPage() {
                     )}
                 </div>
             )}
+
+            {/* Push Notification Prompt */}
+            <PushPromptBanner userId={userId} platform="customer" />
         </div>
     )
 }

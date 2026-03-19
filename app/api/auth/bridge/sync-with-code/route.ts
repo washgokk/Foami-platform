@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
 
         const { data: customer, error: custError } = await supabase
             .from('customers')
-            .upsert(upsertData)
+            .upsert(upsertData, { onConflict: 'line_user_id' })
             .select()
             .maybeSingle()
  
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
                 id: bridgeId, 
                 customer_data: customer || { ...upsertData, line_user_id: profile.userId },
                 created_at: new Date().toISOString()
-            })
+            }, { onConflict: 'id' })
 
         if (bridgeError) {
             return NextResponse.json({ error: bridgeError.message }, { status: 500 })
