@@ -5,7 +5,7 @@ const withPWA = withPWAInit({
   dest: "public",
   disable: false, // Enabled for testing push notifications
   register: true,
-  sw: "sw.js", // Point to our custom/generated sw
+  sw: "sw.js",     // Output filename
 });
 
 const nextConfig: NextConfig = {
