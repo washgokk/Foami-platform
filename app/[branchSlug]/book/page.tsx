@@ -84,6 +84,36 @@ function isPointInPolygon(lat: number, lng: number, polygon: [number, number][])
     return inside
 }
 
+// ─── Get Minimum Distance to Polygon Boundary (km) ───────────
+function minDistanceToPolygon(lat: number, lng: number, polygon: [number, number][]) {
+    let minD = Infinity
+    for (let i = 0; i < polygon.length; i++) {
+        const p1 = polygon[i]
+        const p2 = polygon[(i + 1) % polygon.length]
+        
+        // Check distance to segment p1-p2
+        // For simplicity in spherical coordinates on small scales, 
+        // we use a projection approximation
+        const x = lat, y = lng
+        const x1 = p1[0], y1 = p1[1]
+        const x2 = p2[0], y2 = p2[1]
+        
+        const dx = x2 - x1
+        const dy = y2 - y1
+        const lenSq = dx * dx + dy * dy
+        
+        let t = lenSq === 0 ? -1 : ((x - x1) * dx + (y - y1) * dy) / lenSq
+        t = Math.max(0, Math.min(1, t))
+        
+        const projLat = x1 + t * dx
+        const projLng = y1 + t * dy
+        
+        const d = haversine(lat, lng, projLat, projLng)
+        if (d < minD) minD = d
+    }
+    return minD
+}
+
 // ─── Get Zone Center ──────────────────────────────────────────
 function getZoneCenter(zone: any): [number, number] {
     if (!zone?.polygon_coords?.length) return [0, 0]
@@ -459,10 +489,12 @@ export default function BookPage() {
 
                     // If either leg is outside serving zone, calculate distance fee
                     if (!pickupInS || !deliveryInS) {
-                        // distance from base to pickup is 0 if pickup is in-zone
-                        const d1 = pickupInS ? 0 : haversine(bLat, bLng, pickupLat, pickupLng)
+                        // d1: distance to pickup from NEAREST edge of serving zone
+                        const d1 = pickupInS ? 0 : minDistanceToPolygon(pickupLat, pickupLng, sZone.polygon_coords)
+                        
+                        // d2: distance from pickup to delivery
                         const d2 = showDelivery ? haversine(pickupLat, pickupLng, deliveryLat, deliveryLng) : 0
-
+                        
                         // --- Intelligent Chaining Check ---
                         let skipReturn = false
                         if (showDelivery && deliveryMatched) {
@@ -480,9 +512,12 @@ export default function BookPage() {
                                 if (hasChain) skipReturn = true
                             }
                         }
-
-                        // return distance is 0 if delivery is in-zone or next shift is there
-                        const d3 = (showDelivery && !skipReturn && !deliveryInS) ? haversine(deliveryLat, deliveryLng, bLat, bLng) : (skipReturn || deliveryInS ? 0 : d1)
+                        
+                        // d3: distance from delivery back to NEAREST edge of serving zone
+                        const d3 = (showDelivery && !skipReturn && !deliveryInS) 
+                            ? minDistanceToPolygon(deliveryLat, deliveryLng, sZone.polygon_coords)
+                            : (skipReturn || deliveryInS ? 0 : d1)
+                        
                         const totalDist = d1 + d2 + d3
 
                         const rate = sBranch.out_of_zone_fee || OUT_OF_ZONE_RATE

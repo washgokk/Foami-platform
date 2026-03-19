@@ -78,6 +78,7 @@ export function usePushNotifications(
         setLoading(true)
         setError(null)
 
+        let registration: ServiceWorkerRegistration | null | undefined;
         try {
             console.log('Starting push subscription flow...')
             if (!('serviceWorker' in navigator)) {
@@ -85,7 +86,7 @@ export function usePushNotifications(
             }
 
             // Get registration first
-            let registration = await navigator.serviceWorker.getRegistration()
+            registration = await navigator.serviceWorker.getRegistration()
             
             // If no registration, try to register it now
             if (!registration) {
@@ -215,8 +216,13 @@ export function usePushNotifications(
             setError(err.message)
             // Display a more helpful message to the user
             let userMsg = err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ'
-            if (userMsg.includes('push service error')) {
-                userMsg = 'Browser ไม่สามารถเชื่อมต่อกับบริการแจ้งเตือนได้ (Push Service Error) กรุณารีเฟรชหน้าเว็บหรือลองใช้เบราว์เซอร์อื่นครับ'
+            const vKey = VAPID_PUBLIC_KEY || 'N/A'
+            const vapidPrefix = vKey.length > 10 ? vKey.slice(0, 10) + '...' : vKey
+            const swStatus = registration?.active ? 'Active' : (registration?.waiting ? 'Waiting' : 'Not Found')
+            const isPWA = window.matchMedia('(display-mode: standalone)').matches ? 'YES' : 'NO'
+            
+            if (userMsg.includes('push service error') || err.name === 'AbortError' || err.name === 'NotAllowedError') {
+                userMsg = `[DIAGNOSTIC]\n📍 KEY: ${vapidPrefix}\n📍 SW: ${swStatus}\n📍 PWA: ${isPWA}\n📍 ERR: ${err.name}\n📍 MSG: ${userMsg.slice(0, 50)}...`
             }
             alert('ไม่สามารถเปิดแจ้งเตือนได้: ' + userMsg)
             return false
