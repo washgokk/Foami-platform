@@ -268,7 +268,9 @@ export default function GlobalLogin() {
 
         const handleStorage = (e: StorageEvent) => {
             if (e.key === 'liff_login_success') {
-                router.replace('/search');
+                // v35.3: Use full redirect for better reliability in Safari
+                addLog('Cross-tab success detected! Redirecting...')
+                window.location.href = '/search';
             }
         };
         window.addEventListener('storage', handleStorage);
@@ -324,12 +326,11 @@ export default function GlobalLogin() {
                     ? crypto.randomUUID()
                     : Math.random().toString(36).substring(2) + Date.now().toString(36);
 
-                // v34: Use official LIFF App URL for breakout instead of raw access.line.me
-                // This is much more stable and avoids "Unable to login" (400) errors.
+                // v35.3: Use DIRECT liff.line.me URL to force breakout from PWA
+                // Using our own API domain traps the flow inside the PWA internal webview.
                 const liffUrl = `https://liff.line.me/${liffId}?pwaBridgeId=${bridgeId}`;
-                const breakoutUrl = `${window.location.origin}/api/auth/breakout?url=${encodeURIComponent(liffUrl)}`;
                 
-                setIosPwaBridgeUrl(breakoutUrl);
+                setIosPwaBridgeUrl(liffUrl);
             }
         }
     }, [isIOS, isStandalone]);

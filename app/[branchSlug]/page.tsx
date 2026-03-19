@@ -145,6 +145,7 @@ export default function LiffEntry() {
 
         const handleStorage = (e: StorageEvent) => {
             if (e.key === 'liff_login_success') {
+                // v35.3: Use full redirect
                 window.location.href = `/${branchSlug}/menu`;
             }
         };
@@ -195,10 +196,9 @@ export default function LiffEntry() {
 
         if (isIOS && isStandalone && liffId && liffId !== 'your_liff_id') {
             const bridgeId = Math.random().toString(36).substring(2) + Date.now().toString(36);
-            // v34: Use LIFF App URL for breakout instead of raw access.line.me
+            // v35.3: Use direct LIFF App URL to force breakout
             const liffUrl = `https://liff.line.me/${liffId}?pwaBridgeId=${bridgeId}`;
-            const breakoutUrl = `${window.location.origin}/api/auth/breakout?url=${encodeURIComponent(liffUrl)}`;
-            return [breakoutUrl, bridgeId];
+            return [liffUrl, bridgeId];
         }
         return [null, null];
     })() : [null, null];
