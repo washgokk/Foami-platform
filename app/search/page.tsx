@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { MapPin, Search as SearchIcon, Navigation } from 'lucide-react'
+import { MapPin, Search as SearchIcon, Navigation, X } from 'lucide-react'
 import styles from './search.module.css'
 
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -148,13 +148,13 @@ export default function BranchSearchPage() {
                     </button>
                 </div>
                 {locError && (
-                    <p style={{ fontSize: '0.78rem', color: 'var(--danger)', marginTop: 6, paddingLeft: 4 }}>
-                        ไม่สามารถดึงตำแหน่งได้ กรุณาอนุญาตการเข้าถึงตำแหน่ง
+                    <p style={{ fontSize: '0.78rem', color: 'var(--danger)', marginTop: 8, paddingLeft: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <X size={14} /> ไม่สามารถดึงตำแหน่งได้ กรุณาอนุญาตการเข้าถึงตำแหน่ง
                     </p>
                 )}
                 {userLoc && !locError && (
-                    <p style={{ fontSize: '0.78rem', color: 'var(--primary)', marginTop: 6, paddingLeft: 4, fontWeight: 600 }}>
-                        📍 กำลังแสดงสาขาตามระยะทาง
+                    <p style={{ fontSize: '0.78rem', color: 'var(--primary)', marginTop: 8, paddingLeft: 4, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <MapPin size={14} fill="currentColor" /> กำลังแสดงสาขาตามระยะทาง
                     </p>
                 )}
             </div>

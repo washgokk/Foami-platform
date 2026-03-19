@@ -276,8 +276,8 @@ export default function LoginPage() {
                     >
                         <div className={styles.lineIconWrapper}>
                             <img
-                                src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg"
-                                alt="LINE"
+                                src="https://cdnjs.cloudflare.com/ajax/libs/simple-icons/11.10.0/line.svg"
+                                alt="LINE Login"
                                 className={styles.lineIcon}
                             />
                         </div>
