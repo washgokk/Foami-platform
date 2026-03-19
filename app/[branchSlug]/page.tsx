@@ -145,15 +145,23 @@ export default function LiffEntry() {
 
         const handleStorage = (e: StorageEvent) => {
             if (e.key === 'liff_login_success') {
-                // v35.3: Use full redirect
                 window.location.href = `/${branchSlug}/menu`;
             }
         };
         window.addEventListener('storage', handleStorage);
 
+        // v36: Universal Watchdog (1s)
+        const watchdog = setInterval(() => {
+            if (localStorage.getItem('liff_login_success') || localStorage.getItem('liff_customer')) {
+                localStorage.removeItem('liff_login_success');
+                window.location.href = `/${branchSlug}/menu`;
+            }
+        }, 1000);
+
         main()
         return () => {
             clearTimeout(loadingTimer);
+            clearInterval(watchdog);
             window.removeEventListener('storage', handleStorage);
         }
     }, [router, branchSlug])
@@ -196,9 +204,11 @@ export default function LiffEntry() {
 
         if (isIOS && isStandalone && liffId && liffId !== 'your_liff_id') {
             const bridgeId = Math.random().toString(36).substring(2) + Date.now().toString(36);
-            // v35.3: Use direct LIFF App URL to force breakout
-            const liffUrl = `https://liff.line.me/${liffId}?pwaBridgeId=${bridgeId}`;
-            return [liffUrl, bridgeId];
+            // v36: Revert to Raw OAuth for breakout
+            const channelId = liffId.includes('-') ? liffId.split('-')[0] : liffId;
+            const staticRedirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
+            const oauthUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${staticRedirectUri}&state=${bridgeId}&scope=profile%20openid`;
+            return [oauthUrl, bridgeId];
         }
         return [null, null];
     })() : [null, null];
