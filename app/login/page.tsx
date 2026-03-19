@@ -17,6 +17,12 @@ export default function GlobalLogin() {
     const [error, setError] = useState('')
     const [isBridgeSuccess, setIsBridgeSuccess] = useState(false)
     const [debugInfo, setDebugInfo] = useState('')
+    
+    // v37: Unique Tab Identity for Takeover Strategy
+    const [tabInstanceId] = useState(() => {
+        if (typeof window === 'undefined') return '';
+        return `tab_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    });
 
     // Logging for iPad Debugging
     const [syncStatus, setSyncStatus] = useState<'initial' | 'init_liff' | 'liff_done' | 'fetching_profile' | 'syncing' | 'completed' | 'error'>('initial')
@@ -104,6 +110,9 @@ export default function GlobalLogin() {
                         localStorage.setItem('liff_customer', JSON.stringify(result.customerData));
                         localStorage.setItem('liff_line_user_id', result.customerData.line_user_id);
                     }
+                    
+                    // v37: Claim this tab as the "Winner" (Active Tab)
+                    localStorage.setItem('liff_active_tab_id', tabInstanceId);
                     
                     // Notify other tabs
                     localStorage.setItem('liff_login_success', Date.now().toString());
@@ -289,7 +298,18 @@ export default function GlobalLogin() {
         const watchdog = setInterval(() => {
             const hasSuccess = localStorage.getItem('liff_login_success');
             const hasCustomer = localStorage.getItem('liff_customer');
+            const activeTabId = localStorage.getItem('liff_active_tab_id');
+
             if (hasSuccess || hasCustomer) {
+                // v37: If another tab has claimed "Ownership", this tab must exit.
+                if (activeTabId && activeTabId !== tabInstanceId) {
+                    addLog(`Watchdog: Another tab (${activeTabId}) is active. Closing this one...`);
+                    // Try to close, but most browsers will block it, so redirect to duplicate page.
+                    try { window.close(); } catch (e) { }
+                    window.location.href = '/login/duplicate';
+                    return;
+                }
+
                 addLog('Watchdog: Success detected! Refreshing...');
                 localStorage.removeItem('liff_login_success'); // Clear signal
                 window.location.href = '/search';

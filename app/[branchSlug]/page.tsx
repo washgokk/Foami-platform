@@ -9,6 +9,11 @@ export default function LiffEntry() {
 
     const syncLock = useRef(false)
     const isBridgeSuccess = useRef(false) // Use ref for polling check
+    
+    // v37: Unique Tab Identity for Takeover Strategy
+    const [tabInstanceId] = (typeof window !== 'undefined') ? [
+        `tab_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+    ] : [''];
 
     // Detect standalone mode (PWA)
     const isStandalone = typeof window !== 'undefined' &&
@@ -25,12 +30,10 @@ export default function LiffEntry() {
         const handleDirectSync = async (targetCode: string, targetBridgeId: string) => {
             const processedCodes = JSON.parse(sessionStorage.getItem('processed_line_codes') || '[]')
             if (processedCodes.includes(targetCode)) return true
-
             if (syncLock.current) return true
             syncLock.current = true
 
             try {
-                // v22: Use the current page URL as redirectUri
                 const currentRedirectUri = window.location.origin + window.location.pathname
                 const res = await fetch('/api/auth/bridge/sync-with-code', {
                     method: 'POST',
@@ -42,20 +45,22 @@ export default function LiffEntry() {
                     processedCodes.push(targetCode)
                     sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
                     
-                    // v35: Notify original tab (Auto-Refresh)
+                    if (result.customerData) {
+                        localStorage.setItem('liff_customer', JSON.stringify(result.customerData));
+                        localStorage.setItem('liff_line_user_id', result.customerData.line_user_id);
+                    }
+                    
+                    // v37: Claim Ownership
+                    localStorage.setItem('liff_active_tab_id', tabInstanceId);
                     localStorage.setItem('liff_login_success', Date.now().toString());
 
                     setTimeout(() => {
                         try { window.close() } catch (e) { }
                         window.location.href = `/${branchSlug}/menu`
-                    }, 2000)
+                    }, 1000)
                     return true
                 } else {
                     console.error('Handshake failed:', result.error)
-                    if (result.error?.includes('invalid authorization code')) {
-                        processedCodes.push(targetCode)
-                        sessionStorage.setItem('processed_line_codes', JSON.stringify(processedCodes))
-                    }
                     syncLock.current = false
                     return true
                 }
@@ -66,19 +71,10 @@ export default function LiffEntry() {
             }
         }
 
-        // Stuck Watchdog
-        const loadingTimer = setTimeout(() => {
-            if (bridgeId && !sessionStorage.getItem('sync_refresh_attempt')) {
-                sessionStorage.setItem('sync_refresh_attempt', '1')
-                window.location.reload()
-            }
-        }, 3000)
-
         // ─── Phase 2: Execution Logic ───
         const main = async () => {
             const pwaBridgeId = typeof window !== 'undefined' ? localStorage.getItem('pwa_bridge_id') : null
 
-            // v25: STRICT condition. Only hijack if this is a breakout return.
             if (code && state && state === pwaBridgeId) {
                 await handleDirectSync(code, pwaBridgeId)
                 return
@@ -96,16 +92,12 @@ export default function LiffEntry() {
                 await liff.init({ liffId })
 
                 if (!liff.isLoggedIn()) {
-                    if (isStandalone) return; // Wait for breakout button click 
-
-                    if (bridgeId) liff.login({ redirectUri: window.location.href })
-                    else liff.login()
+                    if (isStandalone) return; 
+                    liff.login()
                     return
                 }
-                const profile = await liff.getProfile()
-                localStorage.setItem('liff_line_user_id', profile.userId)
-                localStorage.setItem('liff_display_name', profile.displayName)
 
+                const profile = await liff.getProfile()
                 const { data } = await supabase
                     .from('customers')
                     .select('*')
@@ -122,14 +114,13 @@ export default function LiffEntry() {
                             body: JSON.stringify({ bridgeId, customerData })
                         })
                         
-                        // v36.4: Save locally then notify
                         if (customerData) {
                             localStorage.setItem('liff_customer', JSON.stringify(customerData));
                             localStorage.setItem('liff_line_user_id', customerData.line_user_id);
                         }
+                        localStorage.setItem('liff_active_tab_id', tabInstanceId);
                         localStorage.setItem('liff_login_success', Date.now().toString());
                         
-                        console.log(`[Handshake] Sync success! Closing in 1s...`)
                         setTimeout(() => {
                             try { window.close() } catch (e) { }
                             window.location.href = `/${branchSlug}/menu`
@@ -151,28 +142,47 @@ export default function LiffEntry() {
             }
         }
 
-        const handleStorage = (e: StorageEvent) => {
-            if (e.key === 'liff_login_success') {
-                window.location.href = `/${branchSlug}/menu`;
+        // --- Watchdogs & Listeners ---
+        const loadingTimer = setTimeout(() => {
+            if (bridgeId && !sessionStorage.getItem('sync_refresh_attempt')) {
+                sessionStorage.setItem('sync_refresh_attempt', '1')
+                window.location.reload()
             }
-        };
-        window.addEventListener('storage', handleStorage);
+        }, 3000)
 
-        // v36: Universal Watchdog (1s)
         const watchdog = setInterval(() => {
-            if (localStorage.getItem('liff_login_success') || localStorage.getItem('liff_customer')) {
+            const hasSuccess = localStorage.getItem('liff_login_success');
+            const hasCustomer = localStorage.getItem('liff_customer');
+            const activeTabId = localStorage.getItem('liff_active_tab_id');
+
+            if (hasSuccess || hasCustomer) {
+                if (activeTabId && activeTabId !== tabInstanceId) {
+                    console.log(`[Watchdog] Another tab is active. Closing...`);
+                    try { window.close(); } catch (e) { }
+                    window.location.href = '/login/duplicate';
+                    return;
+                }
+                console.log('[Watchdog] Login success detected! Refreshing...');
                 localStorage.removeItem('liff_login_success');
                 window.location.href = `/${branchSlug}/menu`;
             }
         }, 1000);
 
+        const handleStorage = (e: StorageEvent) => {
+            if (e.key === 'liff_login_success') {
+                // Handled by watchdog for more reliability, but storage event is good for immediate response
+            }
+        };
+        window.addEventListener('storage', handleStorage);
+
         main()
+
         return () => {
             clearTimeout(loadingTimer);
             clearInterval(watchdog);
             window.removeEventListener('storage', handleStorage);
         }
-    }, [router, branchSlug])
+    }, [router, branchSlug, isStandalone, tabInstanceId])
 
     // ─── Phase 3: PWA Polling (Ported from login/page.tsx) ───
     useEffect(() => {
