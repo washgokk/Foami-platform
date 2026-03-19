@@ -26,13 +26,18 @@ export default function GlobalLogin() {
     const isStandalone = typeof window !== 'undefined' &&
         ((window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches);
 
-    // Detect active bridge for Safari-side (syncing phase)
-    const activeSafariBridgeId = typeof window !== 'undefined'
+    // v42: Detect if this is a PWA-to-Safari handshake flow
+    const bridgeParam = (typeof window !== 'undefined')
         ? (new URLSearchParams(window.location.search).get('bridgeId') ||
             new URLSearchParams(window.location.search).get('state') ||
-            new URLSearchParams(window.location.hash.slice(1)).get('bridgeId') ||
-            localStorage.getItem('safari_bridge_id'))
+            new URLSearchParams(window.location.hash.slice(1)).get('bridgeId'))
         : null;
+
+    const activeSafariBridgeId = (typeof window !== 'undefined')
+        ? (bridgeParam?.startsWith('bridge_') ? bridgeParam : localStorage.getItem('safari_bridge_id'))
+        : null;
+
+    const isHandshakeFlow = !!activeSafariBridgeId?.startsWith('bridge_');
 
     // ─── Phase 1: Check existing session ───
     useEffect(() => {
@@ -61,12 +66,9 @@ export default function GlobalLogin() {
             localStorage.setItem('last_branch_slug', branchHint);
         }
 
-        // Priority: URL Param > State > Hash > Storage
-        const bridgeIdParam = searchParams.get('bridgeId') || searchParams.get('state') || hashParams.get('bridgeId')
-
-        if (bridgeIdParam && !isStandalone) {
-            localStorage.setItem('safari_bridge_id', bridgeIdParam)
-            addLog(`Captured Bridge ID from URL: ${bridgeIdParam}`)
+        if (bridgeParam?.startsWith('bridge_') && !isStandalone) {
+            localStorage.setItem('safari_bridge_id', bridgeParam)
+            addLog(`Captured Bridge ID: ${bridgeParam}`)
         }
 
 
@@ -110,17 +112,17 @@ export default function GlobalLogin() {
                     addLog(`Handshake complete for: ${result.displayName}`)
                     setIsBridgeSuccess(true)
                     
-                    // v41: Use Centralized Resolver for Handshake too
+                    // v42: Faster close for handshake, standard redirect for others
                     setTimeout(() => {
                         const isProbablyPopup = !isStandalone && (window.opener || window.history.length === 1);
-                        if (isProbablyPopup) {
+                        if (isProbablyPopup && isHandshakeFlow) {
                             try { 
                                 window.open('', '_self');
                                 window.close(); 
                             } catch (e) { }
                         }
                         resolveAndRedirect(result.customerData);
-                    }, 500)
+                    }, isHandshakeFlow ? 100 : 500)
                 } else {
                     // v41: Silent ignore for 'already used' codes to prevent red error box flicker
                     const isAlreadyUsed = result.error?.includes('invalid authorization code') || result.error?.includes('used');
@@ -158,10 +160,17 @@ export default function GlobalLogin() {
             // v36.3: Safari/PWA Handshake Recovery.
             // Since Safari and PWA don't share LocalStorage, we can't check 'pwaBridgeId'.
             // If we have code+state and it's not a standalone app, it's definitely a handshake.
+            // v42: Distinguish between standard login and handshake
             if (code && state && !isStandalone) {
-                addLog(`Handshake Return detected (State: ${state}). Starting Sync...`)
-                handleDirectSync(code, state)
-                return
+                if (state.startsWith('bridge_')) {
+                    addLog(`Handshake flow detected (ID: ${state})`)
+                    handleDirectSync(code, state)
+                    return
+                } else {
+                    addLog(`Standard OAuth flow detected.`)
+                    handleDirectSync(code, state)
+                    return
+                }
             }
 
             const liffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID
@@ -221,12 +230,13 @@ export default function GlobalLogin() {
                             }
 
                             if (success) {
-                                addLog('SYNC SUCCESS! Closing in 2s...')
+                                addLog('SYNC SUCCESS!')
                                 localStorage.removeItem('safari_bridge_id')
                                 setTimeout(() => {
                                     try { window.close(); } catch (e) { }
-                                    window.location.href = '/search';
-                                }, 2500);
+                                    resolveAndRedirect(customerData);
+                                }, 200);
+                                return;
                             } else {
                                 addLog('Database Sync Failed')
                                 setError('การซิงค์ข้อมูลล้มเหลว กรุณาลองใหม่อีกครั้ง')
@@ -334,9 +344,8 @@ export default function GlobalLogin() {
                     addLog('Poll Detect Success!')
                     clearInterval(pollInterval)
                     localStorage.removeItem('pwa_bridge_id')
-                    localStorage.setItem('liff_customer', JSON.stringify(result.customerData))
-                    localStorage.setItem('liff_line_user_id', result.customerData.line_user_id)
-                    router.replace('/search')
+                    // v42: Use centralized logic in PWA too
+                    resolveAndRedirect(result.customerData);
                 }
             } catch (e) {
                 console.error('Polling error:', e)
@@ -356,9 +365,9 @@ export default function GlobalLogin() {
         
         if (isIOS && isStandalone) {
             if (liffId && liffId !== 'your_liff_id') {
-                const bridgeId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+                const bridgeId = 'bridge_' + ((typeof crypto !== 'undefined' && crypto.randomUUID)
                     ? crypto.randomUUID()
-                    : Math.random().toString(36).substring(2) + Date.now().toString(36);
+                    : Math.random().toString(36).substring(2) + Date.now().toString(36));
 
                 // v36: Revert to Raw OAuth (access.line.me) to force iOS Breakout
                 // This is more aggressive at forcing the "Open in Safari" behavior.
@@ -478,7 +487,9 @@ export default function GlobalLogin() {
                     ) : syncLoading ? (
                         <div className={styles.syncBox}>
                             <div className="spinner-blue" style={{ width: 40, height: 40, margin: '0 auto 15px' }} />
-                            <h2 style={{ color: 'var(--text-primary)', fontSize: '1.3rem', marginBottom: 10 }}>กำลังซิงค์ข้อมูล...</h2>
+                            <h2 style={{ color: 'var(--text-primary)', fontSize: '1.3rem', marginBottom: 10 }}>
+                                {isHandshakeFlow ? 'กำลังส่งข้อมูลไปยังแอป...' : 'กำลังเข้าสู่ระบบ...'}
+                            </h2>
                             <p style={{ color: 'var(--text-secondary)', fontSize: '1rem' }}>กรุณารอสักครู่ครับ</p>
                         </div>
                     ) : (typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('pwaBridgeId') || localStorage.getItem('pwa_bridge_id'))) ? (
