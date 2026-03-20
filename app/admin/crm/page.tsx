@@ -390,9 +390,11 @@ export default function CRMPage() {
         document.body.removeChild(link)
         
         trackAuditLog({
-            action_type: 'EXPORT_CRM_DATA' as any,
-            entity_type: 'bookings',
-            details: { count: filteredTransactions.length, context: 'CRM All Transactions' }
+            action_type: 'EXPORT',
+            entity_type: 'booking',
+            entity_id: 'all',
+            description: `Exported ${filteredTransactions.length} transactions from CRM`,
+            new_data: { count: filteredTransactions.length, context: 'CRM All Transactions' }
         })
     }
 

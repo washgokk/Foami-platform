@@ -358,7 +358,7 @@ export interface Payout {
 }
 
 // ─── Audit Log Types ──────────────────────────────────────────
-export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'TOGGLE_STATUS' | 'PAYOUT' | 'RESTORE'
+export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'TOGGLE_STATUS' | 'PAYOUT' | 'RESTORE' | 'EXPORT'
 export type AuditEntity = 'staff' | 'branch' | 'service' | 'booking' | 'payout' | 'service_addon' | 'zone' | 'discount_code' | 'cc_price_group'
 
 export interface AuditLog {
