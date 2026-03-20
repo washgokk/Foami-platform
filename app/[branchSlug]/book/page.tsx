@@ -164,6 +164,9 @@ export default function BookPage() {
     const [selectedDate, setSelectedDate] = useState('')
     const [selectedSlot, setSelectedSlot] = useState('')
     const [dateRange, setDateRange] = useState<Date[]>([])
+    const [isTooFar, setIsTooFar] = useState(false)
+    const [differentSpotFee, setDifferentSpotFee] = useState(0)
+    const [travelSurchargeState, setTravelSurchargeState] = useState(0)
 
     // Step 4 — Summary
     const [discountCode, setDiscountCode] = useState('')
@@ -219,33 +222,55 @@ export default function BookPage() {
             supabase.from('service_addons').select('*').eq('is_active', true),
             supabase.from('branches').select('*').eq('slug', branchSlug).maybeSingle()
         ]).then(([{ data: svcs }, { data: ads }, { data: branch }]) => {
-            if (svcs) {
-                const parsed = svcs.map(s => {
+            if (svcs && branch) {
+                const filteredSvcs = svcs.filter(s => {
+                    const settings = s.branch_settings?.[branch.id]
+                    return settings ? settings.is_active : true
+                })
+
+                const parsed = filteredSvcs.map(s => {
+                    const settings = s.branch_settings?.[branch.id]
+                    const markup = Number(settings?.price_markup || 0)
+
                     const parts = s.description.split('\n[Addons: ')
                     const desc = parts[0]
                     const addonsStr = parts.length > 1 ? parts[1].replace(']', '') : ''
-
-                    let color = '#315EC3' // Dominant
-                    if (s.name.includes('เคลือบ')) color = '#F1BFDB' // Accent Pink
-                    if (s.name.includes('บำรุง')) color = '#A0D9F6' // Subordinate Light Blue
 
                     return {
                         id: s.id,
                         name: s.name,
                         description: desc,
-                        price_s: s.price_s,
-                        price_m: s.price_m,
-                        price_l: s.price_l,
+                        price_s: Number(s.price_s) + markup,
+                        price_m: Number(s.price_m) + markup,
+                        price_l: Number(s.price_l) + markup,
+                        original_price_s: Number(s.price_s),
+                        original_price_m: Number(s.price_m) || 0,
+                        original_price_l: Number(s.price_l) || 0,
                         icon: s.name.includes('เคลือบ') ? 'sparkles' : s.name.includes('บำรุง') ? 'wrench' : 'droplets',
                         color: s.name.includes('เคลือบ') ? 'var(--brand-accent)' : s.name.includes('บำรุง') ? 'var(--brand-subordinate)' : 'var(--brand-dominant)',
                         image_url: s.image_url,
                         availableAddons: addonsStr ? addonsStr.split(',') : [],
-                        is_addon_required: s.is_addon_required
+                        is_addon_required: s.is_addon_required,
+                        branch_markup: markup
                     }
                 })
                 setDbPackages(parsed)
             }
-            if (ads) setDbAddons(ads)
+            if (ads && branch) {
+                const filteredAds = ads.filter(a => {
+                    const settings = a.branch_settings?.[branch.id]
+                    return settings ? settings.is_active : true
+                }).map(a => {
+                    const settings = a.branch_settings?.[branch.id]
+                    const markup = Number(settings?.price_markup || 0)
+                    return {
+                        ...a,
+                        price: Number(a.price) + markup,
+                        branch_markup: markup
+                    }
+                })
+                setDbAddons(filteredAds)
+            }
 
             if (branch) {
                 setBranches([branch])
@@ -286,7 +311,7 @@ export default function BookPage() {
             // 1. Fetch Staff Schedules only for THIS branch's zones
             const { data: allSchedules } = await supabase
                 .from('staff_schedules')
-                .select('date, time_slot, zone_id, is_booked, staff_id')
+                .select('date, time_slot, zone_id, is_booked, staff_id, work_type')
                 .gte('date', from)
                 .lte('date', to)
                 .in('zone_id', zoneIds)
@@ -313,7 +338,11 @@ export default function BookPage() {
                 const daySchedules = (allSchedules || []).filter(s => s.date === dateKey)
                 const dayBookings = (allBookings || []).filter(b => b.scheduled_date === dateKey)
 
+                // Re-calculate pickupMatched for availability filtering logic
+                const localPickupMatched = zones.find(z => z.is_active && z.polygon_coords?.length >= 3 && isPointInPolygon(pickupLat, pickupLng, z.polygon_coords))
+
                 const slotsForDay = TIME_SLOTS.map(slot => {
+                    const dateKey = format(d, 'yyyy-MM-dd')
                     if (dateKey === todayStr) {
                         const [sh, sm] = slot.split(':').map(Number)
                         const slotMinutes = sh * 60 + sm
@@ -321,58 +350,79 @@ export default function BookPage() {
                         if (slotMinutes < nowMinutes + 20) return { time_slot: slot, type: 'timed_out' }
                     }
 
-                    // Capacity Calculation:
-                    // A slot is available if:
-                    // 1. There is an unbooked staff schedule for this (date, time, zone)
-                    // 2. AND there are no pending unassigned bookings consuming that staff
+                    // 1. Group schedules by staff to find their "Base Zone" for this slot
+                    const slotSchedules = daySchedules.filter(s => (s.time_slot === slot || s.time_slot?.startsWith(slot)) && !s.is_booked)
+                    const staffAssignments: Record<string, any[]> = {}
+                    slotSchedules.forEach(s => {
+                        if (!staffAssignments[s.staff_id]) staffAssignments[s.staff_id] = []
+                        staffAssignments[s.staff_id].push(s)
+                    })
 
-                    // Filter staff who are assigned to this slot and NOT yet booked
-                    const inZoneFreeStaff = daySchedules.filter(s => (s.time_slot === slot || s.time_slot?.startsWith(slot)) && s.zone_id === zoneId && !s.is_booked)
-                    const otherFreeStaff = daySchedules.filter(s => (s.time_slot === slot || s.time_slot?.startsWith(slot)) && !s.is_booked)
+                    const matchingStaff: { staff_id: string; base_zone_id: string; fee: number; type: 'local' | 'overflow' }[] = []
 
-                    // Filter pending bookings (all types: in-zone, other-zone, or null-zone/out-of-zone)
-                    const pendingBookingsInZone = dayBookings.filter(b => (b.scheduled_time === slot || b.scheduled_time?.startsWith(slot)) && b.zone_id === zoneId && !b.staff_id)
+                    Object.entries(staffAssignments).forEach(([sId, assignments]) => {
+                        // Identify Base (🏠 in_zone)
+                        const baseAssignment = assignments.find(a => a.work_type === 'in_zone') || assignments[0]
+                        const baseZone = zones.find(zn => zn.id === baseAssignment.zone_id)
+                        if (!baseZone) return
+
+                        const isOutOfZone = !localPickupMatched
+                        const isCrossZone = localPickupMatched && localPickupMatched.id !== baseZone.id
+                        
+                        // Check if this staff is willing to serve this location
+                        let canServe = false
+                        if (!isOutOfZone && !isCrossZone) {
+                            // Customer is in staff's base zone
+                            canServe = true 
+                        } else if (isCrossZone) {
+                            // Customer is in another zone, check if staff has Cross-Zone or Out-of-Zone opted in
+                            canServe = assignments.some(a => a.work_type === 'cross_zone' || a.work_type === 'out_of_zone')
+                        } else if (isOutOfZone) {
+                            // Customer is Out-of-Zone, check if staff has Out-of-Zone opted in
+                            canServe = assignments.some(a => a.work_type === 'out_of_zone')
+                        }
+
+                        if (!canServe) return
+
+                        // Calculate distance from Base Zone boundary to Pickup
+                        const distToPickup = minDistanceToPolygon(pickupLat, pickupLng, baseZone.polygon_coords)
+                        
+                        // Check branch-level distance limit
+                        if (distToPickup > (branches[0].max_out_of_zone_km || 2)) return
+
+                        const ozFee = branches[0].out_of_zone_fee || 10
+                        // 2x Multiplier for Round-trip (Base -> Pickup -> Base)
+                        const baseToPickupFee = distToPickup * 2 * ozFee
+
+                        matchingStaff.push({
+                            staff_id: sId,
+                            base_zone_id: baseZone.id,
+                            fee: baseToPickupFee,
+                            type: (isOutOfZone || isCrossZone) ? 'overflow' : 'local'
+                        })
+                    })
+
+                    // 2. Subtract pending unassigned bookings
                     const allPendingInBranch = dayBookings.filter(b => (b.scheduled_time === slot || b.scheduled_time?.startsWith(slot)) && !b.staff_id)
-                    const pendingBookingsOther = allPendingInBranch.filter(b => b.zone_id !== zoneId)
+                    
+                    // Simple capacity check: matchingStaff.length - allPending
+                    // To be more precise, we should sort matchingStaff by fee and pick the best one
+                    matchingStaff.sort((a, b) => a.fee - b.fee)
+                    
+                    const availableCount = matchingStaff.length - allPendingInBranch.length
 
-                    // Effective Capacity in Zone
-                    // For local staff, we subtract pending unassigned bookings in that same zone
-                    const effectiveInZoneCount = inZoneFreeStaff.length - pendingBookingsInZone.length
-
-                    if (effectiveInZoneCount > 0) {
+                    if (availableCount > 0) {
+                        const topStaff = matchingStaff[0]
                         return {
-                            time_slot: slot, type: 'local',
-                            serving_zone_id: zoneId,
-                            available_staff_ids: inZoneFreeStaff.slice(0, effectiveInZoneCount).map(s => s.staff_id)
+                            time_slot: slot,
+                            type: topStaff.type,
+                            serving_zone_id: topStaff.base_zone_id,
+                            available_staff_ids: matchingStaff.slice(0, availableCount).map(ms => ms.staff_id),
+                            calculated_fee: topStaff.fee
                         }
                     } else {
-                        // Check Overflow capacity across the whole branch
-                        const totalFreeInBranch = daySchedules.filter(s => (s.time_slot === slot || s.time_slot?.startsWith(slot)) && !s.is_booked)
-                        const effectiveOtherCount = totalFreeInBranch.length - allPendingInBranch.length
-
-                        if (effectiveOtherCount > 0) {
-                            // Find nearest serving zone among remaining free staff
-                            let nearestZ: any = null
-                            let minDist = Infinity
-                            totalFreeInBranch.forEach((s: any) => {
-                                const z = zones.find(zn => zn.id === s.zone_id)
-                                const b = branches.find(br => br.id === z?.branch_id)
-                                if (b) {
-                                    const d = haversine(pickupLat, pickupLng, b.lat, b.lng)
-                                    if (d < minDist) { minDist = d; nearestZ = z }
-                                }
-                            })
-
-                            const staffInNearest = totalFreeInBranch.filter((s: any) => s.zone_id === nearestZ?.id)
-                            return {
-                                time_slot: slot, type: 'overflow',
-                                serving_zone_id: nearestZ?.id,
-                                available_staff_ids: staffInNearest.slice(0, effectiveOtherCount).map(s => s.staff_id)
-                            }
-                        } else {
-                            const hasStaff = daySchedules.some(s => (s.time_slot === slot || s.time_slot?.startsWith(slot)))
-                            return hasStaff ? { time_slot: slot, type: 'full' } : null
-                        }
+                        const hasAnyStaff = daySchedules.some(s => (s.time_slot === slot || s.time_slot?.startsWith(slot)))
+                        return hasAnyStaff ? { time_slot: slot, type: 'full' } : null
                     }
                 }).filter(Boolean) as any[]
 
@@ -460,7 +510,6 @@ export default function BookPage() {
             setZoneId('')
         }
 
-        // Delivery matching (for info/fee)
         if (showDelivery) {
             const deliveryMatched = zones.find(z => z.is_active && z.polygon_coords?.length >= 3 && isPointInPolygon(deliveryLat, deliveryLng, z.polygon_coords))
             if (deliveryMatched) {
@@ -468,75 +517,44 @@ export default function BookPage() {
             }
         }
 
+        const maxKm = branches[0]?.max_out_of_zone_km || 2
+        let tooFar = false
+        let diffFee = 0
         let travelSurcharge = 0
+
+        // 1. Distance check for the pickup point (Too far from any zone)
+        let minD = Infinity
+        zones.forEach(z => {
+            if (z.is_active && z.polygon_coords?.length >= 3) {
+                const d = minDistanceToPolygon(pickupLat, pickupLng, z.polygon_coords)
+                if (d < minD) minD = d
+            }
+        })
+        if (minD > maxKm && minD !== Infinity) tooFar = true
+
+        // 2. Different spot fee (Pickup -> Delivery)
+        if (showDelivery && (pickupLat !== deliveryLat || pickupLng !== deliveryLng)) {
+            const distBetween = haversine(pickupLat, pickupLng, deliveryLat, deliveryLng)
+            const rate = branches[0]?.out_of_zone_fee || 10
+            // 2x Multiplier for Round-trip (Pickup -> Delivery -> Pickup)
+            diffFee = Math.round(distBetween * 2) * Number(rate)
+        }
+
+        // 3. Travel surcharge (Base -> Pickup) from pre-calculated slot data
         if (selectedDate && selectedSlot && slots[selectedDate]) {
             const daySlots = slots[selectedDate] || []
-            const currentSlot = daySlots.find((s: any) => s.time_slot === selectedSlot)
-
-            if (currentSlot) {
-                // Base Location for distance calculation (serving branch)
-                const sZone = zones.find(z => z.id === currentSlot.serving_zone_id)
-                const sBranch = branches.find(b => b.id === sZone?.branch_id)
-
-                if (sZone && sBranch) {
-                    const bLat = Number(sBranch.lat)
-                    const bLng = Number(sBranch.lng)
-
-                    // Check if trip legs are within serving zone
-                    const pickupInS = isPointInPolygon(pickupLat, pickupLng, sZone.polygon_coords)
-                    const deliveryMatched = zones.find(z => z.is_active && z.polygon_coords?.length >= 3 && isPointInPolygon(deliveryLat, deliveryLng, z.polygon_coords))
-                    const deliveryInS = showDelivery ? (deliveryMatched?.id === sZone.id) : pickupInS
-
-                    // If either leg is outside serving zone, calculate distance fee
-                    if (!pickupInS || !deliveryInS) {
-                        // d1: distance to pickup from NEAREST edge of serving zone
-                        const d1 = pickupInS ? 0 : minDistanceToPolygon(pickupLat, pickupLng, sZone.polygon_coords)
-                        
-                        // d2: distance from pickup to delivery
-                        const d2 = showDelivery ? haversine(pickupLat, pickupLng, deliveryLat, deliveryLng) : 0
-                        
-                        // --- Intelligent Chaining Check ---
-                        let skipReturn = false
-                        if (showDelivery && deliveryMatched) {
-                            const currentIdx = TIME_SLOTS.indexOf(selectedSlot)
-                            const nextSlotName = TIME_SLOTS[currentIdx + 1]
-                            if (nextSlotName) {
-                                // Check allSchedulesData for ANY staff available in current slot having a NEXT shift in delivery zone
-                                const availableStaffIds = currentSlot.available_staff_ids || []
-                                const hasChain = allSchedulesData.some(sch =>
-                                    sch.date === selectedDate &&
-                                    sch.time_slot === nextSlotName &&
-                                    sch.zone_id === deliveryMatched.id &&
-                                    availableStaffIds.includes(sch.staff_id)
-                                )
-                                if (hasChain) skipReturn = true
-                            }
-                        }
-                        
-                        // d3: distance from delivery back to NEAREST edge of serving zone
-                        const d3 = (showDelivery && !skipReturn && !deliveryInS) 
-                            ? minDistanceToPolygon(deliveryLat, deliveryLng, sZone.polygon_coords)
-                            : (skipReturn || deliveryInS ? 0 : d1)
-                        
-                        const totalDist = d1 + d2 + d3
-
-                        const rate = sBranch.out_of_zone_fee || OUT_OF_ZONE_RATE
-                        if (sBranch.out_of_zone_type === 'flat_rate') {
-                            travelSurcharge = Number(rate)
-                        } else {
-                            travelSurcharge = Math.round(totalDist) * Number(rate)
-                        }
-                    }
-                } else if (!zoneId) {
-                    // Fallback if truly out of zone and no specific slot info
-                    travelSurcharge = OVERFLOW_FEE
-                }
+            const currentSlotData = daySlots.find((s: any) => s.time_slot === selectedSlot)
+            if (currentSlotData?.calculated_fee) {
+                travelSurcharge = currentSlotData.calculated_fee
             }
         }
 
-        setExtraFee(baseZoneFee + travelSurcharge)
+        setIsTooFar(tooFar)
+        setDifferentSpotFee(diffFee)
+        setTravelSurchargeState(travelSurcharge)
+        setExtraFee(baseZoneFee + travelSurcharge + diffFee)
 
-    }, [pickupLat, pickupLng, deliveryLat, deliveryLng, showDelivery, zones, branches, selectedDate, selectedSlot, slots, zoneId])
+    }, [pickupLat, pickupLng, deliveryLat, deliveryLng, showDelivery, zones, branches, selectedDate, selectedSlot, slots])
 
     // ─── Pricing ─────────────────────────────────────────────────
     const addonTotal = () => {
@@ -554,18 +572,24 @@ export default function BookPage() {
             } else if (pricingType === 'notify_later') {
                 const vState = addonVariableStates[addonName]
                 if (vState && vState.mode === 'custom') {
-                    t += Number(vState.customAmount) || 0
+                    // Include markup for custom fuel amount
+                    t += (Number(vState.customAmount) || 0) + (dbA.branch_markup || 0)
                 }
             } else {
                 // Fixed or has sub_options
                 if (addonSelectedPrices[addonName] !== undefined) {
-                    t += addonSelectedPrices[addonName]
+                    t += addonSelectedPrices[addonName] + (dbA.branch_markup || 0)
                 } else {
-                    t += dbA.price || 0
+                    t += (dbA.price || 0) + (dbA.branch_markup || 0)
                 }
             }
         }
         return t
+    }
+
+    // New: Calculate only what needs to be paid NOW (Free = 0, others = 0 because they are Pay Later)
+    const addonPaymentTotal = () => {
+        return 0 // All non-free addons are now Pay Later
     }
 
     const isAddonComplete = (addonName: string) => {
@@ -634,9 +658,14 @@ export default function BookPage() {
     }
 
     const { price: pkgPrice, basePrice: pkgBasePrice, adjustment: pkgAdjustment, isCc: isCcPrice, matchedGroupName } = getPkgPrice(selectedPkg)
-    const currentAddonTotal = addonTotal()
-    const total = pkgPrice + currentAddonTotal + extraFee - discountAmount
+    const currentAddonDisplayTotal = addonTotal()
+    const currentAddonPaymentTotal = addonPaymentTotal()
+    const extraFeeValue = extraFee
+    const total = pkgPrice + currentAddonPaymentTotal + extraFeeValue - discountAmount
+    const displayTotal = pkgPrice + currentAddonDisplayTotal + extraFeeValue - discountAmount
     const basePrice = pkgPrice
+    const travelSurcharge = travelSurchargeState
+    const diffFee = differentSpotFee
 
     // ─── Discount ────────────────────────────────────────────────
     const applyDiscount = async () => {
@@ -729,12 +758,12 @@ export default function BookPage() {
         }
     }
 
-    // Auto-fetch when reaching payment step
+    // Auto-fetch when reaching payment step or when total price changes
     useEffect(() => {
-        if (step === 4 && payMethod === 'stripe' && !clientSecret) {
+        if (step === 4 && payMethod === 'stripe') {
             fetchPaymentIntent()
         }
-    }, [step, payMethod, clientSecret])
+    }, [step, payMethod, total]) // Re-fetch if total price changes
 
     const handleStripeSuccess = async (paymentIntentId: string) => {
         setPaymentSuccessful(true)
@@ -799,6 +828,10 @@ export default function BookPage() {
         // Snapshot branch costs
         const bSettings = branches.find(b => b.id === activeBranchId) || branches[0]
 
+        // Calculate additional_price (addons that were NOT paid now)
+        const initAdditionalPrice = currentAddonDisplayTotal // Since currentAddonPaymentTotal is 0
+        const initAdditionalNote = currentAddonDisplayTotal > 0 ? 'บริการเสริม (รอชำระ)' : null
+
         try {
             const { data: bookingData, error } = await supabase.from('bookings').insert({
                 id: bookingId,
@@ -811,7 +844,14 @@ export default function BookPage() {
                 branch_id: activeBranchId,
                 zone_id: zoneId || null,
                 extra_fee: extraFee,
-                base_price: basePrice, total_price: total,
+                travel_surcharge: travelSurchargeState,
+                different_spot_fee: differentSpotFee,
+                staff_extra_payout: (travelSurchargeState + differentSpotFee) * 0.5,
+                base_price: basePrice, 
+                total_price: total, // Only paid amount (Package + Fees - Discount)
+                additional_price: 0,
+                additional_price_note: richAddons.length > 0 ? `บริการเสริมที่เลือก: ${richAddons.map(a => a.name).join(', ')} (รอเรียกเก็บ)` : null,
+                is_additional_paid: false,
                 discount_code: discountCode || null, discount_amount: discountAmount,
                 payment_method: payMethod,
                 payment_status: stripeId ? 'paid' : (payMethod === 'stripe' ? 'paid' : 'pending'),
@@ -821,6 +861,8 @@ export default function BookPage() {
                 customer_note: customerNote || null,
                 status: 'pending',
                 auto_assigned: false,
+                package_markup_amount: (selectedPkg as any)?.branch_markup || 0,
+                original_base_price: (selectedPkg?.vehicle_size === 'S' ? (selectedPkg as any).original_price_s : selectedPkg?.vehicle_size === 'M' ? (selectedPkg as any).original_price_m : (selectedPkg as any).original_price_l) || 0,
                 labor_cost: bSettings?.labor_cost_per_job || 0,
                 capital_cost: bSettings?.max_capital_per_job || 0,
                 rental_cost: bSettings?.vehicle_rental_per_job || 0,
@@ -948,7 +990,7 @@ export default function BookPage() {
         !!selectedPkg &&
         Object.keys(addons).every(name => !addons[name] || isAddonComplete(name)) &&
         (selectedPkg.is_addon_required === true ? Object.values(addons).some(v => v === true) : true),
-        !!selectedVehicle && !!pickupAddress && !!pickupAddressDetail.trim(),
+        !!selectedVehicle && !!pickupAddress && !!pickupAddressDetail.trim() && !isTooFar,
         !!(selectedDate && selectedSlot),
         true,
         !!payMethod,
@@ -1153,12 +1195,23 @@ export default function BookPage() {
                                                     </div>
 
                                                     {!isFree && !isNotifyLater && dynPrices.length > 0 && (
-                                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>เริ่มต้น {dynPrices[0].price} ฿</span>
+                                                        <div style={{ textAlign: 'right' }}>
+                                                            <div style={{ color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 700 }}>{dynPrices[0].price} ฿</div>
+                                                            <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>(จ่ายหลังใช้บริการ)</div>
+                                                        </div>
                                                     )}
                                                     {!isFree && !isNotifyLater && dynPrices.length === 0 && (
-                                                        <span style={{ color: 'var(--success)', fontSize: '0.78rem', fontWeight: 600 }}>{baseDBPrice} ฿</span>
+                                                        <div style={{ textAlign: 'right' }}>
+                                                            <div style={{ color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 700 }}>{baseDBPrice} ฿</div>
+                                                            <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>(จ่ายหลังใช้บริการ)</div>
+                                                        </div>
                                                     )}
-                                                    {isNotifyLater && <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>แจ้งภายหลัง</span>}
+                                                    {isNotifyLater && (
+                                                        <div style={{ textAlign: 'right' }}>
+                                                            <div style={{ color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 700 }}>แจ้งภายหลัง</div>
+                                                            <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>(จ่ายหลังใช้บริการ)</div>
+                                                        </div>
+                                                    )}
                                                     {isFree && <span style={{ color: 'var(--success)', fontSize: '0.78rem', fontWeight: 600 }}>ฟรี</span>}
                                                 </div>
 
@@ -1482,9 +1535,19 @@ export default function BookPage() {
                             </div>
                         )}
 
-                        {extraFee > 0 && (
+                        {isTooFar && (
+                            <div className="alert alert-error" style={{ marginTop: 'var(--space-4)', gap: 8, display: 'flex', alignItems: 'center', background: '#FEE2E2', color: '#B91C1C', borderColor: '#FCA5A5' }}>
+                                <XCircle size={20} /> <div><strong>ขออภัย!</strong> ตำแหน่งของคุณอยู่นอกพื้นที่ให้บริการสูงสุด ({branches[0]?.max_out_of_zone_km || 2} กม. จากเขตบริการ)</div>
+                            </div>
+                        )}
+
+                        {extraFee > 0 && !isTooFar && (
                             <div className="alert alert-warning" style={{ marginTop: 'var(--space-4)', gap: 8, display: 'flex', alignItems: 'center' }}>
-                                <AlertTriangle size={20} /> <div>ตำแหน่งอยู่นอกโซนบริการ คิดเพิ่ม <strong>฿{extraFee}</strong> (10 บาท/กม.)</div>
+                                <AlertTriangle size={20} /> <div>
+                                    {differentSpotFee > 0 && <div>• ค่าบริการรับส่งเพิ่มเติม (คนละจุด): ฿{differentSpotFee}</div>}
+                                    {extraFee - differentSpotFee > 0 && <div>• ค่าบริการนอกโซน: ฿{extraFee - differentSpotFee}</div>}
+                                    รวมค่าบริการส่วนต่าง: <strong>฿{extraFee}</strong>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -1685,7 +1748,9 @@ export default function BookPage() {
                                     }
                                     return { label, val: dbA.price || 0 }
                                 }).filter(Boolean),
-                                ...(extraFee > 0 ? [{ label: 'ค่าระยะทางนอกโซน', val: extraFee }] : []),
+                                ...(travelSurchargeState > 0 ? [{ label: 'ค่าเดินทางไปจุดรับ', val: travelSurchargeState }] : []),
+                                ...(differentSpotFee > 0 ? [{ label: 'ค่าส่งรถต่างสถานที่', val: differentSpotFee }] : []),
+                                ...((extraFee - travelSurchargeState - differentSpotFee) > 0 ? [{ label: 'ค่าระยะทางนอกโซน', val: (extraFee - travelSurchargeState - differentSpotFee) }] : []),
                                 ...(discountAmount > 0 ? [{ label: `ส่วนลด (${discountCode})`, val: -discountAmount }] : []),
                             ].map((row: any) => (
                                 <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: 8, alignItems: 'center' }}>
@@ -1697,9 +1762,16 @@ export default function BookPage() {
                                     </span>
                                 </div>
                             ))}
-                            <div style={{ borderTop: '2px solid var(--border)', paddingTop: 'var(--space-3)', display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1.2rem' }}>
-                                <span>รวมทั้งหมด</span>
+                            <div style={{ borderTop: '2px solid var(--border)', paddingTop: 'var(--space-3)', display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '1rem', marginBottom: 4 }}>
+                                <span style={{ color: 'var(--text-muted)' }}>สัญญาราคารวมทั้งหมด</span>
+                                <span>฿{displayTotal.toLocaleString()}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1.25rem' }}>
+                                <span>ยอดโอน/จ่ายตอนนี้</span>
                                 <span style={{ color: 'var(--primary)' }}>฿{total.toLocaleString()}</span>
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'right', marginTop: 4 }}>
+                                * ไม่รวมค่าบริการเสริมที่ต้องจ่ายหน้างาน
                             </div>
                         </div>
 

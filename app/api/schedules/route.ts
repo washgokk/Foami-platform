@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
         zone_id: s.zone_id,
         date: s.date,
         time_slot: s.time_slot,
+        work_type: s.work_type || 'in_zone',
         is_booked: false,
     }))
 

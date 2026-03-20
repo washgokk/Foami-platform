@@ -32,6 +32,9 @@ import { Elements } from '@stripe/react-stripe-js'
 import CheckoutForm from '@/components/Stripe/CheckoutForm'
 import Logo from '@/components/Branding/Logo'
 import ImageZoom from '@/components/Global/ImageZoom'
+import { format, addDays, isBefore, subHours, parseISO } from 'date-fns'
+import { th } from 'date-fns/locale'
+import { TIME_SLOTS } from '@/lib/types'
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '')
 
@@ -62,6 +65,14 @@ export default function MyBookingsPage() {
     const [submitting, setSubmitting] = useState(false)
     const [clientSecret, setClientSecret] = useState('')
     const [zoomConfig, setZoomConfig] = useState<{ images: { src: string; alt?: string }[]; initialIndex: number } | null>(null)
+    
+    // Reschedule States
+    const [isRescheduling, setIsRescheduling] = useState(false)
+    const [rescheduleDate, setRescheduleDate] = useState('')
+    const [rescheduleSlot, setRescheduleSlot] = useState('')
+    const [rescheduleSlots, setRescheduleSlots] = useState<any[]>([])
+    const [rescheduleLoading, setRescheduleLoading] = useState(false)
+    const [dateRange] = useState<Date[]>(() => Array.from({ length: 7 }, (_, i) => addDays(new Date(), i)))
 
     useEffect(() => {
         const customer = localStorage.getItem('liff_customer')
@@ -212,6 +223,132 @@ export default function MyBookingsPage() {
             setClientSecret('')
         } catch (e: any) {
             alert('บันทึกข้อมูลการชำระเงินขัดข้อง: ' + e.message)
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
+    const loadRescheduleSlots = async (date: string, booking: any) => {
+        if (!date || !booking) return
+        setRescheduleLoading(true)
+        try {
+            const { data: branch } = await supabase.from('branches').select('id, max_out_of_zone_km').eq('slug', branchSlug).single()
+            if (!branch) return
+
+            // 1. Fetch Staff Schedules for the zone
+            const { data: schedules } = await supabase
+                .from('staff_schedules')
+                .select('time_slot, zone_id, is_booked, staff_id, work_type')
+                .eq('date', date)
+                .eq('zone_id', booking.zone_id)
+                .eq('is_booked', false)
+
+            // 2. Fetch Existing Bookings for the slot
+            const { data: bookings } = await supabase
+                .from('bookings')
+                .select('scheduled_time, staff_id')
+                .eq('scheduled_date', date)
+                .eq('branch_id', branch.id)
+                .not('status', 'eq', 'cancelled')
+
+            const now = new Date()
+            const thTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }))
+            const todayStr = format(thTime, 'yyyy-MM-dd')
+            const nowMinutes = thTime.getHours() * 60 + thTime.getMinutes()
+
+            const availableSlots = TIME_SLOTS.map(slot => {
+                if (date === todayStr) {
+                    const [sh, sm] = slot.split(':').map(Number)
+                    const slotMinutes = sh * 60 + sm
+                    if (slotMinutes <= nowMinutes + 20) return null
+                }
+
+                const slotSchedules = (schedules || []).filter(s => s.time_slot === slot)
+                if (slotSchedules.length === 0) return null
+
+                const slotBookings = (bookings || []).filter(b => b.scheduled_time === slot && !b.staff_id)
+                const availableCount = slotSchedules.length - slotBookings.length
+
+                if (availableCount > 0) {
+                    return { time_slot: slot, available_staff_ids: slotSchedules.map(s => s.staff_id) }
+                }
+                return null
+            }).filter(Boolean)
+
+            setRescheduleSlots(availableSlots)
+        } catch (e) {
+            console.error('Error loading slots:', e)
+        } finally {
+            setRescheduleLoading(false)
+        }
+    }
+
+    const handleRescheduleSubmit = async () => {
+        if (!selectedBooking || !rescheduleDate || !rescheduleSlot) return
+        
+        const confirm = window.confirm('คุณแน่ใจหรือไม่ว่าต้องการเลื่อนนัดเป็นวันที่ ' + format(parseISO(rescheduleDate), 'd MMM yyyy', { locale: th }) + ' เวลา ' + rescheduleSlot + ' น.?')
+        if (!confirm) return
+
+        setSubmitting(true)
+        try {
+            const newCount = (selectedBooking.reschedule_count || 0) + 1
+            const { error } = await supabase.from('bookings')
+                .update({
+                    scheduled_date: rescheduleDate,
+                    scheduled_time: rescheduleSlot,
+                    reschedule_count: newCount,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', selectedBooking.id)
+
+            if (error) throw error
+
+            // Notify Staff
+            if (selectedBooking.staff_id) {
+                fetch('/api/push/notify-staff', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        staff_id: selectedBooking.staff_id,
+                        title: 'ลูกค้าเลื่อนนัด! 📅',
+                        body: `คิวงาน #${selectedBooking.id.slice(0, 8)} เลื่อนเป็น ${rescheduleDate} @ ${rescheduleSlot}`,
+                        url: `/staff/jobs/${selectedBooking.id}`
+                    })
+                }).catch(() => {})
+            }
+
+            alert('เลื่อนนัดสำเร็จแล้ว!')
+            setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, scheduled_date: rescheduleDate, scheduled_time: rescheduleSlot, reschedule_count: newCount } : b))
+            setSelectedBooking(null)
+            setIsRescheduling(false)
+        } catch (e: any) {
+            alert('ไม่สามารถเลื่อนนัดได้: ' + e.message)
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
+    const handleCancelNoRefund = async () => {
+        if (!selectedBooking) return
+        const confirm = window.confirm('ยืนยันตัวการยกเลิกการจอง?\n*เงื่อนไข: เมื่อมีการเลื่อนนัดครบ 3 ครั้งแล้ว หากยกเลิกจะไม่มีการคืนเงินทุกกรณี')
+        if (!confirm) return
+
+        setSubmitting(true)
+        try {
+            const { error } = await supabase.from('bookings')
+                .update({
+                    status: 'cancelled',
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', selectedBooking.id)
+
+            if (error) throw error
+
+            alert('ยกเลิกการจองสำเร็จแล้ว (ไม่มีการคืนเงิน)')
+            setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, status: 'cancelled' } : b))
+            setSelectedBooking(null)
+        } catch (e: any) {
+            alert('ไม่สามารถยกเลิกได้: ' + e.message)
         } finally {
             setSubmitting(false)
         }
@@ -448,7 +585,11 @@ export default function MyBookingsPage() {
                                         })
                                     }
                                     const trueBasePrice = selectedBooking.services?.price_s || selectedBooking.base_price || 0
-                                    const sizeAdj = (selectedBooking.total_price || 0) - trueBasePrice - addonsTotal - (selectedBooking.extra_fee || 0) + (selectedBooking.discount_amount || 0) - (selectedBooking.additional_price || 0)
+                                    // Calculate package adjustment (Size vs Base)
+                                    // Formula: (Paid Total) + (Discount) - (Fees like extra distance) - (Base Price)
+                                    const paidTotalWithDiscount = (selectedBooking.total_price || 0) + (selectedBooking.discount_amount || 0)
+                                    const feesTotal = (selectedBooking.extra_fee || 0) + (selectedBooking.travel_surcharge || 0) + (selectedBooking.different_spot_fee || 0)
+                                    const sizeAdj = paidTotalWithDiscount - feesTotal - trueBasePrice
                                     
                                     return (
                                         <>
@@ -469,27 +610,42 @@ export default function MyBookingsPage() {
                                             {/* Rich Addons */}
                                             {Array.isArray(selectedBooking.addon_ids) && selectedBooking.addon_ids.map((addon: any, idx: number) => {
                                                 const label = typeof addon === 'string' ? addon : (addon.name || 'บริการเสริม')
-                                                let price = 0
+                                                let p = 0
                                                 if (typeof addon !== 'string') {
-                                                    if (addon.isFree) price = 0
-                                                    else if (addon.selectedPrice !== undefined) price = addon.selectedPrice
-                                                    else if (addon.price !== undefined) price = addon.price
-                                                    else if (addon.variableState?.customAmount) price = Number(addon.variableState.customAmount)
+                                                    if (addon.isFree) p = 0
+                                                    else if (addon.selectedPrice !== undefined) p = addon.selectedPrice
+                                                    else if (addon.price !== undefined) p = addon.price
+                                                    else if (addon.variableState?.customAmount) p = Number(addon.variableState.customAmount)
                                                 }
 
                                                 return (
                                                     <div key={idx} className={styles.detailRow}>
                                                         <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem', paddingLeft: 12 }}>+ {label} {addon.variableState?.mode === 'full_tank' ? '(ตามจริง)' : ''}</span>
-                                                        <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>
-                                                            {addon.isFree ? 'ฟรี' : (price === 0 && addon.variableState?.mode === 'full_tank' && selectedBooking.additional_price > 0) ? `฿${selectedBooking.additional_price.toLocaleString()}` : (price === 0 && addon.variableState?.mode === 'full_tank') ? 'เก็บหน้างาน' : `฿${price.toLocaleString()}`}
+                                                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                                                            {addon.isFree ? 'ฟรี' : `฿${p.toLocaleString()} (จ่ายหลังใช้บริการ)`}
                                                         </span>
                                                     </div>
                                                 )
                                             })}
 
-                                            {selectedBooking.extra_fee > 0 && (
+                                            {(selectedBooking.travel_surcharge > 0 || selectedBooking.different_spot_fee > 0) ? (
+                                                <>
+                                                    {selectedBooking.travel_surcharge > 0 && (
+                                                        <div className={styles.detailRow}>
+                                                            <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>ค่าเดินทางไปจุดรับ</span>
+                                                            <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>฿{selectedBooking.travel_surcharge.toLocaleString()}</span>
+                                                        </div>
+                                                    )}
+                                                    {selectedBooking.different_spot_fee > 0 && (
+                                                        <div className={styles.detailRow}>
+                                                            <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>ค่ารับ-ส่งต่างสถานที่</span>
+                                                            <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>฿{selectedBooking.different_spot_fee.toLocaleString()}</span>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            ) : selectedBooking.extra_fee > 0 && (
                                                 <div className={styles.detailRow}>
-                                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>ค่าระยะทางนอกโซน</span>
+                                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>ค่าธรรมเนียมนอกพื้นที่</span>
                                                     <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>฿{selectedBooking.extra_fee.toLocaleString()}</span>
                                                 </div>
                                             )}
@@ -504,9 +660,14 @@ export default function MyBookingsPage() {
                                     )
                                 })()}
 
-                                <div className={styles.detailRow} style={{ marginTop: 8, paddingTop: 12, borderTop: '2px dashed var(--border)', fontWeight: 900, fontSize: '1.2rem' }}>
-                                    <span style={{ color: 'var(--text-primary)' }}>รวมทั้งหมด</span>
-                                    <span style={{ color: 'var(--primary)' }}>฿{selectedBooking.total_price?.toLocaleString()}</span>
+                                <div className={styles.detailRow} style={{ marginTop: 8, paddingTop: 12, borderTop: '2px dashed var(--border)', fontWeight: 800 }}>
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>ยอดที่โอนจ่ายแล้ว</span>
+                                    <span style={{ color: 'var(--primary)', fontSize: '1.1rem' }}>฿{selectedBooking.total_price?.toLocaleString()}</span>
+                                </div>
+
+                                <div className={styles.detailRow} style={{ marginTop: 4, opacity: 0.8 }}>
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>สัญญาราคารวมทั้งหมด</span>
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 700 }}>฿{((selectedBooking.total_price || 0) + (selectedBooking.additional_price || 0)).toLocaleString()}</span>
                                 </div>
                             </div>
 
@@ -565,6 +726,123 @@ export default function MyBookingsPage() {
                                             </div>
                                         )}
                                     </div>
+                                </div>
+                            )}
+
+                            {/* Section: Reschedule (New Feature) */}
+                            {['pending', 'confirmed'].includes(selectedBooking.status) && (
+                                <div style={{ borderTop: '1px dashed var(--border)', paddingTop: 'var(--space-4)', marginTop: 'var(--space-2)' }}>
+                                    {!isRescheduling ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                            {(selectedBooking.reschedule_count || 0) < 3 ? (
+                                                <>
+                                                    {(() => {
+                                                        const now = new Date()
+                                                        const thTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }))
+                                                        const scheduledTimeStr = `${selectedBooking.scheduled_date}T${selectedBooking.scheduled_time}`
+                                                        const scheduledDate = parseISO(scheduledTimeStr)
+                                                        const limitDate = subHours(scheduledDate, 3)
+                                                        const canReschedule = isBefore(thTime, limitDate)
+
+                                                        if (!canReschedule) {
+                                                            return <div style={{ fontSize: '0.8rem', color: 'var(--danger)', fontWeight: 600, textAlign: 'center' }}>เลื่อนนัดได้ก่อนเวลาจองอย่างน้อย 3 ชม.</div>
+                                                        }
+
+                                                        return (
+                                                            <button 
+                                                                className="btn btn-secondary btn-lg" 
+                                                                style={{ width: '100%', borderRadius: 'var(--radius-full)', fontWeight: 800, gap: 8 }}
+                                                                onClick={() => {
+                                                                    setIsRescheduling(true)
+                                                                    setRescheduleDate(selectedBooking.scheduled_date)
+                                                                    loadRescheduleSlots(selectedBooking.scheduled_date, selectedBooking)
+                                                                }}
+                                                            >
+                                                                <Calendar size={18} /> เลื่อนนัด ({3 - (selectedBooking.reschedule_count || 0)} ครั้งที่เหลือ)
+                                                            </button>
+                                                        )
+                                                    })()}
+                                                </>
+                                            ) : (
+                                                <button 
+                                                    className="btn btn-danger btn-lg btn-ghost" 
+                                                    style={{ width: '100%', borderRadius: 'var(--radius-full)', fontWeight: 800, border: '1px solid var(--danger)' }}
+                                                    onClick={handleCancelNoRefund}
+                                                >
+                                                    <XCircle size={18} /> ยกเลิกการจอง (ไม่คืนเงิน)
+                                                </button>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div style={{ background: 'var(--surface-2)', padding: 16, borderRadius: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>เลือกวัน/เวลาใหม่</div>
+                                                <button className="btn btn-ghost btn-sm" onClick={() => setIsRescheduling(false)}><X size={16} /></button>
+                                            </div>
+                                            
+                                            {/* Date Selector */}
+                                            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, scrollbarWidth: 'none' }}>
+                                                {dateRange.map(d => {
+                                                    const dateStr = format(d, 'yyyy-MM-dd')
+                                                    const isSelected = rescheduleDate === dateStr
+                                                    return (
+                                                        <button 
+                                                            key={dateStr}
+                                                            onClick={() => {
+                                                                setRescheduleDate(dateStr)
+                                                                setRescheduleSlot('')
+                                                                loadRescheduleSlots(dateStr, selectedBooking)
+                                                            }}
+                                                            style={{
+                                                                flexShrink: 0, padding: '8px 12px', borderRadius: 12, border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
+                                                                background: isSelected ? 'var(--primary-ghost)' : 'white', color: isSelected ? 'var(--primary)' : 'var(--text-primary)',
+                                                                fontSize: '0.8rem', fontWeight: 800, textAlign: 'center', minWidth: 65
+                                                            }}
+                                                        >
+                                                            <div style={{ fontSize: '0.65rem', opacity: 0.7 }}>{format(d, 'EEE', { locale: th })}</div>
+                                                            <div>{format(d, 'd MMM', { locale: th })}</div>
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+
+                                            {/* Time Slots */}
+                                            {rescheduleLoading ? (
+                                                <div style={{ textAlign: 'center', padding: 12 }}><div className="spinner spinner-sm" /></div>
+                                            ) : (
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                                                    {rescheduleSlots.map(s => {
+                                                        const isSelected = rescheduleSlot === s.time_slot
+                                                        return (
+                                                            <button 
+                                                                key={s.time_slot}
+                                                                onClick={() => setRescheduleSlot(s.time_slot)}
+                                                                style={{
+                                                                    padding: '8px 4px', borderRadius: 10, border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
+                                                                    background: isSelected ? 'var(--primary)' : 'white', color: isSelected ? 'white' : 'var(--text-primary)',
+                                                                    fontSize: '0.8rem', fontWeight: 700
+                                                                }}
+                                                            >
+                                                                {s.time_slot}
+                                                            </button>
+                                                        )
+                                                    })}
+                                                    {rescheduleSlots.length === 0 && (
+                                                        <div style={{ gridColumn: 'span 4', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)', padding: 12 }}>ไม่มีคิวว่างในวันที่เลือก</div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            <button 
+                                                className="btn btn-primary btn-lg" 
+                                                style={{ width: '100%', borderRadius: 'var(--radius-full)', fontWeight: 800, marginTop: 8 }}
+                                                disabled={!rescheduleSlot || submitting}
+                                                onClick={handleRescheduleSubmit}
+                                            >
+                                                {submitting ? <div className="spinner spinner-white" /> : 'ยืนยันการเลื่อนนัด'}
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

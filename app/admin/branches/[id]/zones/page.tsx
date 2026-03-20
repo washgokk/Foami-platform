@@ -185,7 +185,7 @@ export default function ZonesPage() {
                     <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <Map size={28} color="var(--brand-dominant)" /> โซนบริการ — {branch?.name}
                     </h1>
-                    <p className="page-subtitle">แต่ละโซนแสดงเป็นสีต่างกันบนแผนที่ · นอกโซน = 10 บาท/กม.</p>
+                    <p className="page-subtitle">แต่ละโซนแสดงเป็นสีต่างกันบนแผนที่ · นอกโซน = {branch?.out_of_zone_fee || 0} บาท/กม. · รัศมีสูงสุด {branch?.max_out_of_zone_km || 2} กม.</p>
                 </div>
                 {createMode === 'idle' && !redrawZone && (
                     <button className="btn btn-primary" style={{ borderRadius: 12, gap: 8 }} onClick={() => setCreateMode('naming')}>
@@ -217,19 +217,20 @@ export default function ZonesPage() {
 
             {/* ─── Step 2: Drawing mode (inline) ─── */}
             {(createMode === 'drawing' || redrawZone) && (
-                <ZoneDrawMap
-                    center={branchCenter}
-                    zones={zones}
-                    editingZoneId={redrawZone?.id}
-                    title={redrawZone ? <><Edit2 size={18} /> วาดกรอบใหม่: {redrawZone.name}</> : <><Map size={18} /> วาดกรอบโซน: "{newName}"</>}
-                    accentColor={redrawZone
-                        ? (zones.find(z => z.id === redrawZone.id) as any)?.color || ZONE_COLORS[0]
-                        : ZONE_COLORS[zones.length % ZONE_COLORS.length]}
-                    existingCoords={redrawZone?.polygon_coords || []}
-                    saving={saving}
-                    onSave={redrawZone ? saveRedraw : saveNewZone}
-                    onCancel={() => { setCreateMode('idle'); setRedrawZone(null) }}
-                />
+                    <ZoneDrawMap
+                        center={branchCenter}
+                        zones={zones}
+                        editingZoneId={redrawZone?.id}
+                        title={redrawZone ? <><Edit2 size={18} /> วาดกรอบใหม่: {redrawZone.name}</> : <><Map size={18} /> วาดกรอบโซน: "{newName}"</>}
+                        accentColor={redrawZone
+                            ? (zones.find(z => z.id === redrawZone.id) as any)?.color || ZONE_COLORS[0]
+                            : ZONE_COLORS[zones.length % ZONE_COLORS.length]}
+                        existingCoords={redrawZone?.polygon_coords || []}
+                        saving={saving}
+                        onSave={redrawZone ? saveRedraw : saveNewZone}
+                        onCancel={() => { setCreateMode('idle'); setRedrawZone(null) }}
+                        maxKm={branch?.max_out_of_zone_km}
+                    />
             )}
 
             {/* ─── Overview map (all zones) ─── */}
@@ -239,6 +240,7 @@ export default function ZonesPage() {
                         center={branchCenter}
                         zones={zones}
                         onRedraw={setRedrawZone}
+                        maxKm={branch?.max_out_of_zone_km}
                     />
                 </div>
             )}
@@ -328,8 +330,8 @@ export default function ZonesPage() {
 }
 
 // ─── Overview Map Component ──────────────────────────────────────────────────
-function ZoneOverviewMap({ center, zones, onRedraw }: {
-    center: [number, number]; zones: Zone[]; onRedraw: (z: Zone) => void
+function ZoneOverviewMap({ center, zones, onRedraw, maxKm }: {
+    center: [number, number]; zones: Zone[]; onRedraw: (z: Zone) => void; maxKm?: number
 }) {
     const mapRef = useRef<HTMLDivElement>(null)
     const mapInstanceRef = useRef<any>(null)
@@ -374,6 +376,19 @@ function ZoneOverviewMap({ center, zones, onRedraw }: {
 
             L.marker(center, { icon: branchIcon }).addTo(map).bindTooltip('ที่ตั้งสาขา', { permanent: true, direction: 'top', offset: [0, -32], className: 'leaflet-branch-label' })
 
+            // Draw Max Radius Circle
+            if (maxKm) {
+                L.circle(center, {
+                    radius: maxKm * 1000,
+                    color: 'var(--brand-dominant)',
+                    fillColor: 'var(--brand-dominant)',
+                    fillOpacity: 0.03,
+                    dashArray: '10, 10',
+                    weight: 1,
+                    interactive: false
+                }).addTo(map)
+            }
+
             layerGroupRef.current = L.featureGroup().addTo(map)
             mapInstanceRef.current = map
             
@@ -412,6 +427,31 @@ function ZoneOverviewMap({ center, zones, onRedraw }: {
                         permanent: true, direction: 'center',
                         className: 'leaflet-zone-label',
                     })
+
+                    // Draw dashed buffer for this zone
+                    if (maxKm && maxKm > 0) {
+                        try {
+                            const turf = require('@turf/turf')
+                            // Turf uses [lng, lat] and needs first point to equal last point
+                            const coords = z.polygon_coords.map(c => [c[1], c[0]])
+                            coords.push([coords[0][0], coords[0][1]])
+                            
+                            const poly = turf.polygon([coords])
+                            const buffered = turf.buffer(poly, maxKm, { units: 'kilometers' })
+                            
+                            L.geoJSON(buffered, {
+                                style: {
+                                    color,
+                                    fillColor: 'transparent',
+                                    fillOpacity: 0,
+                                    weight: 2,
+                                    dashArray: '5, 10'
+                                }
+                            }).addTo(layerGroupRef.current)
+                        } catch (err) {
+                            console.error('Turf buffer failed for zone', z.name, err)
+                        }
+                    }
                 }
             })
 
@@ -476,13 +516,14 @@ function ZoneOverviewMap({ center, zones, onRedraw }: {
 }
 
 // ─── Draw Map Component ──────────────────────────────────────────────────────
-function ZoneDrawMap({ center, zones, editingZoneId, title, accentColor, existingCoords, saving, onSave, onCancel }: {
+function ZoneDrawMap({ center, zones, editingZoneId, title, accentColor, existingCoords, saving, onSave, onCancel, maxKm }: {
     center: [number, number]; zones: Zone[]; editingZoneId?: string
     title: React.ReactNode; accentColor: string
     existingCoords: [number, number][]
     saving: boolean
     onSave: (coords: [number, number][]) => void
     onCancel: () => void
+    maxKm?: number
 }) {
     const mapRef = useRef<HTMLDivElement>(null)
     const mapInstanceRef = useRef<any>(null)
@@ -522,12 +563,36 @@ function ZoneDrawMap({ center, zones, editingZoneId, title, accentColor, existin
             });
             L.marker(center, { icon: branchIcon }).addTo(map).bindTooltip('ที่ตั้งสาขา')
 
+            // Draw Max Radius Circle
+            if (maxKm) {
+                L.circle(center, {
+                    radius: maxKm * 1000,
+                    color: 'var(--brand-dominant)',
+                    fillColor: 'var(--brand-dominant)',
+                    fillOpacity: 0.03,
+                    dashArray: '10, 10',
+                    weight: 1,
+                    interactive: false
+                }).addTo(map)
+            }
+
             // Show OTHER zones for reference
             zones.forEach((z, idx) => {
                 if (z.id === editingZoneId || !z.polygon_coords?.length) return
                 const color = (z as any).color || ZONE_COLORS[idx % ZONE_COLORS.length]
                 L.polygon(z.polygon_coords, { color, fillColor: color, fillOpacity: 0.1, weight: 1.5, dashArray: '6,4' })
                     .addTo(map).bindTooltip(z.name, { direction: 'center' })
+
+                // Buffer for other zones
+                if (maxKm && maxKm > 0 && z.polygon_coords.length >= 3) {
+                    try {
+                        const turf = require('@turf/turf')
+                        const coords = z.polygon_coords.map(c => [c[1], c[0]])
+                        coords.push([coords[0][0], coords[0][1]])
+                        const buff = turf.buffer(turf.polygon([coords]), maxKm, { units: 'kilometers' })
+                        L.geoJSON(buff, { style: { color, fillOpacity: 0, weight: 1, dashArray: '4,6', opacity: 0.5 } }).addTo(map)
+                    } catch(e) {}
+                }
             })
 
             // Draw existing points if re-drawing
@@ -537,6 +602,17 @@ function ZoneDrawMap({ center, zones, editingZoneId, title, accentColor, existin
                     markerRefs.current.push(m)
                 })
                 polyRef.current = L.polygon(existingCoords, { color: accentColor, fillColor: accentColor, fillOpacity: 0.2, weight: 2.5 }).addTo(map)
+
+                // Buffer for being edited zone
+                if (maxKm && maxKm > 0) {
+                    try {
+                        const turf = require('@turf/turf')
+                        const coords = existingCoords.map(c => [c[1], c[0]])
+                        coords.push([coords[0][0], coords[0][1]])
+                        const buff = turf.buffer(turf.polygon([coords]), maxKm, { units: 'kilometers' })
+                        L.geoJSON(buff, { style: { color: accentColor, fillOpacity: 0, weight: 2, dashArray: '5,10' } }).addTo(map)
+                    } catch(e) {}
+                }
             }
 
             map.on('click', (e: any) => {

@@ -33,14 +33,16 @@ export default function ServicesPage() {
         name: '', description: '', price: '0',
         imageUrl: '',
         addons: [] as string[],
-        is_addon_required: false
+        is_addon_required: false,
+        branch_settings: {} as Record<string, { is_active: boolean; price_markup: number }>
     })
     const [addonForm, setAddonForm] = useState({
         name: '', description: '',
         priceType: 'fixed' as 'free' | 'fixed' | 'by_size' | 'variable',
         imageUrl: '',
         price: '0',
-        dynamicPrices: [{ label: '', price: '0', imageUrl: '' }]
+        dynamicPrices: [{ label: '', price: '0', imageUrl: '' }],
+        branch_settings: {} as Record<string, { is_active: boolean; price_markup: number }>
     })
     const [saving, setSaving] = useState(false)
     const [confirmConfig, setConfirmConfig] = useState<{
@@ -87,7 +89,8 @@ export default function ServicesPage() {
                 price_l: +svcForm.price,
                 is_active: true,
                 is_addon_required: svcForm.is_addon_required,
-                image_url: svcForm.imageUrl
+                image_url: svcForm.imageUrl,
+                branch_settings: svcForm.branch_settings
             }
             if (editingSvc) {
                 const { error } = await supabase.from('services').update(payload).eq('id', editingSvc.id)
@@ -100,7 +103,7 @@ export default function ServicesPage() {
                     entity_id: editingSvc.id,
                     old_data: editingSvc,
                     new_data: { ...editingSvc, ...payload },
-                    description: `แก้ไขค่าบริการ: ${payload.name}`
+                    description: `แก้ไขบริการ: ${payload.name} (ราคา: ${payload.price_s}${payload.branch_settings ? ', มีการตั้งค่ารายสาขา' : ''})`
                 })
             } else {
                 const { data, error } = await supabase.from('services').insert(payload).select().single()
@@ -156,7 +159,8 @@ export default function ServicesPage() {
                     name: p.label,
                     price: +p.price,
                     image_url: p.imageUrl
-                })) : []
+                })) : [],
+                branch_settings: addonForm.branch_settings
             }
             if (editingAddon) {
                 const { error } = await supabase.from('service_addons').update(payload).eq('id', editingAddon.id)
@@ -169,7 +173,7 @@ export default function ServicesPage() {
                     entity_id: editingAddon.id,
                     old_data: editingAddon,
                     new_data: { ...editingAddon, ...payload },
-                    description: `แก้ไขบริการเสริม: ${payload.name}`
+                    description: `แก้ไขบริการเสริม: ${payload.name} (ราคา: ${payload.price}${payload.branch_settings ? ', มีการตั้งค่ารายสาขา' : ''})`
                 })
             } else {
                 const { data, error } = await supabase.from('service_addons').insert(payload).select().single()
@@ -459,10 +463,11 @@ export default function ServicesPage() {
                 price: String(s.price_s), 
                 imageUrl: s.image_url || '', 
                 addons: selectedAddons,
-                is_addon_required: s.is_addon_required || false
+                is_addon_required: s.is_addon_required || false,
+                branch_settings: s.branch_settings || {}
             })
         } else {
-            setSvcForm({ name: '', description: '', price: '0', imageUrl: '', addons: [], is_addon_required: false })
+            setSvcForm({ name: '', description: '', price: '0', imageUrl: '', addons: [], is_addon_required: false, branch_settings: {} })
         }
         setShowModal(true)
     }
@@ -496,10 +501,11 @@ export default function ServicesPage() {
                 priceType: isFree ? 'free' : isVariable ? 'variable' : isBySize ? 'by_size' : 'fixed', 
                 price: String(a.price), 
                 imageUrl: a.image_url || '', 
-                dynamicPrices: dynPrices as any 
+                dynamicPrices: dynPrices as any,
+                branch_settings: a.branch_settings || {}
             })
         } else {
-            setAddonForm({ name: '', description: '', priceType: 'fixed', imageUrl: '', price: '0', dynamicPrices: [{ label: '', price: '0', imageUrl: '' }] })
+            setAddonForm({ name: '', description: '', priceType: 'fixed', imageUrl: '', price: '0', dynamicPrices: [{ label: '', price: '0', imageUrl: '' }], branch_settings: {} })
         }
         setShowModal(true)
     }
@@ -532,7 +538,7 @@ export default function ServicesPage() {
                     {tab === 'services' && (
                         <div className="table-wrapper">
                             <table>
-                                <thead><tr><th>บริการ</th><th>คำอธิบาย</th><th>ราคาเริ่มต้น</th><th>บริการเสริม</th><th>สถานะ</th><th></th></tr></thead>
+                                <thead><tr><th>บริการ</th><th>คำอธิบาย</th><th>ราคาเริ่มต้น</th><th>บริการเสริม</th><th>สาขาที่ใช้งาน</th><th>สถานะ</th><th></th></tr></thead>
                                 <tbody>
                                     {services.length === 0 ? (
                                         <tr><td colSpan={6}><div className="empty-state"><Package size={48} color="var(--text-muted)" /><p className="empty-state-title">ยังไม่มีบริการ</p></div></td></tr>
@@ -546,6 +552,20 @@ export default function ServicesPage() {
                                                 <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{desc}</td>
                                                 <td><strong>฿{s.price_s}</strong></td>
                                                 <td>{hasAddons ? <span className="badge badge-picking">มีบริการเสริม</span> : <span className="badge badge-waiting">ไม่มี</span>}</td>
+                                                <td>
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                                        {(() => {
+                                                            const inactiveCount = Object.values(s.branch_settings || {}).filter(cfg => cfg && !cfg.is_active).length
+                                                            if (!s.branch_settings || Object.keys(s.branch_settings).length === 0 || inactiveCount === 0) {
+                                                                return <span className="badge badge-completed" style={{ fontSize: '0.7rem' }}>ทุกสาขา</span>
+                                                            }
+                                                            const activeBrs = branches.filter(b => !s.branch_settings?.[b.id] || s.branch_settings[b.id].is_active)
+                                                            if (activeBrs.length === 0) return <span className="badge badge-cancelled" style={{ fontSize: '0.7rem' }}>ปิดทุกสาขา</span>
+                                                            if (activeBrs.length === branches.length) return <span className="badge badge-completed" style={{ fontSize: '0.7rem' }}>ทุกสาขา</span>
+                                                            return activeBrs.map(b => <span key={b.id} className="badge" style={{ fontSize: '0.7rem' }}>{b.name}</span>)
+                                                        })()}
+                                                    </div>
+                                                </td>
                                                 <td>
                                                     <button 
                                                         className={`badge ${s.is_active ? 'badge-completed' : 'badge-cancelled'}`} 
@@ -572,7 +592,7 @@ export default function ServicesPage() {
                     {tab === 'addons' && (
                         <div className="table-wrapper">
                             <table>
-                                <thead><tr><th>บริการเสริม</th><th>คำอธิบาย</th><th>ราคา</th><th>สถานะ</th><th></th></tr></thead>
+                                <thead><tr><th>บริการเสริม</th><th>คำอธิบาย</th><th>ราคา</th><th>สาขาที่ใช้งาน</th><th>สถานะ</th><th></th></tr></thead>
                                 <tbody>
                                     {addons.length === 0 ? (
                                         <tr><td colSpan={5}><div className="empty-state"><Plus size={48} color="var(--text-muted)" /><p className="empty-state-title">ยังไม่มีบริการเสริม</p></div></td></tr>
@@ -581,6 +601,20 @@ export default function ServicesPage() {
                                             <td><strong>{a.name}</strong></td>
                                             <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{a.description}</td>
                                             <td>฿{a.price}</td>
+                                            <td>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                                    {(() => {
+                                                        const inactiveCount = Object.values(a.branch_settings || {}).filter(cfg => cfg && !cfg.is_active).length
+                                                        if (!a.branch_settings || Object.keys(a.branch_settings).length === 0 || inactiveCount === 0) {
+                                                            return <span className="badge badge-completed" style={{ fontSize: '0.7rem' }}>ทุกสาขา</span>
+                                                        }
+                                                        const activeBrs = branches.filter(b => !a.branch_settings?.[b.id] || a.branch_settings[b.id].is_active)
+                                                        if (activeBrs.length === 0) return <span className="badge badge-cancelled" style={{ fontSize: '0.7rem' }}>ปิดทุกสาขา</span>
+                                                        if (activeBrs.length === branches.length) return <span className="badge badge-completed" style={{ fontSize: '0.7rem' }}>ทุกสาขา</span>
+                                                        return activeBrs.map(b => <span key={b.id} className="badge" style={{ fontSize: '0.7rem' }}>{b.name}</span>)
+                                                    })()}
+                                                </div>
+                                            </td>
                                             <td>
                                                 <button 
                                                     className={`badge ${a.is_active ? 'badge-completed' : 'badge-cancelled'}`} 
@@ -777,7 +811,7 @@ export default function ServicesPage() {
                     <div className="modal" onClick={e => e.stopPropagation()}>
                         {tab === 'services' ? (
                             <form onSubmit={saveSvc}>
-                                <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 24 }}>{editingSvc ? '✏️ แก้ไขบริการ' : '+ เพิ่มบริการ'}</h2>
+                                <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 24 }}>{editingSvc ? 'แก้ไขบริการ' : 'เพิ่มบริการใหม่'}</h2>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                                     <div className="form-group"><label className="form-label">ชื่อแพ็กเกจ</label><input className="form-input" value={svcForm.name} onChange={e => setSvcForm(p => ({ ...p, name: e.target.value }))} required /></div>
                                     <div className="form-group"><label className="form-label">คำอธิบาย</label><input className="form-input" value={svcForm.description} onChange={e => setSvcForm(p => ({ ...p, description: e.target.value }))} /></div>
@@ -816,17 +850,59 @@ export default function ServicesPage() {
                                                     {a.name}
                                                 </label>
                                             ))}
+                                    </div>
+                                    
+                                    <div style={{ marginTop: 24, borderTop: '2px dashed var(--border)', paddingTop: 20 }}>
+                                        <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--brand-dominant)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <Building2 size={18} /> ตั้งค่ารายสาขา (Branch Availability & Pricing)
+                                        </h3>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                            {branches.map(b => {
+                                                const config = svcForm.branch_settings[b.id] || { is_active: true, price_markup: 0 }
+                                                return (
+                                                    <div key={b.id} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px', alignItems: 'center', gap: 12, background: 'var(--surface-2)', padding: '10px 16px', borderRadius: 12 }}>
+                                                        <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{b.name}</div>
+                                                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem' }}>
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={config.is_active} 
+                                                                onChange={e => {
+                                                                    const next = { ...svcForm.branch_settings }
+                                                                    next[b.id] = { ...config, is_active: e.target.checked }
+                                                                    setSvcForm(p => ({ ...p, branch_settings: next }))
+                                                                }}
+                                                            />
+                                                            <span style={{ fontWeight: 600 }}>เปิดบริการ</span>
+                                                        </label>
+                                                        <div style={{ position: 'relative' }}>
+                                                            <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.8rem', fontWeight: 800, color: 'var(--brand-dominant)' }}>+฿</span>
+                                                            <input 
+                                                                type="number" 
+                                                                className="form-input" 
+                                                                style={{ paddingLeft: 35, fontSize: '0.85rem', height: 36, borderRadius: 8, fontWeight: 700 }}
+                                                                value={config.price_markup}
+                                                                onChange={e => {
+                                                                    const next = { ...svcForm.branch_settings }
+                                                                    next[b.id] = { ...config, price_markup: Number(e.target.value) }
+                                                                    setSvcForm(p => ({ ...p, branch_settings: next }))
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
                                         </div>
                                     </div>
                                 </div>
-                                <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 24 }}>
+                            </div>
+                            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 24 }}>
                                     <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>ยกเลิก</button>
                                     <button type="submit" className="btn btn-primary" disabled={saving}>บันทึก</button>
                                 </div>
                             </form>
                         ) : (
                             <form onSubmit={saveAddon}>
-                                <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 24 }}>{editingAddon ? '✏️ แก้ไขบริการเสริม' : '+ เพิ่มบริการเสริม'}</h2>
+                                <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: 24 }}>{editingAddon ? 'แก้ไขบริการเสริม' : 'เพิ่มบริการเสริมใหม่'}</h2>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                                     <div className="form-group"><label className="form-label">ชื่อบริการเสริม</label><input className="form-input" value={addonForm.name} onChange={e => setAddonForm(p => ({ ...p, name: e.target.value }))} required /></div>
                                     <div className="form-group"><label className="form-label">คำอธิบาย</label><input className="form-input" value={addonForm.description} onChange={e => setAddonForm(p => ({ ...p, description: e.target.value }))} /></div>
@@ -889,6 +965,48 @@ export default function ServicesPage() {
                                             * แจ้งราคาภายหลังที่หน้างาน (พนักงานจะเป็นคนระบุราคา)
                                         </div>
                                     )}
+
+                                    <div style={{ marginTop: 24, borderTop: '2px dashed var(--border)', paddingTop: 20 }}>
+                                        <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--brand-dominant)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <Building2 size={18} /> ตั้งค่ารายสาขา (Branch Availability & Pricing)
+                                        </h3>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                            {branches.map(b => {
+                                                const config = addonForm.branch_settings[b.id] || { is_active: true, price_markup: 0 }
+                                                return (
+                                                    <div key={b.id} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px', alignItems: 'center', gap: 12, background: 'var(--surface-2)', padding: '10px 16px', borderRadius: 12 }}>
+                                                        <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{b.name}</div>
+                                                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem' }}>
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={config.is_active} 
+                                                                onChange={e => {
+                                                                    const next = { ...addonForm.branch_settings }
+                                                                    next[b.id] = { ...config, is_active: e.target.checked }
+                                                                    setAddonForm(p => ({ ...p, branch_settings: next }))
+                                                                }}
+                                                            />
+                                                            <span style={{ fontWeight: 600 }}>เปิดบริการ</span>
+                                                        </label>
+                                                        <div style={{ position: 'relative' }}>
+                                                            <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.8rem', fontWeight: 800, color: 'var(--brand-dominant)' }}>+฿</span>
+                                                            <input 
+                                                                type="number" 
+                                                                className="form-input" 
+                                                                style={{ paddingLeft: 35, fontSize: '0.85rem', height: 36, borderRadius: 8, fontWeight: 700 }}
+                                                                value={config.price_markup}
+                                                                onChange={e => {
+                                                                    const next = { ...addonForm.branch_settings }
+                                                                    next[b.id] = { ...config, price_markup: Number(e.target.value) }
+                                                                    setAddonForm(p => ({ ...p, branch_settings: next }))
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 24 }}>
                                     <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>ยกเลิก</button>

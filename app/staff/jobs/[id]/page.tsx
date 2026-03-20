@@ -20,24 +20,40 @@ const STATUS_ACTIONS: Record<string, { label: string; next: BookingStatus; color
     delivering: { label: 'ถึงที่หมายแล้ว', next: 'completed', color: 'var(--success)', icon: CheckCircle2 },
 }
 
-const InfoSection = ({ job }: { job: any }) => {
-    let addonsTotal = 0
+const InfoSection = ({ job, addons }: { job: any, addons: any[] }) => {
+    // 1:1 CRM LOGIC REWRITE
+    const pkgMarkup = job.package_markup_amount || 0
+    const originalBase = job.original_base_price || job.services?.price_s || 0
+    const ccAdj = job.original_base_price !== undefined 
+        ? Math.max(0, (job.base_price || 0) - originalBase - pkgMarkup)
+        : Math.max(0, (job.base_price || 0) - (job.services?.price_s || 0))
+
+    let rowAddonTotal = 0
     if (Array.isArray(job.addon_ids)) {
-        job.addon_ids.forEach((addon: any) => {
-            let price = 0
-            if (typeof addon !== 'string') {
-                if (addon.isFree) price = 0
-                else if (addon.selectedPrice !== undefined) price = addon.selectedPrice
-                else if (addon.price !== undefined) price = addon.price
-                else if (addon.variableState?.customAmount) price = Number(addon.variableState.customAmount)
-            }
-            addonsTotal += price
+        job.addon_ids.forEach((a: any) => {
+            const addonObj = typeof a === 'string' ? addons.find((da: any) => da.id === a || da.name === a) : a
+            rowAddonTotal += (addonObj?.price || addonObj?.selectedPrice || 0)
         })
     }
+    
+    const travelSurcharge = job.travel_surcharge || 0
+    const diffSpotFee = job.different_spot_fee || 0
+    const additional = job.additional_price || 0
+    const discount = job.discount_amount || 0
+    
+    const computedTotal = (job.base_price || 0) + rowAddonTotal + travelSurcharge + diffSpotFee + additional - discount
+    const paidAmount = job.status === 'completed' ? computedTotal : (job.payment_status === 'paid' ? (job.total_price || 0) : 0)
+    const balance = Math.max(0, computedTotal - paidAmount)
+    const paidLabel = job.status === 'completed' ? 'ยอดชำระทั้งหมด (Settled)' : 'ยอดชำระแล้วผ่านแอป (Paid)'
 
-    const totalPkgPlusAdj = (job.total_price || 0) - addonsTotal - (job.extra_fee || 0) + (job.discount_amount || 0) - (job.additional_price || 0)
-    const rawBasePrice = job.services?.price_s || job.services?.price || 0
-    const sizeAdjustment = totalPkgPlusAdj - rawBasePrice
+    const Row = ({ label, value, color }: { label: string; value: number | string; color?: string }) => (
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.88rem' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
+            <span style={{ fontWeight: 700, color: color || 'var(--text-primary)' }}>
+                {typeof value === 'number' ? `฿${value.toLocaleString()}` : value}
+            </span>
+        </div>
+    )
 
     return (
         <div className={styles.jobItem}>
@@ -52,22 +68,17 @@ const InfoSection = ({ job }: { job: any }) => {
             {Array.isArray(job.addon_ids) && job.addon_ids.length > 0 && (
                 <div style={{ background: 'var(--surface-2)', padding: 12, borderRadius: 12, display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
                     <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>บริการเสริม</div>
-                    {job.addon_ids.map((addon: any, idx: number) => {
-                        const label = typeof addon === 'string' ? addon : (addon.name || 'บริการเสริม')
-                        let price = 0
-                        if (typeof addon !== 'string') {
-                            if (addon.isFree) price = 0
-                            else if (addon.selectedPrice !== undefined) price = addon.selectedPrice
-                            else if (addon.price !== undefined) price = addon.price
-                            else if (addon.variableState?.customAmount) price = Number(addon.variableState.customAmount)
-                        }
+                    {job.addon_ids.map((a: any, idx: number) => {
+                        const addonObj = typeof a === 'string' ? addons.find((da: any) => da.id === a || da.name === a) : a
+                        const label = addonObj?.name || (typeof a === 'string' ? a : 'บริการเสริม')
+                        const price = addonObj?.price || addonObj?.selectedPrice || 0
                         return (
                             <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                                 <span style={{ color: 'var(--text-secondary)' }}>
-                                    • {label} {addon.variableState?.mode === 'full_tank' ? '(เต็มถัง)' : addon.variableState?.mode === 'custom' ? `(กำหนดเอง ฿${Number(addon.variableState.customAmount).toLocaleString()})` : ''}
+                                    • {label}
                                 </span>
                                 <span style={{ fontWeight: 700 }}>
-                                    {addon.isFree ? 'ฟรี' : (price === 0 && addon.variableState?.mode === 'full_tank') ? 'เก็บหน้างาน' : `฿${price.toLocaleString()}`}
+                                    {addonObj?.isFree ? 'ฟรี' : `฿${price.toLocaleString()}`}
                                 </span>
                             </div>
                         )
@@ -75,49 +86,85 @@ const InfoSection = ({ job }: { job: any }) => {
                 </div>
             )}
 
-            {/* Full Price Breakdown */}
-            <div style={{ borderTop: '2px dashed var(--border)', marginTop: 20, paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    <span>วันที่จอง</span>
-                    <span>{job.scheduled_date} {job.scheduled_time?.slice(0, 5)}</span>
+            {/* Financial Summary - CRM Aligned */}
+            <div style={{ marginTop: 24, padding: '20px 16px', background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
+                    <BadgeDollarSign size={20} color="var(--brand-dominant)" />
+                    <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)' }}>สรุปรายละเอียดงานและการเงิน</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    <span>ค่าบริการพื้นฐาน</span>
-                    <span>฿{rawBasePrice?.toLocaleString()}</span>
-                </div>
-                {sizeAdjustment !== 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--danger)' }}>
-                        <span>ส่วนต่างขนาดรถ ({VEHICLE_SIZE_LABEL[job.customers?.vehicle_size] || job.customers?.vehicle_size})</span>
-                        <span>{sizeAdjustment > 0 ? '+' : ''}฿{sizeAdjustment?.toLocaleString()}</span>
+
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <Row label="ค่าบริการหลัก (S)" value={originalBase} />
+                    {pkgMarkup > 0 && <Row label="ส่วนต่างสาขา" value={pkgMarkup} color="var(--brand-dominant)" />}
+                    {ccAdj > 0 && <Row label={`ส่วนต่าง CC (${VEHICLE_SIZE_LABEL[job.customers?.vehicle_size] || job.customers?.vehicle_size})`} value={ccAdj} color="var(--danger)" />}
+                    {rowAddonTotal > 0 && <Row label="บริการเสริมรวม" value={rowAddonTotal} color="var(--brand-secondary)" />}
+                    {travelSurcharge > 0 && <Row label="ค่าเดินทางไปจุดรับ" value={travelSurcharge} color="var(--primary)" />}
+                    {diffSpotFee > 0 && <Row label="ค่ารับ-ส่งต่างสถานที่" value={diffSpotFee} color="var(--primary)" />}
+                    {additional > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', margin: '4px 0', padding: '8px', background: 'var(--warning-ghost)', borderRadius: 8 }}>
+                            <Row label="ยอดเพิ่มเติมหน้างาน" value={additional} color="var(--warning-dark)" />
+                            {job.additional_price_note && (
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>* {job.additional_price_note}</div>
+                            )}
+                        </div>
+                    )}
+                    {discount > 0 && <Row label="ส่วนลด" value={`-฿${discount.toLocaleString()}`} color="var(--danger)" />}
+
+                    <div style={{ 
+                        marginTop: 12, 
+                        padding: '12px 0 0', 
+                        borderTop: '2px solid var(--border)', 
+                        display: 'flex', 
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                    }}>
+                        <span style={{ fontWeight: 900, fontSize: '1.05rem', color: 'var(--text-primary)' }}>ยอดรวมทั้งสิ้น (Total Bill)</span>
+                        <span style={{ fontWeight: 900, fontSize: '1.25rem', color: 'var(--brand-dominant)' }}>฿{computedTotal.toLocaleString()}</span>
                     </div>
-                )}
-                {addonsTotal > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                        <span>ค่าบริการเสริมรวม</span>
-                        <span>฿{addonsTotal.toLocaleString()}</span>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: '0.85rem', color: 'var(--success)' }}>
+                        <span>{paidLabel}</span>
+                        <span>฿{paidAmount.toLocaleString()}</span>
                     </div>
-                )}
-                {job.extra_fee > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                        <span>ค่าระยะทางนอกโซน</span>
-                        <span>฿{job.extra_fee.toLocaleString()}</span>
-                    </div>
-                )}
-                {job.additional_price > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                        <span>ค่าใช้จ่ายเพิ่มเติมหน้างาน</span>
-                        <span>฿{job.additional_price.toLocaleString()}</span>
-                    </div>
-                )}
-                {job.discount_amount > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--danger)' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Tag size={14} /> ส่วนลด {job.discount_code ? `(${job.discount_code})` : ''}</span>
-                        <span>-฿{job.discount_amount.toLocaleString()}</span>
-                    </div>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, paddingTop: 12, borderTop: '1.5px solid var(--border)' }}>
-                    <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>ยอดรวมทั้งหมด</span>
-                    <span style={{ fontWeight: 900, color: 'var(--primary)', fontSize: '1.2rem' }}>฿{job.total_price?.toLocaleString()}</span>
+
+                    {balance > 0 && job.status !== 'completed' && (
+                        <div style={{ 
+                            marginTop: 16, 
+                            padding: '16px', 
+                            borderRadius: '14px', 
+                            background: '#FFD700', // Solid Gold/Yellow
+                            color: '#2D2D2D',      // High contrast dark text
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                            border: '1px solid #E6C200'
+                        }}>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 800, opacity: 0.8 }}>ยอดที่ต้องเก็บเพิ่ม (Pending)</span>
+                                <span style={{ fontSize: '1.6rem', fontWeight: 900 }}>฿{balance.toLocaleString()}</span>
+                            </div>
+                            <Receipt size={32} />
+                        </div>
+                    )}
+
+                    {job.status === 'completed' && (
+                        <div style={{ 
+                            marginTop: 16, 
+                            padding: '14px', 
+                            borderRadius: '12px', 
+                            background: 'var(--success-ghost)', 
+                            color: 'var(--success-dark)', 
+                            textAlign: 'center',
+                            fontWeight: 800,
+                            border: '1.5px solid var(--success-light)',
+                            fontSize: '1rem'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                                <CheckCircle size={22} /> ชำระครบถ้วนแล้วและจบงาน
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -128,6 +175,7 @@ export default function JobDetailPage() {
     const { id } = useParams<{ id: string }>()
     const router = useRouter()
     const [job, setJob] = useState<any>(null)
+    const [addons, setAddons] = useState<any[]>([])
     const [photos, setPhotos] = useState<{ before: string[]; after: string[] }>({ before: [], after: [] })
     const [loading, setLoading] = useState(true)
     const [actionLoading, setActionLoading] = useState(false)
@@ -148,28 +196,33 @@ export default function JobDetailPage() {
 
     const load = useCallback(async () => {
         try {
-            const { data, error } = await supabase
-                .from('bookings')
-                .select(`
-                    *,
-                    customers (
-                        full_name, phone, vehicle_brand, vehicle_model, vehicle_color, license_plate, vehicle_size
-                    ),
-                    services (
-                        name, price_s, price_m, price_l
-                    ),
-                    zones (
-                        name, extra_fee
-                    ),
-                    staff (
-                        full_name
-                    )
-                `)
-                .eq('id', id)
-                .single()
+            const [jobRes, addonRes] = await Promise.all([
+                supabase
+                    .from('bookings')
+                    .select(`
+                        *,
+                        customers (
+                            full_name, phone, vehicle_brand, vehicle_model, vehicle_color, license_plate, vehicle_size
+                        ),
+                        services (
+                            name, price_s, price_m, price_l
+                        ),
+                        zones (
+                            name, extra_fee
+                        ),
+                        staff (
+                            full_name
+                        )
+                    `)
+                    .eq('id', id)
+                    .single(),
+                supabase.from('addons').select('*')
+            ])
 
-            if (error) throw error
-            const currentJob = data ? { ...data } : null
+            if (jobRes.error) throw jobRes.error
+            if (addonRes.data) setAddons(addonRes.data)
+            
+            const currentJob = jobRes.data ? { ...jobRes.data } : null
 
             // MOCK DB FALLBACK: Manually fetch relations since the simple mock doesn't support joins
             if (currentJob && !currentJob.customers && currentJob.customer_id) {
@@ -270,7 +323,6 @@ export default function JobDetailPage() {
             const oldAdditionalPrice = Number(job.additional_price) || 0
             const newAdditionalPrice = Number(additionalPrice) || 0
             const priceDiff = newAdditionalPrice - oldAdditionalPrice
-            const newTotal = (Number(job.total_price) || 0) + priceDiff
 
             // Prepare History
             const history = [...(job.additional_history || [])]
@@ -287,7 +339,6 @@ export default function JobDetailPage() {
                 additional_price: newAdditionalPrice,
                 additional_price_note: additionalNote,
                 additional_price_slips: slipUrls,
-                total_price: newTotal,
                 additional_history: history
             }
 
@@ -534,7 +585,7 @@ export default function JobDetailPage() {
                     <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '1rem', fontWeight: 800, marginBottom: 16 }}>
                         <ClipboardList size={20} color="var(--primary)" /> รายละเอียดการบริการ
                     </h3>
-                    <InfoSection job={job} />
+                    <InfoSection job={job} addons={addons} />
                 </div>
 
                 <div className={`card card-padded ${styles.section}`}>

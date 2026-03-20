@@ -90,7 +90,8 @@
 }
 
 .cell {
-    height: 36px;
+    min-height: 48px;
+    height: auto;
     border-radius: var(--radius-sm);
     background: transparent; /* Transparent for highlight */
     border: 1.5px solid transparent;

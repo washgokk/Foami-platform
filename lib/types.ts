@@ -139,6 +139,7 @@ export interface Branch {
     vehicle_rental_per_job?: number
     fuel_cost_per_job?: number
     price_group_id?: string
+    max_out_of_zone_km?: number
 }
 
 export interface Zone {
@@ -180,6 +181,7 @@ export interface Service {
     is_active: boolean
     is_addon_required: boolean
     image_url?: string
+    branch_settings?: Record<string, { is_active: boolean; price_markup: number }>
 }
 
 export interface ServiceAddon {
@@ -195,6 +197,7 @@ export interface ServiceAddon {
         price: number
         image_url?: string
     }>
+    branch_settings?: Record<string, { is_active: boolean; price_markup: number }>
 }
 
 export interface ServiceSizeAdjustment {
@@ -251,6 +254,7 @@ export interface StaffSchedule {
     zone_id: string
     date: string
     time_slot: string
+    work_type?: 'in_zone' | 'cross_zone' | 'out_of_zone'
     is_booked: boolean
     staff?: Staff
     branches?: Branch
@@ -297,6 +301,9 @@ export interface Booking {
     review_comment?: string
     vehicle_photos?: string[]
     customer_note?: string
+    travel_surcharge?: number
+    staff_extra_payout?: number
+    different_spot_fee?: number
     additional_price?: number
     additional_price_note?: string
     additional_price_slips?: string[]
@@ -305,6 +312,7 @@ export interface Booking {
     capital_cost?: number
     rental_cost?: number
     fuel_cost?: number
+    reschedule_count?: number
     created_at: string
     updated_at: string
     // Joins

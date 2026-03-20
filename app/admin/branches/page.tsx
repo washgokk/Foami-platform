@@ -43,7 +43,8 @@ export default function BranchesPage() {
         name: '', slug: '', lat: 16.4419, lng: 102.836, rawAddress: '',
         houseNumber: '', moo: '', street: '', subdistrict: '', district: '', province: '', zipcode: '',
         out_of_zone_type: 'per_km' as 'per_km' | 'flat_rate', out_of_zone_fee: 5,
-        labor_cost_per_job: 30, max_capital_per_job: 0, vehicle_rental_per_job: 0, fuel_cost_per_job: 0
+        labor_cost_per_job: 30, max_capital_per_job: 0, vehicle_rental_per_job: 0, fuel_cost_per_job: 0,
+        max_out_of_zone_km: 2
     }
     const [form, setForm] = useState(defaultForm)
     const [saving, setSaving] = useState(false)
@@ -89,7 +90,8 @@ export default function BranchesPage() {
             labor_cost_per_job: b.labor_cost_per_job ?? 0,
             max_capital_per_job: b.max_capital_per_job ?? 0,
             vehicle_rental_per_job: b.vehicle_rental_per_job ?? 0,
-            fuel_cost_per_job: b.fuel_cost_per_job ?? 0
+            fuel_cost_per_job: b.fuel_cost_per_job ?? 0,
+            max_out_of_zone_km: b.max_out_of_zone_km ?? 2
         })
         setError('')
         setShowModal(true)
@@ -132,7 +134,8 @@ export default function BranchesPage() {
             labor_cost_per_job: Number(form.labor_cost_per_job),
             max_capital_per_job: Number(form.max_capital_per_job),
             vehicle_rental_per_job: Number(form.vehicle_rental_per_job),
-            fuel_cost_per_job: Number(form.fuel_cost_per_job)
+            fuel_cost_per_job: Number(form.fuel_cost_per_job),
+            max_out_of_zone_km: Number(form.max_out_of_zone_km)
         }
         let err
         if (editing) {
@@ -424,6 +427,11 @@ export default function BranchesPage() {
                                     <div className="form-group">
                                         <label className="form-label">{form.out_of_zone_type === 'flat_rate' ? 'จำนวนเงินที่บวกเพิ่ม' : 'เรทราคา (บาท/กม.)'}</label>
                                         <input type="number" className="form-input" placeholder="เช่น 10" value={form.out_of_zone_fee} onChange={e => setForm(p => ({ ...p, out_of_zone_fee: Number(e.target.value) }))} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">ระยะให้บริการสูงสุดนอกโซน (กม.)</label>
+                                        <input type="number" min={2} className="form-input" placeholder="เช่น 5" value={form.max_out_of_zone_km} onChange={e => setForm(p => ({ ...p, max_out_of_zone_km: Number(e.target.value) }))} />
+                                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 4 }}>กำหนดระยะทางสูงสุดที่อนุญาตให้ลูกค้าจองได้ (ขั้นต่ำ 2 กม.)</p>
                                     </div>
                                 </div>
                             </div>

@@ -31,7 +31,8 @@ import {
     BarChart3,
     History,
     Search,
-    X
+    X,
+    Download
 } from 'lucide-react'
 import { trackAuditLog } from '@/lib/audit'
 
@@ -288,6 +289,112 @@ export default function CRMPage() {
         })
     }
     const matchedUsersCount = customerStats.filter(evaluateSegmentMatch).length
+    
+    // ─── CSV Export Logic ───────────────────────────────────────
+    const exportToCSV = () => {
+        if (!filteredTransactions.length) return alert('ไม่มีข้อมูลที่กรองได้เพื่อ Export')
+
+        const headers = [
+            'Timestamp', 'Booking ID', 'Customer Name', 'Phone', 'Brand', 'Model', 'Plate', 'Color',
+            'Scheduled Date', 'Scheduled Time', 'Branch', 'Zone', 'Service', 'Addons',
+            'Original Base Price', 'Branch Markup', 'CC Adjustment', 'Addon Price',
+            'Travel Surcharge', 'Different Spot Fee', 'Additional Price', 'Discount', 'Total Bill',
+            'Labor Cost', 'Rental Cost', 'Fuel Cost', 'Capital Cost', 'Bonus Payout', 'Extra Staff Payment', 'Net Profit to Branch',
+            'Payment Status', 'Job Status', 'Rating', 'Pickup Address', 'Delivery Address'
+        ]
+
+        const csvRows = [headers.join(',')]
+
+        filteredTransactions.forEach(b => {
+            const vData = b.vehicle_data || b.customers || {}
+            const zonesData = b.zones as any
+            const branchName = zonesData?.branches?.name || branches.find((br: any) => br.id === b.branch_id)?.name || 'ไม่ระบุ'
+            const zoneName = b.extra_fee > 0 ? 'นอกโซน' : (zonesData?.name || '-')
+            
+            // Re-calculate derived values
+            const pkgMarkup = b.package_markup_amount || 0
+            const originalBase = b.original_base_price || b.services?.price_s || 0
+            const ccAdj = b.original_base_price !== undefined 
+                ? Math.max(0, (b.base_price || 0) - originalBase - pkgMarkup)
+                : Math.max(0, (b.base_price || 0) - (b.services?.price_s || 0))
+
+            let rowAddonTotal = 0
+            let addonNames = 'ไม่มี'
+            if (Array.isArray(b.addon_ids) && b.addon_ids.length > 0) {
+                addonNames = b.addon_ids.map((a: any) => {
+                    const addonObj = typeof a === 'string' ? addons.find((da: any) => da.id === a || da.name === a) : a
+                    rowAddonTotal += (addonObj?.price || 0)
+                    return typeof a === 'string' ? a : a.name
+                }).join('; ')
+            }
+
+            const computedTotal = (b.base_price || 0) + rowAddonTotal + (b.travel_surcharge || 0) + (b.different_spot_fee || 0) + (b.additional_price || 0) - (b.discount_amount || 0);
+            const labor = b.labor_cost || 0;
+            const rental = b.rental_cost || 0;
+            const fuel = b.fuel_cost || 0;
+            const capital = b.capital_cost || 0;
+            const bonus = b.staff_extra_payout || 0;
+            const extraStaff = b.additional_price || 0;
+            const staffTotal = labor + rental + fuel + capital + bonus + extraStaff;
+            const branchProfit = computedTotal - staffTotal;
+
+            const row = [
+                new Date(b.created_at).toLocaleString('th-TH'),
+                b.id,
+                `"${(b.customers?.full_name || '').replace(/"/g, '""')}"`,
+                b.customers?.phone || '',
+                `"${(vData.vehicle_brand || '').replace(/"/g, '""')}"`,
+                `"${(vData.vehicle_model || '').replace(/"/g, '""')}"`,
+                `"${(vData.license_plate || '').replace(/"/g, '""')}"`,
+                `"${(vData.vehicle_color || '').replace(/"/g, '""')}"`,
+                b.scheduled_date || '',
+                b.scheduled_time || '',
+                `"${branchName.replace(/"/g, '""')}"`,
+                `"${zoneName.replace(/"/g, '""')}"`,
+                `"${(b.services?.name || '').replace(/"/g, '""')}"`,
+                `"${addonNames.replace(/"/g, '""')}"`,
+                originalBase,
+                pkgMarkup,
+                ccAdj,
+                rowAddonTotal,
+                b.travel_surcharge || 0,
+                b.different_spot_fee || 0,
+                b.additional_price || 0,
+                b.discount_amount || 0,
+                computedTotal,
+                labor,
+                rental,
+                fuel,
+                capital,
+                bonus,
+                extraStaff,
+                branchProfit,
+                b.payment_status || '',
+                b.status || '',
+                b.rating || '',
+                `"${(b.pickup_address || '').replace(/"/g, '""')}"`,
+                `"${(b.delivery_address || '').replace(/"/g, '""')}"`
+            ]
+            csvRows.push(row.join(','))
+        })
+
+        const csvContent = "\uFEFF" + csvRows.join('\n')
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.setAttribute('href', url)
+        link.setAttribute('download', `foami_transactions_${new Date().toISOString().split('T')[0]}.csv`)
+        link.style.visibility = 'hidden'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        
+        trackAuditLog({
+            action_type: 'EXPORT_CRM_DATA' as any,
+            entity_type: 'bookings',
+            details: { count: filteredTransactions.length, context: 'CRM All Transactions' }
+        })
+    }
 
     // ─── ID Migration Logic ─────────────────────────────────────
     const runIdMigration = async () => {
@@ -572,6 +679,13 @@ export default function CRMPage() {
                             className="btn btn-ghost btn-sm"
                             onClick={() => setTxFilters({ branchId: 'all', status: 'all', startDate: '', endDate: '', search: '' })}
                         >ล้างค่า</button>
+                        <button 
+                            className="btn btn-primary btn-sm"
+                            style={{ gap: 8 }}
+                            onClick={exportToCSV}
+                        >
+                            <Download size={16} /> Export CSV
+                        </button>
                     </div>
 
                     <div className={styles.tableContainer}>
@@ -582,7 +696,8 @@ export default function CRMPage() {
                                             <th colSpan={3} className={styles.bgGroupCustomer} style={{ textAlign: 'center', borderBottom: 'none' }}>ข้อมูลลูกค้า</th>
                                             <th colSpan={3} className={styles.bgGroupVehicle} style={{ textAlign: 'center', borderBottom: 'none' }}>ข้อมูลรถ</th>
                                             <th colSpan={4} className={styles.bgGroupDetail} style={{ textAlign: 'center', borderBottom: 'none' }}>รายละเอียดงาน</th>
-                                            <th colSpan={6} className={styles.bgGroupPricing} style={{ textAlign: 'center', borderBottom: 'none' }}>การเงิน & ส่วนลด</th>
+                                            <th colSpan={10} className={styles.bgGroupPricing} style={{ textAlign: 'center', borderBottom: 'none' }}>การเงิน & ส่วนลด</th>
+                                            <th colSpan={7} className={styles.bgGroupCosts} style={{ textAlign: 'center', borderBottom: 'none' }}>คำนวนต้นทุนจ่ายพนักงาน</th>
                                             <th colSpan={3} className={styles.bgGroupStatus} style={{ textAlign: 'center', borderBottom: 'none' }}>สถานะ & รีวิว</th>
                                             <th colSpan={2} style={{ textAlign: 'center', borderBottom: 'none' }}>รับ/ส่ง</th>
                                         </tr>
@@ -604,12 +719,24 @@ export default function CRMPage() {
                                             <th className={styles.bgGroupDetail}>แพ็กเกจ / เสริม</th>
 
                                             {/* Pricing */}
-                                            <th className={styles.bgGroupPricing}>แพ็กเกจ</th>
+                                            <th className={styles.bgGroupPricing}>แพ็กเกจ (เดิม)</th>
+                                            <th className={styles.bgGroupPricing}>ส่วนต่างสาขา</th>
                                             <th className={styles.bgGroupPricing}>ส่วนต่าง CC</th>
-                                            <th className={styles.bgGroupPricing}>นอกโซน</th>
+                                            <th className={styles.bgGroupPricing}>เสริม</th>
+                                            <th className={styles.bgGroupPricing}>ค่านอกโซน</th>
+                                            <th className={styles.bgGroupPricing}>ต่างจุด</th>
                                             <th className={styles.bgGroupPricing}>เพิ่มเติม</th>
                                             <th className={styles.bgGroupPricing}>ส่วนลด</th>
                                             <th className={styles.bgGroupPricing}>ยอดรวม</th>
+
+                                            {/* Staff Costs */}
+                                            <th className={styles.bgGroupCosts}>ค่าแรง</th>
+                                            <th className={styles.bgGroupCosts}>ค่ารถ</th>
+                                            <th className={styles.bgGroupCosts}>น้ำมัน</th>
+                                            <th className={styles.bgGroupCosts}>ต้นทุน</th>
+                                            <th className={styles.bgGroupCosts}>โบนัส</th>
+                                            <th className={styles.bgGroupCosts}>เพิ่มเติม(สตาฟ)</th>
+                                            <th className={styles.bgGroupCosts}>เข้าสาขา</th>
 
                                             {/* Status */}
                                             <th className={styles.bgGroupStatus}>ชำระเงิน</th>
@@ -629,13 +756,23 @@ export default function CRMPage() {
                                             const zoneName = b.extra_fee > 0 ? 'นอกโซน' : (zonesData?.name || '-')
                                             
                                             // Split Pricing Logic
-                                            const rawBasePrice = b.services?.price_s || 0
-                                            const ccAdj = Math.max(0, (b.base_price || 0) - rawBasePrice)
+                                            const pkgMarkup = b.package_markup_amount || 0
+                                            const originalBase = b.original_base_price || b.services?.price_s || 0
+                                            // If snapshot exists, CC Adj is (Total Base - Original - Markup)
+                                            // Else fallback to current CC groups logic
+                                            const ccAdj = b.original_base_price !== undefined 
+                                                ? Math.max(0, (b.base_price || 0) - originalBase - pkgMarkup)
+                                                : Math.max(0, (b.base_price || 0) - (b.services?.price_s || 0))
 
                                             // Parse Addons
                                             let addonListStr = 'ไม่มี'
+                                            let rowAddonTotal = 0
                                             if (Array.isArray(b.addon_ids) && b.addon_ids.length > 0) {
-                                                addonListStr = b.addon_ids.map((a: any) => typeof a === 'string' ? a : a.name).join(', ')
+                                                addonListStr = b.addon_ids.map((a: any) => {
+                                                    const addonObj = typeof a === 'string' ? addons.find(da => da.id === a || da.name === a) : a
+                                                    rowAddonTotal += (addonObj?.price || 0)
+                                                    return typeof a === 'string' ? a : a.name
+                                                }).join(', ')
                                             }
 
                                             // Helper to extract building/detail name from full address
@@ -674,10 +811,13 @@ export default function CRMPage() {
                                                         </div>
                                                     </td>
                                                     {/* Pricing */}
-                                                    <td>฿{rawBasePrice.toLocaleString()}</td>
-                                                    <td style={{ color: ccAdj > 0 ? 'var(--danger)' : 'inherit' }}>฿{ccAdj.toLocaleString()}</td>
-                                                    <td style={{ color: b.extra_fee > 0 ? 'var(--primary)' : 'inherit' }}>฿{b.extra_fee?.toLocaleString() || 0}</td>
-                                                    <td style={{ color: 'var(--warning)' }}>
+                                                    <td className={styles.bgGroupPricing}>฿{originalBase.toLocaleString()}</td>
+                                                    <td className={styles.bgGroupPricing} style={{ color: pkgMarkup > 0 ? 'var(--brand-dominant)' : 'inherit', fontWeight: pkgMarkup > 0 ? 700 : 400 }}>฿{pkgMarkup.toLocaleString()}</td>
+                                                    <td className={styles.bgGroupPricing} style={{ color: ccAdj > 0 ? 'var(--danger)' : 'inherit' }}>฿{ccAdj.toLocaleString()}</td>
+                                                    <td className={styles.bgGroupPricing} style={{ color: rowAddonTotal > 0 ? 'var(--brand-secondary)' : 'inherit' }}>฿{rowAddonTotal.toLocaleString()}</td>
+                                                    <td className={styles.bgGroupPricing} style={{ color: (b.travel_surcharge || 0) > 0 ? 'var(--primary)' : 'inherit' }}>฿{(b.travel_surcharge || 0).toLocaleString()}</td>
+                                                    <td className={styles.bgGroupPricing} style={{ color: (b.different_spot_fee || 0) > 0 ? 'var(--primary)' : 'inherit' }}>฿{(b.different_spot_fee || 0).toLocaleString()}</td>
+                                                    <td className={styles.bgGroupPricing} style={{ color: 'var(--warning)' }}>
                                                         <div>
                                                             {b.slip_url ? (
                                                                 <a href={b.slip_url} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline', color: 'var(--warning)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }} title="กดเพื่อดูสลิป">
@@ -693,10 +833,42 @@ export default function CRMPage() {
                                                             </div>
                                                         )}
                                                     </td>
-                                                    <td style={{ color: 'var(--danger)' }}>
+                                                    <td className={styles.bgGroupPricing} style={{ color: 'var(--danger)' }}>
                                                         {b.discount_amount ? `-฿${b.discount_amount.toLocaleString()}` : '฿0'}
                                                     </td>
-                                                    <td style={{ fontWeight: 700, color: 'var(--primary)' }}>฿{b.total_price?.toLocaleString() || 0}</td>
+                                                    
+                                                    {(() => {
+                                                        const computedTotal = (b.base_price || 0) + rowAddonTotal + (b.travel_surcharge || 0) + (b.different_spot_fee || 0) + (b.additional_price || 0) - (b.discount_amount || 0);
+                                                        
+                                                        // Costs (using snapshots or 0)
+                                                        const labor = b.labor_cost || 0;
+                                                        const rental = b.rental_cost || 0;
+                                                        const fuel = b.fuel_cost || 0;
+                                                        const capital = b.capital_cost || 0;
+                                                        const bonus = b.staff_extra_payout || 0;
+                                                        const extraStaff = b.additional_price || 0;
+                                                        const staffTotal = labor + rental + fuel + capital + bonus + extraStaff;
+                                                        const branchProfit = computedTotal - staffTotal;
+
+                                                        return (
+                                                            <>
+                                                                <td className={styles.bgGroupPricing} style={{ fontWeight: 800, color: 'var(--primary)', borderLeft: '2px solid var(--border)' }}>
+                                                                    ฿{computedTotal.toLocaleString()}
+                                                                </td>
+
+                                                                {/* Costs Breakdown */}
+                                                                <td className={styles.bgGroupCosts}>฿{labor.toLocaleString()}</td>
+                                                                <td className={styles.bgGroupCosts}>฿{rental.toLocaleString()}</td>
+                                                                <td className={styles.bgGroupCosts}>฿{fuel.toLocaleString()}</td>
+                                                                <td className={styles.bgGroupCosts}>฿{capital.toLocaleString()}</td>
+                                                                <td className={styles.bgGroupCosts} style={{ fontWeight: 600 }}>฿{bonus.toLocaleString()}</td>
+                                                                <td className={styles.bgGroupCosts}>฿{extraStaff.toLocaleString()}</td>
+                                                                <td className={styles.bgGroupCosts} style={{ fontWeight: 800, color: 'var(--success)', borderLeft: '2px solid var(--border)' }}>
+                                                                    ฿{branchProfit.toLocaleString()}
+                                                                </td>
+                                                            </>
+                                                        )
+                                                    })()}
                                                     {/* Status */}
                                                     <td>
                                                         <span className={`badge ${b.payment_status === 'paid' ? 'badge-completed' : 'badge-pending'}`}>

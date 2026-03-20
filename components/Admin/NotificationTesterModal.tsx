@@ -25,15 +25,23 @@ export default function NotificationTesterModal({ isOpen, onClose }: Notificatio
     const [targetType, setTargetType] = useState<'staff' | 'customer'>('staff')
     const [users, setUsers] = useState<any[]>([])
     const [selectedUser, setSelectedUser] = useState<string>('')
+    const [branches, setBranches] = useState<any[]>([])
     const [loading, setLoading] = useState(false)
+    const [simulating, setSimulating] = useState(false)
     const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null)
 
     useEffect(() => {
         if (isOpen) {
             loadUsers()
+            loadBranches()
             setStatus(null)
         }
     }, [isOpen, targetType])
+
+    const loadBranches = async () => {
+        const { data } = await supabase.from('branches').select('id, slug, name').limit(10)
+        if (data) setBranches(data)
+    }
 
     const loadUsers = async () => {
         const table = targetType === 'staff' ? 'staff' : 'customers'
@@ -86,6 +94,40 @@ export default function NotificationTesterModal({ isOpen, onClose }: Notificatio
             setStatus({ type: 'error', msg: err.message })
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleSimulate = async () => {
+        if (!selectedUser || targetType !== 'customer') return
+        setSimulating(true)
+        try {
+            // Fetch full customer data
+            const { data, error } = await supabase
+                .from('customers')
+                .select('*')
+                .eq('id', selectedUser)
+                .single()
+            
+            if (error) throw error
+            if (!data) throw new Error('Customer not found')
+
+            // Pick a branch (first one or default)
+            const branch = branches[0]?.slug || 'foami-demo'
+
+            // Inject to localStorage
+            localStorage.setItem('liff_customer', JSON.stringify(data))
+            localStorage.setItem('liff_line_user_id', data.line_user_id || '')
+            localStorage.setItem('last_branch_slug', branch)
+
+            // Redirect to menu in new tab (or same if preferred, but new tab is better for admin)
+            const url = `/${branch}/menu`
+            window.open(url, '_blank')
+            
+            setStatus({ type: 'success', msg: `จำลองเป็น ${data.full_name} สำเร็จ! (เปิดหน้าต่างใหม่แล้ว)` })
+        } catch (err: any) {
+            setStatus({ type: 'error', msg: `จำลองล้มเหลว: ${err.message}` })
+        } finally {
+            setSimulating(false)
         }
     }
 
@@ -142,6 +184,23 @@ export default function NotificationTesterModal({ isOpen, onClose }: Notificatio
                         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 6 }}>
                             * ควรเลือกบัญชีที่คุณใช้งานอยู่ เพื่อตรวจสอบข้อความในเครื่องตัวเองครับ
                         </p>
+
+                        {/* Simulation Button (Only for Customer) */}
+                        {targetType === 'customer' && selectedUser && (
+                            <div style={{ marginTop: 15, padding: 12, background: 'var(--primary-ghost)', borderRadius: 12, border: '1px dashed var(--primary)' }}>
+                                <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--primary)', marginBottom: 10 }}>
+                                    🛠️ ตัวจำลองลูกค้า (สำหรับ Local Testing เท่านั้น)
+                                </p>
+                                <button 
+                                    className="btn btn-primary"
+                                    onClick={handleSimulate}
+                                    disabled={simulating}
+                                    style={{ width: '100%', borderRadius: 10, background: 'var(--brand-dominant)', border: 'none' }}
+                                >
+                                    {simulating ? 'กำลังเตรียมข้อมูล...' : '🚀 จำลองเป็นลูกค้าคนนี้ (Bypass Login)'}
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Notification Cases */}

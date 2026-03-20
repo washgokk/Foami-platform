@@ -11,6 +11,7 @@ export default function AdminBookingsPage() {
     const [filter, setFilter] = useState<string>('all')
     const [search, setSearch] = useState('')
     const [selected, setSelected] = useState<any>(null)
+    const [addons, setAddons] = useState<any[]>([])
     const [zoomConfig, setZoomConfig] = useState<{ images: { src: string; alt?: string }[]; initialIndex: number } | null>(null)
 
     const load = useCallback(async () => {
@@ -18,10 +19,16 @@ export default function AdminBookingsPage() {
         try {
             let q = supabase.from('bookings').select('*').order('created_at', { ascending: false })
             if (filter !== 'all') q = q.eq('status', filter)
-            const { data, error } = await q
-            if (error) throw error
             
-            const rawBookings = data || []
+            const [bookingRes, addonRes] = await Promise.all([
+                q,
+                supabase.from('addons').select('*')
+            ])
+            
+            if (bookingRes.error) throw bookingRes.error
+            if (addonRes.data) setAddons(addonRes.data)
+            
+            const rawBookings = bookingRes.data || []
             
             // MOCK DB FALLBACK: Manually fetch relations since mock doesn't support joins
             const enhanced = await Promise.all(rawBookings.map(async (b: any) => {
@@ -138,7 +145,31 @@ export default function AdminBookingsPage() {
                                         <div style={{ fontWeight: 600 }}>{b.staff?.full_name || '-'}</div>
                                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{b.zones?.name}</div>
                                     </td>
-                                    <td style={{ fontWeight: 700 }}>฿{(b.total_price || 0).toLocaleString()}</td>
+                                     <td style={{ fontWeight: 700 }}>
+                                        {(() => {
+                                            const pkgMarkup = b.package_markup_amount || 0
+                                            const ccAdj = ((b.total_price || 0) + (b.discount_amount || 0) - (b.extra_fee || 0) - (b.travel_surcharge || 0) - (b.different_spot_fee || 0)) - (b.services?.price_s || b.services?.price || 0)
+                                            
+                                            let addonTotal = 0
+                                            if (Array.isArray(b.addon_ids)) {
+                                                b.addon_ids.forEach((a: any) => {
+                                                    if (typeof a === 'string') {
+                                                        const ad = addons.find(da => da.id === a || da.name === a)
+                                                        addonTotal += (ad?.price || 0)
+                                                    } else {
+                                                        // Rich Addon Object
+                                                        if (a.isFree) addonTotal += 0
+                                                        else if (a.selectedPrice !== undefined) addonTotal += a.selectedPrice
+                                                        else if (a.price !== undefined) addonTotal += a.price
+                                                        else if (a.variableState?.customAmount) addonTotal += (Number(a.variableState.customAmount) || 0)
+                                                    }
+                                                })
+                                            }
+
+                                            const totalBill = (b.base_price || 0) + addonTotal + (b.travel_surcharge || 0) + (b.different_spot_fee || 0) + (b.additional_price || 0) - (b.discount_amount || 0)
+                                            return `฿${totalBill.toLocaleString()}`
+                                        })()}
+                                    </td>
                                     <td>
                                         <span className={`badge ${b.payment_status === 'paid' ? 'badge-completed' : b.payment_status === 'refunded' ? 'badge-cancelled' : 'badge-pending'}`}>
                                             {b.payment_status === 'paid' ? 'ชำระแล้ว' : b.payment_status === 'refunded' ? 'คืนเงิน' : 'รอชำระ'}
@@ -186,8 +217,16 @@ export default function AdminBookingsPage() {
                                 ['โซน', selected.zones?.name],
                                 ['รับจาก', selected.pickup_address],
                                 ['ส่งที่', selected.delivery_address],
-                                ['ราคา', `฿${(selected.total_price || 0).toLocaleString()}`],
-                                ['ช่างผู้รับผิดชอบ', selected.staff?.full_name || 'ยังไม่ได้รับ'],
+                            ].map(([key, val]) => (
+                                <div key={key} style={{ display: 'flex', gap: 'var(--space-4)' }}>
+                                    <span style={{ color: 'var(--text-muted)', width: 120, flexShrink: 0 }}>{key}</span>
+                                    <span style={{ fontWeight: 500 }}>{val}</span>
+                                </div>
+                            ))}
+
+
+                            {[
+                                ['ผู้รับผิดชอบ', selected.staff?.full_name || 'ยังไม่ได้รับ'],
                                 ['สถานะ', BOOKING_STATUS_LABEL[selected.status as BookingStatus]],
                             ].map(([key, val]) => (
                                 <div key={key} style={{ display: 'flex', gap: 'var(--space-4)' }}>

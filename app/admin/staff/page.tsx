@@ -237,12 +237,13 @@ export default function StaffPage() {
             rentalTotal: number, 
             fuelTotal: number,
             capitalTotal: number,
-            extraFromJobs: number 
+            extraFromJobs: number,
+            bonusTotal: number
         }> = {}
         selectedBookingIds.forEach(id => {
             const b = bookings.find(x => x.id === id)
             if (b && b.staff_id) {
-                if (!groups[b.staff_id]) groups[b.staff_id] = { bookings: [], laborTotal: 0, rentalTotal: 0, fuelTotal: 0, capitalTotal: 0, extraFromJobs: 0 }
+                if (!groups[b.staff_id]) groups[b.staff_id] = { bookings: [], laborTotal: 0, rentalTotal: 0, fuelTotal: 0, capitalTotal: 0, extraFromJobs: 0, bonusTotal: 0 }
                 groups[b.staff_id].bookings.push(b)
                 
                 const s = staff.find(st => st.id === b.staff_id)
@@ -254,12 +255,14 @@ export default function StaffPage() {
                 const fuel = b.fuel_cost !== undefined ? b.fuel_cost : (bData?.fuel_cost_per_job || 0)
                 const capital = b.capital_cost !== undefined ? b.capital_cost : (bData?.max_capital_per_job || 0)
                 const bAddi = b.additional_price || 0
+                const bBonus = b.staff_extra_payout || 0
                 
                 groups[b.staff_id].laborTotal += labor
                 groups[b.staff_id].rentalTotal += rental
                 groups[b.staff_id].fuelTotal += fuel
                 groups[b.staff_id].capitalTotal += capital
                 groups[b.staff_id].extraFromJobs += bAddi
+                groups[b.staff_id].bonusTotal += bBonus
             }
         })
         return groups
@@ -651,6 +654,7 @@ export default function StaffPage() {
                                     <th style={{ textAlign: 'center' }}>ค่ารถ</th>
                                     <th style={{ textAlign: 'center' }}>น้ำมัน</th>
                                     <th style={{ textAlign: 'center' }}>ต้นทุน</th>
+                                    <th style={{ textAlign: 'center' }}>โบนัสค่าเดินทาง</th>
                                     <th style={{ textAlign: 'center' }}>เพิ่มเติม</th>
                                 </tr>
                             </thead>
@@ -704,6 +708,9 @@ export default function StaffPage() {
                                             <td style={{ textAlign: 'center', fontWeight: 700 }}>{rental.toLocaleString()}</td>
                                             <td style={{ textAlign: 'center', fontWeight: 700 }}>{fuel.toLocaleString()}</td>
                                             <td style={{ textAlign: 'center', fontWeight: 700 }}>{capital.toLocaleString()}</td>
+                                            <td style={{ textAlign: 'center', fontWeight: 800, color: 'var(--brand-dominant)' }}>
+                                                {b.staff_extra_payout ? `฿${b.staff_extra_payout.toLocaleString()}` : '-'}
+                                            </td>
                                             <td style={{ textAlign: 'center' }}>
                                                 {b.additional_price ? (
                                                     <div style={{ color: 'var(--brand-dominant)', fontWeight: 800 }}>+{b.additional_price.toLocaleString()} ฿</div>
@@ -747,6 +754,10 @@ export default function StaffPage() {
                                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', marginBottom: 20 }}>
                                                 <span style={{ fontWeight: 700, color: 'var(--brand-dominant)' }}>บริการพิเศษ / SML / อื่นๆ</span>
                                                 <span style={{ fontWeight: 900, color: 'var(--brand-dominant)' }}>+{data.extraFromJobs.toLocaleString()} ฿</span>
+                                            </div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', marginBottom: 20 }}>
+                                                <span style={{ fontWeight: 800, color: 'var(--brand-dominant)' }}>โบนัสค่าเดินทาง (50%)</span>
+                                                <span style={{ fontWeight: 900, color: 'var(--brand-dominant)' }}>+{data.bonusTotal.toLocaleString()} ฿</span>
                                             </div>
                                             
                                             <div style={{ background: 'var(--brand-dominant-ghost)', padding: 20, borderRadius: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, border: '1.5px solid var(--brand-dominant-light)' }}>
@@ -806,7 +817,11 @@ export default function StaffPage() {
                                                 <button 
                                                     className="btn btn-primary" 
                                                     style={{ width: '100%', borderRadius: 16, padding: '16px', fontWeight: 800, gap: 12, fontSize: '1rem', boxShadow: '0 8px 16px var(--brand-dominant-ghost)' }}
-                                                    onClick={() => handleRecordPayout(staffId, data.bookings.map(x => x.id), total - data.extraFromJobs, data.extraFromJobs)}
+                                                    onClick={() => {
+                                                        const baseAmount = data.laborTotal + data.rentalTotal + data.fuelTotal + data.capitalTotal;
+                                                        const extraCosts = data.extraFromJobs + data.bonusTotal;
+                                                        handleRecordPayout(staffId, data.bookings.map(x => x.id), baseAmount, extraCosts);
+                                                    }}
                                                     disabled={recordingPayout || !staffSlips[staffId]}
                                                 >
                                                     {recordingPayout ? <span className="spinner" /> : <><Banknote size={24} /> บันทึกการจ่ายเงิน</>}

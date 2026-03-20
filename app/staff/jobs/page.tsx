@@ -32,6 +32,7 @@ export default function StaffJobsPage() {
     const [jobs, setJobs] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState('all')
+    const [addons, setAddons] = useState<any[]>([])
     const [staffId, setStaffId] = useState('')
 
     useEffect(() => {
@@ -78,8 +79,11 @@ export default function StaffJobsPage() {
 
             if (filter !== 'all') q = (q as any).eq('status', filter)
 
-            const { data } = await (q as any)
-            const finalJobs = await resolveRelations(data || [])
+            const { data: bRes } = await (q as any)
+            const { data: aRes } = await supabase.from('addons').select('*')
+            
+            if (aRes) setAddons(aRes)
+            const finalJobs = await resolveRelations(bRes || [])
             setJobs(finalJobs)
             setLoading(false)
         }
@@ -144,8 +148,38 @@ export default function StaffJobsPage() {
                                 <span className={`badge ${BOOKING_STATUS_CSS[job.status as BookingStatus] || ''}`} style={{ fontSize: '0.7rem' }}>
                                     {BOOKING_STATUS_LABEL[job.status as BookingStatus] || job.status}
                                 </span>
-                                <div className={styles.jobPrice}>
-                                    ฿{(job.total_price || 0).toLocaleString()}
+                                <div className={styles.jobPrice} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                                    {(() => {
+                                        let addonTotal = 0
+                                        if (Array.isArray(job.addon_ids)) {
+                                            job.addon_ids.forEach((a: any) => {
+                                                const ad = typeof a === 'string' ? addons.find(da => da.id === a || da.name === a) : a
+                                                addonTotal += (ad?.price || ad?.selectedPrice || 0)
+                                            })
+                                        }
+                                        const travelSurcharge = job.travel_surcharge || 0
+                                        const diffSpotFee = job.different_spot_fee || 0
+                                        const additional = job.additional_price || 0
+                                        const discount = job.discount_amount || 0
+                                        
+                                        const totalBill = (job.base_price || 0) + addonTotal + travelSurcharge + diffSpotFee + additional - discount
+                                        const paidAmount = job.status === 'completed' ? totalBill : (job.payment_status === 'paid' ? (job.total_price || 0) : 0)
+                                        const balance = Math.max(0, totalBill - paidAmount)
+
+                                        return (
+                                            <>
+                                                <div style={{ fontWeight: 900, color: 'var(--text-primary)', fontSize: '1.05rem' }}>฿{totalBill.toLocaleString()}</div>
+                                                {balance > 0 && job.status !== 'completed' && (
+                                                    <div style={{ fontSize: '0.68rem', color: 'var(--warning-dark)', fontWeight: 800, background: 'var(--warning-ghost)', padding: '2px 6px', borderRadius: 6 }}>
+                                                        ค้าง ฿{balance.toLocaleString()}
+                                                    </div>
+                                                )}
+                                                {job.status === 'completed' && (
+                                                    <div style={{ fontSize: '0.65rem', color: 'var(--success)', fontWeight: 700 }}>ชำระครบแล้ว</div>
+                                                )}
+                                            </>
+                                        )
+                                    })()}
                                 </div>
                             </div>
                         </Link>
