@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
@@ -167,6 +167,7 @@ export default function BookPage() {
     const [isTooFar, setIsTooFar] = useState(false)
     const [differentSpotFee, setDifferentSpotFee] = useState(0)
     const [travelSurchargeState, setTravelSurchargeState] = useState(0)
+    const [baseZoneExtraFee, setBaseZoneExtraFee] = useState(0)
 
     // Step 4 — Summary
     const [discountCode, setDiscountCode] = useState('')
@@ -185,6 +186,21 @@ export default function BookPage() {
     const [pendingBookingId, setPendingBookingId] = useState<string | null>(null)
     const [paymentSuccessful, setPaymentSuccessful] = useState(false)
     const [previewImg, setPreviewImg] = useState<string | null>(null)
+
+    const [pickupMatched, setPickupMatched] = useState<any>(null)
+    const [deliveryMatched, setDeliveryMatched] = useState<any>(null)
+
+    useEffect(() => {
+        if (!zones.length) { setPickupMatched(null); return }
+        const found = zones.find(z => z.is_active && z.polygon_coords?.length >= 3 && isPointInPolygon(pickupLat, pickupLng, z.polygon_coords))
+        setPickupMatched(found || null)
+    }, [zones, pickupLat, pickupLng])
+
+    useEffect(() => {
+        if (!showDelivery || !zones.length) { setDeliveryMatched(null); return }
+        const found = zones.find(z => z.is_active && z.polygon_coords?.length >= 3 && isPointInPolygon(deliveryLat, deliveryLng, z.polygon_coords))
+        setDeliveryMatched(found || null)
+    }, [showDelivery, zones, deliveryLat, deliveryLng])
 
     // ─── Init ───────────────────────────────────────────────────
     useEffect(() => {
@@ -338,8 +354,9 @@ export default function BookPage() {
                 const daySchedules = (allSchedules || []).filter(s => s.date === dateKey)
                 const dayBookings = (allBookings || []).filter(b => b.scheduled_date === dateKey)
 
-                // Re-calculate pickupMatched for availability filtering logic
-                const localPickupMatched = zones.find(z => z.is_active && z.polygon_coords?.length >= 3 && isPointInPolygon(pickupLat, pickupLng, z.polygon_coords))
+                // Calculate pickup/delivery status directly from coordinates to avoid stale state
+                const localPickupMatched = zones.find(z => z.is_active && isPointInPolygon(pickupLat, pickupLng, z.polygon_coords))
+                const localDeliveryMatched = zones.find(z => z.is_active && isPointInPolygon(deliveryLat, deliveryLng, z.polygon_coords))
 
                 const slotsForDay = TIME_SLOTS.map(slot => {
                     const dateKey = format(d, 'yyyy-MM-dd')
@@ -351,9 +368,16 @@ export default function BookPage() {
                     }
 
                     // 1. Group schedules by staff to find their "Base Zone" for this slot
-                    const slotSchedules = daySchedules.filter(s => (s.time_slot === slot || s.time_slot?.startsWith(slot)) && !s.is_booked)
+                    const slotSchedules = daySchedules.filter(s => (s.time_slot === slot || s.time_slot?.startsWith(slot)))
+                    
+                    // Critical: Identify staff who are ALREADY BOOKED for this slot (any zone)
+                    const bookedStaffIdsForSlot = slotSchedules.filter(s => s.is_booked).map(s => s.staff_id)
+                    
+                    // Filter for available schedules (not booked, and staff not already busy)
+                    const availableSchedules = slotSchedules.filter(s => !s.is_booked && !bookedStaffIdsForSlot.includes(s.staff_id))
+
                     const staffAssignments: Record<string, any[]> = {}
-                    slotSchedules.forEach(s => {
+                    availableSchedules.forEach(s => {
                         if (!staffAssignments[s.staff_id]) staffAssignments[s.staff_id] = []
                         staffAssignments[s.staff_id].push(s)
                     })
@@ -361,45 +385,46 @@ export default function BookPage() {
                     const matchingStaff: { staff_id: string; base_zone_id: string; fee: number; type: 'local' | 'overflow' }[] = []
 
                     Object.entries(staffAssignments).forEach(([sId, assignments]) => {
-                        // Identify Base (🏠 in_zone)
-                        const baseAssignment = assignments.find(a => a.work_type === 'in_zone') || assignments[0]
-                        const baseZone = zones.find(zn => zn.id === baseAssignment.zone_id)
+                        // Find the ANCHOR assignment (in_zone) to act as the base for distances
+                        const anchor = assignments.find(a => !a.work_type || a.work_type === 'in_zone') || assignments[0]
+                        const baseZone = zones.find(zn => zn.id === anchor.zone_id)
                         if (!baseZone) return
 
-                        const isOutOfZone = !localPickupMatched
-                        const isCrossZone = localPickupMatched && localPickupMatched.id !== baseZone.id
+                        const isO = !localPickupMatched || (showDelivery && !localDeliveryMatched)
+                        const isC = (localPickupMatched && localPickupMatched.id !== baseZone.id) || 
+                                   (showDelivery && localDeliveryMatched && localDeliveryMatched.id !== baseZone.id)
+
+                        // Check if this staff is willing to serve this specific job (look at ALL their assignments in the slot)
+                        let canS = false
+                        if (isO) canS = assignments.some(a => a.work_type === 'out_of_zone')
+                        else if (isC) canS = assignments.some(a => a.work_type === 'cross_zone' || a.work_type === 'out_of_zone')
+                        else canS = true
                         
-                        // Check if this staff is willing to serve this location
-                        let canServe = false
-                        if (!isOutOfZone && !isCrossZone) {
-                            // Customer is in staff's base zone
-                            canServe = true 
-                        } else if (isCrossZone) {
-                            // Customer is in another zone, check if staff has Cross-Zone or Out-of-Zone opted in
-                            canServe = assignments.some(a => a.work_type === 'cross_zone' || a.work_type === 'out_of_zone')
-                        } else if (isOutOfZone) {
-                            // Customer is Out-of-Zone, check if staff has Out-of-Zone opted in
-                            canServe = assignments.some(a => a.work_type === 'out_of_zone')
+                        if (canS) {
+                            const isPickupInBase = isPointInPolygon(pickupLat, pickupLng, baseZone.polygon_coords)
+                            const dPickup = isPickupInBase ? 0 : minDistanceToPolygon(pickupLat, pickupLng, baseZone.polygon_coords)
+                            
+                            const isDeliveryInBase = showDelivery ? isPointInPolygon(deliveryLat, deliveryLng, baseZone.polygon_coords) : true
+                            const dDelivery = (showDelivery && !isDeliveryInBase) ? minDistanceToPolygon(deliveryLat, deliveryLng, baseZone.polygon_coords) : 0
+                            const maxDist = Math.max(dPickup, dDelivery)
+
+                            // Check branch-level distance limit from anchor
+                            if (maxDist > (branches[0].max_out_of_zone_km || 2)) return
+
+                            // Rule: If job is Out-of-Zone AND Anchor has Rocket, fee is 0.
+                            const anchorHasRocket = anchor.work_type === 'out_of_zone'
+                            let fee = dPickup * 2 * (branches[0].out_of_zone_fee || 10)
+                            if (isO && anchorHasRocket) {
+                                fee = 0
+                            }
+                            
+                            matchingStaff.push({
+                                staff_id: sId,
+                                base_zone_id: baseZone.id,
+                                fee: fee,
+                                type: (isO || isC) ? 'overflow' : 'local'
+                            })
                         }
-
-                        if (!canServe) return
-
-                        // Calculate distance from Base Zone boundary to Pickup
-                        const distToPickup = minDistanceToPolygon(pickupLat, pickupLng, baseZone.polygon_coords)
-                        
-                        // Check branch-level distance limit
-                        if (distToPickup > (branches[0].max_out_of_zone_km || 2)) return
-
-                        const ozFee = branches[0].out_of_zone_fee || 10
-                        // 2x Multiplier for Round-trip (Base -> Pickup -> Base)
-                        const baseToPickupFee = distToPickup * 2 * ozFee
-
-                        matchingStaff.push({
-                            staff_id: sId,
-                            base_zone_id: baseZone.id,
-                            fee: baseToPickupFee,
-                            type: (isOutOfZone || isCrossZone) ? 'overflow' : 'local'
-                        })
                     })
 
                     // 2. Subtract pending unassigned bookings
@@ -413,6 +438,7 @@ export default function BookPage() {
 
                     if (availableCount > 0) {
                         const topStaff = matchingStaff[0]
+                        console.log(`[Slot Picker] Slot: ${slot}, Staff: ${topStaff.staff_id}, Fee: ${topStaff.fee}, distToPickup: ${minDistanceToPolygon(pickupLat, pickupLng, zones.find(z => z.id === topStaff.base_zone_id)?.polygon_coords || [])}`);
                         return {
                             time_slot: slot,
                             type: topStaff.type,
@@ -433,7 +459,7 @@ export default function BookPage() {
         }
 
         loadAvailability()
-    }, [zoneId, selectedDate, dateRange, pickupLat, pickupLng, branches, zones])
+    }, [zoneId, selectedDate, dateRange, pickupLat, pickupLng, deliveryLat, deliveryLng, showDelivery, branches, zones])
 
     // ─── Recently Used Locations (from History) ────────────────
     const [recentLocations, setRecentLocations] = useState<any[]>([])
@@ -501,8 +527,6 @@ export default function BookPage() {
         if (!zones.length || !branches.length) return
 
         let baseZoneFee = 0
-        const pickupMatched = zones.find(z => z.is_active && z.polygon_coords?.length >= 3 && isPointInPolygon(pickupLat, pickupLng, z.polygon_coords))
-
         if (pickupMatched) {
             setZoneId(pickupMatched.id)
             baseZoneFee = Number(pickupMatched.extra_fee || 0)
@@ -510,11 +534,8 @@ export default function BookPage() {
             setZoneId('')
         }
 
-        if (showDelivery) {
-            const deliveryMatched = zones.find(z => z.is_active && z.polygon_coords?.length >= 3 && isPointInPolygon(deliveryLat, deliveryLng, z.polygon_coords))
-            if (deliveryMatched) {
-                baseZoneFee += Number(deliveryMatched.extra_fee || 0)
-            }
+        if (showDelivery && deliveryMatched) {
+            baseZoneFee += Number(deliveryMatched.extra_fee || 0)
         }
 
         const maxKm = branches[0]?.max_out_of_zone_km || 2
@@ -549,10 +570,12 @@ export default function BookPage() {
             }
         }
 
+        console.log(`[Summary Calc] Slot: ${selectedSlot}, baseZoneFee: ${baseZoneFee}, travelSurcharge: ${travelSurcharge}, diffFee: ${diffFee}`);
         setIsTooFar(tooFar)
-        setDifferentSpotFee(diffFee)
-        setTravelSurchargeState(travelSurcharge)
-        setExtraFee(baseZoneFee + travelSurcharge + diffFee)
+        setDifferentSpotFee(Math.round(diffFee))
+        setTravelSurchargeState(Math.round(travelSurcharge))
+        setBaseZoneExtraFee(Math.round(baseZoneFee))
+        setExtraFee(Math.round(baseZoneFee + travelSurcharge + diffFee))
 
     }, [pickupLat, pickupLng, deliveryLat, deliveryLng, showDelivery, zones, branches, selectedDate, selectedSlot, slots])
 
@@ -660,9 +683,9 @@ export default function BookPage() {
     const { price: pkgPrice, basePrice: pkgBasePrice, adjustment: pkgAdjustment, isCc: isCcPrice, matchedGroupName } = getPkgPrice(selectedPkg)
     const currentAddonDisplayTotal = addonTotal()
     const currentAddonPaymentTotal = addonPaymentTotal()
-    const extraFeeValue = extraFee
-    const total = pkgPrice + currentAddonPaymentTotal + extraFeeValue - discountAmount
-    const displayTotal = pkgPrice + currentAddonDisplayTotal + extraFeeValue - discountAmount
+    const extraFeeValue = Math.round(extraFee)
+    const total = Math.round(pkgPrice + currentAddonPaymentTotal + extraFeeValue - discountAmount)
+    const displayTotal = Math.round(pkgPrice + currentAddonDisplayTotal + extraFeeValue - discountAmount)
     const basePrice = pkgPrice
     const travelSurcharge = travelSurchargeState
     const diffFee = differentSpotFee
@@ -1094,10 +1117,23 @@ export default function BookPage() {
 
                                             <div className={styles.packagePriceRow}>
                                                 <div>
-                                                    <div className={styles.packagePriceLabel}>เริ่มต้น</div>
                                                     <div style={{ color: pkg.color }}>
-                                                        <span className={styles.packageCurrency}>฿</span>
-                                                        <span className={styles.packageAmount}>{(pkg.price_s || pkg.price || 0).toLocaleString()}</span>
+                                                        {(() => {
+                                                            const prices = [pkg.price_s, pkg.price_m, pkg.price_l].filter(p => p !== null && p !== undefined && p > 0);
+                                                            const min = Math.min(...prices);
+                                                            const max = Math.max(...prices);
+                                                            if (min !== max && prices.length > 1) {
+                                                                return (
+                                                                    <span className={styles.packageAmount}>฿{min.toLocaleString()} - ฿{max.toLocaleString()}</span>
+                                                                );
+                                                            }
+                                                            return (
+                                                                <>
+                                                                    <span className={styles.packageCurrency}>฿</span>
+                                                                    <span className={styles.packageAmount}>{(pkg.price_s || pkg.price || 0).toLocaleString()}</span>
+                                                                </>
+                                                            );
+                                                        })()}
                                                     </div>
                                                 </div>
                                                 {!isSelected && (
@@ -1196,7 +1232,14 @@ export default function BookPage() {
 
                                                     {!isFree && !isNotifyLater && dynPrices.length > 0 && (
                                                         <div style={{ textAlign: 'right' }}>
-                                                            <div style={{ color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 700 }}>{dynPrices[0].price} ฿</div>
+                                                            <div style={{ color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 700 }}>
+                                                                {(() => {
+                                                                    const prs = dynPrices.map((p: any) => p.price);
+                                                                    const min = Math.min(...prs);
+                                                                    const max = Math.max(...prs);
+                                                                    return min === max ? `${min} ฿` : `${min}-${max} ฿`;
+                                                                })()}
+                                                            </div>
                                                             <div style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>(จ่ายหลังใช้บริการ)</div>
                                                         </div>
                                                     )}
@@ -1405,7 +1448,14 @@ export default function BookPage() {
 
                             <div className="form-group">
                                 <label className="form-label">ชื่อหอพัก / หมู่บ้าน / ที่อยู่ <span style={{ color: 'var(--danger)' }}>*</span></label>
-                                <input className="form-input" placeholder="เช่น หอพัก ABC, บ้านเลขที่ 123" value={pickupAddressDetail} onChange={e => setPickupAddressDetail(e.target.value)} required />
+                                <input 
+                                    className="form-input" 
+                                    placeholder="เช่น หอพัก ABC, บ้านเลขที่ 123" 
+                                    value={pickupAddressDetail} 
+                                    onChange={e => setPickupAddressDetail(e.target.value)} 
+                                    required 
+                                    style={!pickupAddressDetail.trim() ? { borderColor: 'var(--danger)', background: '#FEF2F2' } : {}}
+                                />
                             </div>
                             <div className="form-group">
                                 <label className="form-label">รายละเอียดเพิ่มเติม</label>
@@ -1520,7 +1570,14 @@ export default function BookPage() {
 
                                 <div className="form-group">
                                     <label className="form-label">ชื่อหอพัก / หมู่บ้าน / ที่อยู่ <span style={{ color: 'var(--danger)' }}>*</span></label>
-                                    <input className="form-input" placeholder="เช่น หอพัก XYZ, บ้านเลขที่ 456" value={deliveryAddressDetail} onChange={e => setDeliveryAddressDetail(e.target.value)} required />
+                                    <input 
+                                        className="form-input" 
+                                        placeholder="เช่น หอพัก XYZ, บ้านเลขที่ 456" 
+                                        value={deliveryAddressDetail} 
+                                        onChange={e => setDeliveryAddressDetail(e.target.value)} 
+                                        required 
+                                        style={(!deliveryAddressDetail.trim() && showDelivery) ? { borderColor: 'var(--danger)', background: '#FEF2F2' } : {}}
+                                    />
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">รายละเอียดเพิ่มเติม</label>
@@ -1537,16 +1594,16 @@ export default function BookPage() {
 
                         {isTooFar && (
                             <div className="alert alert-error" style={{ marginTop: 'var(--space-4)', gap: 8, display: 'flex', alignItems: 'center', background: '#FEE2E2', color: '#B91C1C', borderColor: '#FCA5A5' }}>
-                                <XCircle size={20} /> <div><strong>ขออภัย!</strong> ตำแหน่งของคุณอยู่นอกพื้นที่ให้บริการสูงสุด ({branches[0]?.max_out_of_zone_km || 2} กม. จากเขตบริการ)</div>
+                                <XCircle size={20} /> <div><strong>ขออภัย!</strong> ตำแหน่งของคุณอยู่นอกพื้นที่ให้บริการสูงสุด</div>
                             </div>
                         )}
 
                         {extraFee > 0 && !isTooFar && (
                             <div className="alert alert-warning" style={{ marginTop: 'var(--space-4)', gap: 8, display: 'flex', alignItems: 'center' }}>
                                 <AlertTriangle size={20} /> <div>
-                                    {differentSpotFee > 0 && <div>• ค่าบริการรับส่งเพิ่มเติม (คนละจุด): ฿{differentSpotFee}</div>}
-                                    {extraFee - differentSpotFee > 0 && <div>• ค่าบริการนอกโซน: ฿{extraFee - differentSpotFee}</div>}
-                                    รวมค่าบริการส่วนต่าง: <strong>฿{extraFee}</strong>
+                                    {differentSpotFee > 0 && <div>• ตำแหน่งรับและส่งรถเป็นคนละที่กัน (มีค่าเดินทางเพิ่มเติม)</div>}
+                                    {extraFee - differentSpotFee > 0 && <div>• มีค่าบริการจัดการพื้นที่ห่างไกล</div>}
+                                    โปรดตรวจสอบสรุปราคาสุดท้ายในขั้นตอนถัดไป
                                 </div>
                             </div>
                         )}
@@ -1588,55 +1645,12 @@ export default function BookPage() {
                                 {(slots[selectedDate] || []).map((sl: any) => {
                                     const isSelected = selectedSlot === sl.time_slot
                                     const isFull = sl.type === 'full'
-                                    // Calculate dynamic surcharge label based on distance (for any slot)
-                                    let slotSurcharge = 0
-                                    const sZone = zones.find(z => z.id === sl.serving_zone_id)
-                                    const sBranch = branches.find(b => b.id === sZone?.branch_id)
-                                    if (sZone && sBranch) {
-                                        const bLat = Number(sBranch.lat)
-                                        const bLng = Number(sBranch.lng)
-                                        const pickupInS = isPointInPolygon(pickupLat, pickupLng, sZone.polygon_coords)
-                                        const deliveryMatched = zones.find(z => z.is_active && z.polygon_coords?.length >= 3 && isPointInPolygon(deliveryLat, deliveryLng, z.polygon_coords))
-                                        const deliveryInS = showDelivery ? (deliveryMatched?.id === sZone.id) : pickupInS
-
-                                        if (!pickupInS || !deliveryInS) {
-                                            const d1 = pickupInS ? 0 : haversine(bLat, bLng, pickupLat, pickupLng)
-                                            const d2 = showDelivery ? haversine(pickupLat, pickupLng, deliveryLat, deliveryLng) : 0
-
-                                            // --- Intelligent Chaining Check ---
-                                            let skipReturn = false
-                                            if (showDelivery && deliveryMatched) {
-                                                const currentIdx = TIME_SLOTS.indexOf(sl.time_slot)
-                                                const nextSlotName = TIME_SLOTS[currentIdx + 1]
-                                                if (nextSlotName) {
-                                                    const availableStaffIds = sl.available_staff_ids || []
-                                                    const hasChain = allSchedulesData.some(sch =>
-                                                        sch.date === selectedDate &&
-                                                        sch.time_slot === nextSlotName &&
-                                                        sch.zone_id === deliveryMatched.id &&
-                                                        availableStaffIds.includes(sch.staff_id)
-                                                    )
-                                                    if (hasChain) skipReturn = true
-                                                }
-                                            }
-
-                                            const d3 = (showDelivery && !skipReturn && !deliveryInS) ? haversine(deliveryLat, deliveryLng, bLat, bLng) : (skipReturn || deliveryInS ? 0 : d1)
-                                            const totalD = d1 + d2 + d3
-
-                                            if (sBranch.out_of_zone_type === 'flat_rate') {
-                                                slotSurcharge = Number(sBranch.out_of_zone_fee || OVERFLOW_FEE)
-                                            } else {
-                                                slotSurcharge = Math.round(totalD) * Number(sBranch.out_of_zone_fee || OUT_OF_ZONE_RATE)
-                                            }
-                                        }
-                                    } else if (!zoneId) {
-                                        // Fallback for completely unknown zone but slot exists
-                                        slotSurcharge = OVERFLOW_FEE
-                                    }
-
-                                    const hasSurcharge = slotSurcharge > 0
-
                                     const isTimedOut = sl.type === 'timed_out'
+
+                                    // NEW: Unified Fee display (Travel + Different Spot)
+                                    const diffFee = differentSpotFee
+                                    const slotSurcharge = Math.round((sl.calculated_fee || 0) + diffFee + baseZoneExtraFee)
+                                    const hasSurcharge = slotSurcharge > 0
 
                                     return (
                                         <button key={sl.time_slot} disabled={isFull || isTimedOut}
@@ -1714,7 +1728,7 @@ export default function BookPage() {
                         {/* Price breakdown */}
                         <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-5)', border: '1px solid var(--border)', marginBottom: 'var(--space-4)' }}>
                             <div style={{ fontWeight: 700, marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <Coins size={20} color="var(--primary)" /> ราคา
+                                <Coins size={20} color="var(--primary)" /> รายละเอียดค่าใช้จ่าย
                             </div>
                             {[
                                 { label: `แพ็กเกจ ${selectedPkg?.name}`, val: pkgBasePrice },
@@ -1727,30 +1741,14 @@ export default function BookPage() {
                                     if (!isSelected) return null
                                     const dbA = dbAddons.find(a => a.name === name)
                                     if (!dbA) return null
-                                    // use resolved label if exists
                                     const label = ADDON_LABELS[name] || name
-                                    const isBySize = dbA.description.includes('[Prices:')
-                                    const isVariable = dbA.description.includes('[Pricing: Variable]')
                                     const isFree = dbA.description.includes('[Pricing: Free]')
-
                                     if (isFree) return { label, val: 0, note: 'ฟรี' }
-                                    if (isVariable) {
-                                        const vState = addonVariableStates[name]
-                                        if (vState?.mode === 'custom') {
-                                            return { label, val: Number(vState.customAmount) || 0 }
-                                        }
-                                        return { label: `${label} (เต็มแพ็กเกจ)`, val: 0, note: 'ตามจริง' }
-                                    }
-                                    if (isBySize) {
-                                        const selectedP = addonSelectedPrices[name]
-                                        const variant = dbA.description.split('[Prices:')[1]?.split(']')[0]?.split(',').find((v: string) => v.includes(`=${selectedP}`))?.split('=')[0]?.trim()
-                                        return { label: variant ? `${label} (${variant})` : label, val: selectedP || dbA.price || 0 }
-                                    }
-                                    return { label, val: dbA.price || 0 }
+                                    return null // All paid/variable addons go to the Pay Later section
                                 }).filter(Boolean),
-                                ...(travelSurchargeState > 0 ? [{ label: 'ค่าเดินทางไปจุดรับ', val: travelSurchargeState }] : []),
-                                ...(differentSpotFee > 0 ? [{ label: 'ค่าส่งรถต่างสถานที่', val: differentSpotFee }] : []),
-                                ...((extraFee - travelSurchargeState - differentSpotFee) > 0 ? [{ label: 'ค่าระยะทางนอกโซน', val: (extraFee - travelSurchargeState - differentSpotFee) }] : []),
+                                ...(travelSurchargeState > 0 ? [{ label: (pickupMatched ? 'ค่าเดินทางเพิ่มเติม' : 'ค่าระยะทางนอกโซน'), val: Math.round(travelSurchargeState) }] : []),
+                                ...(differentSpotFee > 0 ? [{ label: 'ค่าส่งรถต่างสถานที่', val: Math.round(differentSpotFee) }] : []),
+                                ...((extraFee - travelSurchargeState - differentSpotFee) > 0 ? [{ label: 'ค่าบริการจัดการพื้นที่ห่างไกล', val: Math.round(extraFee - travelSurchargeState - differentSpotFee) }] : []),
                                 ...(discountAmount > 0 ? [{ label: `ส่วนลด (${discountCode})`, val: -discountAmount }] : []),
                             ].map((row: any) => (
                                 <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: 8, alignItems: 'center' }}>
@@ -1762,18 +1760,56 @@ export default function BookPage() {
                                     </span>
                                 </div>
                             ))}
-                            <div style={{ borderTop: '2px solid var(--border)', paddingTop: 'var(--space-3)', display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '1rem', marginBottom: 4 }}>
-                                <span style={{ color: 'var(--text-muted)' }}>สัญญาราคารวมทั้งหมด</span>
-                                <span>฿{displayTotal.toLocaleString()}</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1.25rem' }}>
+                            <div style={{ borderTop: '2px solid var(--border)', paddingTop: 'var(--space-4)', marginTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1.2rem' }}>
                                 <span>ยอดโอน/จ่ายตอนนี้</span>
-                                <span style={{ color: 'var(--primary)' }}>฿{total.toLocaleString()}</span>
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'right', marginTop: 4 }}>
-                                * ไม่รวมค่าบริการเสริมที่ต้องจ่ายหน้างาน
+                                <span style={{ color: 'var(--primary)' }}>฿{Math.round(total).toLocaleString()}</span>
                             </div>
                         </div>
+
+                        {/* Pay Later Section */}
+                        {Object.entries(addons).some(([name, isSelected]) => {
+                            if (!isSelected) return false
+                            const dbA = dbAddons.find(a => a.name === name)
+                            return dbA && !dbA.description.includes('[Pricing: Free]')
+                        }) && (
+                            <div style={{ background: '#F8FAFC', borderRadius: 'var(--radius-xl)', padding: 'var(--space-5)', border: '1px solid var(--border)', marginBottom: 'var(--space-4)', borderLeft: '4px solid var(--warning)' }}>
+                                <div style={{ fontWeight: 700, marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--warning-dark)' }}>
+                                    <Smartphone size={20} /> รายการชำระหน้างาน (จ่ายทีหลัง)
+                                </div>
+                                {Object.entries(addons).map(([name, isSelected]) => {
+                                    if (!isSelected) return null
+                                    const dbA = dbAddons.find(a => a.name === name)
+                                    if (!dbA || dbA.description.includes('[Pricing: Free]')) return null
+                                    
+                                    const label = ADDON_LABELS[name] || name
+                                    const isVariable = dbA.description.includes('[Pricing: Variable]')
+                                    const vState = addonVariableStates[name]
+                                    
+                                    let priceDisplay = 'ตามจริงหน้างงาน'
+                                    if (!isVariable) {
+                                        const p = Math.round(addonSelectedPrices[name] || dbA.price || 0)
+                                        priceDisplay = `฿${p.toLocaleString()}`
+                                    } else if (vState?.mode === 'custom') {
+                                        const val = Number(vState.customAmount) || 0
+                                        priceDisplay = `฿${val.toLocaleString()}`
+                                    }
+
+                                    return (
+                                        <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: 8, alignItems: 'center' }}>
+                                            <span style={{ color: 'var(--text-secondary)' }}>
+                                                {vState?.mode === 'full_tank' ? `${label} (เต็มถัง)` : label}
+                                            </span>
+                                            <span style={{ fontWeight: 600, color: 'var(--warning-dark)' }}>
+                                                {priceDisplay}
+                                            </span>
+                                        </div>
+                                    )
+                                }).filter(Boolean)}
+                                <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: 12, fontStyle: 'italic', background: '#F1F5F9', padding: '8px 12px', borderRadius: '8px' }}>
+                                    * พนักงานจะเรียกเก็บยอดส่วนนี้หน้างานตามการใช้งานจริง
+                                </div>
+                            </div>
+                        )}
 
                         {/* Discount code */}
                         <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>

@@ -79,14 +79,16 @@ export default function StaffSchedulePage() {
         setPendingSlots(prev => {
             const next = { ...prev }
             const currentSlotZones = { ...(next[key] || {}) }
-            
+
             // Logic: 
             // 1. One zone must be the "Base" (in_zone or the first out_of_zone)
             // 2. Base Cycle: None -> 🏠 (in_zone) -> 🏠🚀 (out_of_zone) -> None
             // 3. Secondary Cycle: None -> 🌐 (cross_zone) -> 🌐🚀 (out_of_zone) -> None
 
-            const baseZoneId = Object.keys(currentSlotZones).find(zId => currentSlotZones[zId] === 'in_zone') 
-                || Object.keys(currentSlotZones)[0] // If no in_zone, the first one acts as base
+            const baseZoneId = existingList.find(s => !s.work_type || s.work_type === 'in_zone')?.zone_id
+                || Object.keys(currentSlotZones).find(zId => currentSlotZones[zId] === 'in_zone')
+                || existingList[0]?.zone_id
+                || Object.keys(currentSlotZones)[0]
 
             const isCurrentBase = !baseZoneId || baseZoneId === selectedZone
             const currentType = currentSlotZones[selectedZone]
@@ -117,17 +119,17 @@ export default function StaffSchedulePage() {
                 const hasPrimary = finalZoneIds.some(zId => currentSlotZones[zId] === 'in_zone' || currentSlotZones[zId] === 'out_of_zone')
                 // Wait, if all are cross_zone (which shouldn't happen by cycle), promote one.
                 const primaryCount = finalZoneIds.filter(zId => currentSlotZones[zId] === 'in_zone' || (currentSlotZones[zId] === 'out_of_zone' && zId === finalZoneIds[0])).length
-                
+
                 // If the only zone was deleted, we're fine. 
                 // If we have zones but no 'in_zone', and we want a base, we ensure the FIRST one is either in_zone or out_of_zone
                 if (!finalZoneIds.some(zId => currentSlotZones[zId] === 'in_zone' || (currentSlotZones[zId] === 'out_of_zone' && zId === baseZoneId))) {
-                   // This part is tricky. Let's just make it simpler:
-                   // If there are assignments, and none is 'in_zone', make the first one 'in_zone' if it was 'cross_zone'
-                   if (!finalZoneIds.some(zId => currentSlotZones[zId] === 'in_zone')) {
+                    // This part is tricky. Let's just make it simpler:
+                    // If there are assignments, and none is 'in_zone', make the first one 'in_zone' if it was 'cross_zone'
+                    if (!finalZoneIds.some(zId => currentSlotZones[zId] === 'in_zone')) {
                         const firstId = finalZoneIds[0]
                         if (currentSlotZones[firstId] === 'cross_zone') currentSlotZones[firstId] = 'in_zone'
                         // if it's already out_of_zone, it's effectively 🏠🚀
-                   }
+                    }
                 }
             }
 
@@ -243,9 +245,9 @@ export default function StaffSchedulePage() {
 
                             // Combine all zones (saved + pending) to display
                             const displayZones = [
-                                ...existingList.map(s => ({ 
-                                    id: s.id, 
-                                    zone_id: s.zone_id, 
+                                ...existingList.map(s => ({
+                                    id: s.id,
+                                    zone_id: s.zone_id,
                                     status: s.is_booked ? 'booked' : 'saved',
                                     work_type: pendingSlots[`${format(d, 'yyyy-MM-dd')}_${slot}`]?.[s.zone_id] || s.work_type || 'in_zone'
                                 })),
@@ -265,11 +267,11 @@ export default function StaffSchedulePage() {
                                             const zObj = zones.find(z => z.id === dz.zone_id)
                                             if (!zObj) return null
                                             const displayName = zObj.name
-                                            
+
                                             // Determine context for out_of_zone
                                             const hasInZone = displayZones.some(z => z.work_type === 'in_zone')
                                             const isPrimary = dz.work_type === 'in_zone' || (dz.work_type === 'out_of_zone' && !hasInZone && idx === 0)
-                                            
+
                                             const Icons = []
                                             let color = 'var(--brand-dominant)'
                                             let bg = 'var(--brand-dominant-ghost)'
