@@ -217,6 +217,21 @@ export default function MyBookingsPage() {
                         url: `/staff/jobs/${selectedBooking.id}`
                     })
                 }).catch(() => {})
+
+                // If job is already in delivering status, notify customer that it's now actually delivering
+                if (selectedBooking.status === 'delivering') {
+                    const message = '🚗 ล้างเสร็จแล้ว! พนักงานกำลังนำรถกลับ\nเตรียมรอรับรถสุดเงาได้เลยครับ'
+                    fetch('/api/line/notify-customer', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            line_user_id: (JSON.parse(localStorage.getItem('liff_customer') || '{}')).line_user_id,
+                            message: message,
+                            booking_id: selectedBooking.id,
+                            notif_type: 'delivering',
+                        }),
+                    }).catch(() => {})
+                }
             }
 
             setSelectedBooking((p: any) => ({ ...p, is_additional_paid: true }))
@@ -305,13 +320,15 @@ export default function MyBookingsPage() {
 
             // Notify Staff
             if (selectedBooking.staff_id) {
+                const { NOTIFICATIONS } = await import('@/lib/notifications-config')
+                const notif = NOTIFICATIONS.STAFF.RESCHEDULED
                 fetch('/api/push/notify-staff', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         staff_id: selectedBooking.staff_id,
-                        title: 'ลูกค้าเลื่อนนัด! 📅',
-                        body: `คิวงาน #${selectedBooking.id.slice(0, 8)} เลื่อนเป็น ${rescheduleDate} @ ${rescheduleSlot}`,
+                        title: notif.pushTitle,
+                        body: notif.pushBody(selectedBooking.id, rescheduleDate, rescheduleSlot),
                         url: `/staff/jobs/${selectedBooking.id}`
                     })
                 }).catch(() => {})
@@ -345,6 +362,23 @@ export default function MyBookingsPage() {
             if (error) throw error
 
             alert('ยกเลิกการจองสำเร็จแล้ว (ไม่มีการคืนเงิน)')
+            
+            // Notify Staff
+            if (selectedBooking.staff_id) {
+                const { NOTIFICATIONS } = await import('@/lib/notifications-config')
+                const notif = NOTIFICATIONS.STAFF.CANCELLED
+                fetch('/api/push/notify-staff', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        staff_id: selectedBooking.staff_id,
+                        title: notif.pushTitle,
+                        body: notif.pushBody(selectedBooking.id, selectedBooking.scheduled_date, selectedBooking.scheduled_time),
+                        url: `/staff`
+                    })
+                }).catch(() => {})
+            }
+
             setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, status: 'cancelled' } : b))
             setSelectedBooking(null)
         } catch (e: any) {

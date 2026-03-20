@@ -49,13 +49,17 @@ export async function POST(
 
     // 4. Notify Customer via Line
     if (booking.customers?.line_user_id) {
+        const { NOTIFICATIONS } = await import('@/lib/notifications-config')
         try {
             await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/line/notify-customer`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     line_user_id: booking.customers.line_user_id,
-                    message: `✅ พนักงานรับงานของคุณแล้ว!\nคุณ ${booking.customers.full_name} เตรียมตัวรอรับบริการได้เลยครับ`,
+                    message: NOTIFICATIONS.CUSTOMER.ACCEPTED.lineMessage(
+                        booking.scheduled_date,
+                        booking.scheduled_time
+                    ),
                     booking_id: id,
                 }),
             })
@@ -63,10 +67,14 @@ export async function POST(
     }
 
     // 5. Notify Customer via Web Push
+    const { NOTIFICATIONS } = await import('@/lib/notifications-config')
     try {
         await sendPushNotification(booking.customer_id, 'customer', {
-            title: 'พนักงานรับงานแล้ว! ✅',
-            body: `พนักงานกำลังเตรียมตัวเพื่อไปดูแลรถของคุณในเวลา ${booking.scheduled_time}`,
+            title: NOTIFICATIONS.CUSTOMER.ACCEPTED.pushTitle,
+            body: NOTIFICATIONS.CUSTOMER.ACCEPTED.pushBody(
+                booking.scheduled_date,
+                booking.scheduled_time
+            ),
             url: `/menu/my-bookings`
         })
     } catch { /* Non-critical */ }

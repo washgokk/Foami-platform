@@ -32,6 +32,7 @@ const NAV_ITEMS = [
     { href: '/admin/services', icon: Wrench, label: 'บริการ & ราคา' },
     { href: '/admin/bookings', icon: ClipboardList, label: 'การจอง' },
     { href: '/admin/discounts', icon: Ticket, label: 'โค้ดส่วนลด' },
+    { href: '/admin/promotions', icon: Bell, label: 'แจ้งโปรโมชั่น' },
 ]
 
 export default function AdminLayoutClient({ children }: { children: React.ReactNode }) {

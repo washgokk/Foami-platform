@@ -12,6 +12,8 @@ import {
 } from '@/lib/types'
 import { format, addDays } from 'date-fns'
 import { th } from 'date-fns/locale'
+import { haversine, isPointInPolygon, minDistanceToPolygon } from '@/lib/geo-utils'
+import { findMatchingStaffForJob } from '@/lib/staff-matching'
 import {
     ChevronLeft,
     ChevronRight,
@@ -63,56 +65,6 @@ const STEPS = [
     { name: 'สรุป', icon: FileText },
     { name: 'ชำระ', icon: CreditCard },
 ]
-
-// ─── Haversine distance (km) ─────────────────────────────────
-function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
-    const R = 6371
-    const dLat = ((lat2 - lat1) * Math.PI) / 180
-    const dLng = ((lng2 - lng1) * Math.PI) / 180
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-}
-
-// ─── Point-in-polygon (ray casting) ──────────────────────────
-function isPointInPolygon(lat: number, lng: number, polygon: [number, number][]) {
-    let inside = false
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i][0], yi = polygon[i][1]
-        const xj = polygon[j][0], yj = polygon[j][1]
-        if ((yi > lng) !== (yj > lng) && lat < ((xj - xi) * (lng - yi)) / (yj - yi) + xi) inside = !inside
-    }
-    return inside
-}
-
-// ─── Get Minimum Distance to Polygon Boundary (km) ───────────
-function minDistanceToPolygon(lat: number, lng: number, polygon: [number, number][]) {
-    let minD = Infinity
-    for (let i = 0; i < polygon.length; i++) {
-        const p1 = polygon[i]
-        const p2 = polygon[(i + 1) % polygon.length]
-        
-        // Check distance to segment p1-p2
-        // For simplicity in spherical coordinates on small scales, 
-        // we use a projection approximation
-        const x = lat, y = lng
-        const x1 = p1[0], y1 = p1[1]
-        const x2 = p2[0], y2 = p2[1]
-        
-        const dx = x2 - x1
-        const dy = y2 - y1
-        const lenSq = dx * dx + dy * dy
-        
-        let t = lenSq === 0 ? -1 : ((x - x1) * dx + (y - y1) * dy) / lenSq
-        t = Math.max(0, Math.min(1, t))
-        
-        const projLat = x1 + t * dx
-        const projLng = y1 + t * dy
-        
-        const d = haversine(lat, lng, projLat, projLng)
-        if (d < minD) minD = d
-    }
-    return minD
-}
 
 // ─── Get Zone Center ──────────────────────────────────────────
 function getZoneCenter(zone: any): [number, number] {
@@ -367,78 +319,19 @@ export default function BookPage() {
                         if (slotMinutes < nowMinutes + 20) return { time_slot: slot, type: 'timed_out' }
                     }
 
-                    // 1. Group schedules by staff to find their "Base Zone" for this slot
-                    const slotSchedules = daySchedules.filter(s => (s.time_slot === slot || s.time_slot?.startsWith(slot)))
-                    
-                    // Critical: Identify staff who are ALREADY BOOKED for this slot (any zone)
-                    const bookedStaffIdsForSlot = slotSchedules.filter(s => s.is_booked).map(s => s.staff_id)
-                    
-                    // Filter for available schedules (not booked, and staff not already busy)
-                    const availableSchedules = slotSchedules.filter(s => !s.is_booked && !bookedStaffIdsForSlot.includes(s.staff_id))
-
-                    const staffAssignments: Record<string, any[]> = {}
-                    availableSchedules.forEach(s => {
-                        if (!staffAssignments[s.staff_id]) staffAssignments[s.staff_id] = []
-                        staffAssignments[s.staff_id].push(s)
+                    const matchingStaff = findMatchingStaffForJob({
+                        pickupLat, pickupLng, deliveryLat, deliveryLng, showDelivery,
+                        zones, branch: branches[0],
+                        daySchedules, dayBookings, timeSlot: slot
                     })
 
-                    const matchingStaff: { staff_id: string; base_zone_id: string; fee: number; type: 'local' | 'overflow' }[] = []
-
-                    Object.entries(staffAssignments).forEach(([sId, assignments]) => {
-                        // Find the ANCHOR assignment (in_zone) to act as the base for distances
-                        const anchor = assignments.find(a => !a.work_type || a.work_type === 'in_zone') || assignments[0]
-                        const baseZone = zones.find(zn => zn.id === anchor.zone_id)
-                        if (!baseZone) return
-
-                        const isO = !localPickupMatched || (showDelivery && !localDeliveryMatched)
-                        const isC = (localPickupMatched && localPickupMatched.id !== baseZone.id) || 
-                                   (showDelivery && localDeliveryMatched && localDeliveryMatched.id !== baseZone.id)
-
-                        // Check if this staff is willing to serve this specific job (look at ALL their assignments in the slot)
-                        let canS = false
-                        if (isO) canS = assignments.some(a => a.work_type === 'out_of_zone')
-                        else if (isC) canS = assignments.some(a => a.work_type === 'cross_zone' || a.work_type === 'out_of_zone')
-                        else canS = true
-                        
-                        if (canS) {
-                            const isPickupInBase = isPointInPolygon(pickupLat, pickupLng, baseZone.polygon_coords)
-                            const dPickup = isPickupInBase ? 0 : minDistanceToPolygon(pickupLat, pickupLng, baseZone.polygon_coords)
-                            
-                            const isDeliveryInBase = showDelivery ? isPointInPolygon(deliveryLat, deliveryLng, baseZone.polygon_coords) : true
-                            const dDelivery = (showDelivery && !isDeliveryInBase) ? minDistanceToPolygon(deliveryLat, deliveryLng, baseZone.polygon_coords) : 0
-                            const maxDist = Math.max(dPickup, dDelivery)
-
-                            // Check branch-level distance limit from anchor
-                            if (maxDist > (branches[0].max_out_of_zone_km || 2)) return
-
-                            // Rule: If job is Out-of-Zone AND Anchor has Rocket, fee is 0.
-                            const anchorHasRocket = anchor.work_type === 'out_of_zone'
-                            let fee = dPickup * 2 * (branches[0].out_of_zone_fee || 10)
-                            if (isO && anchorHasRocket) {
-                                fee = 0
-                            }
-                            
-                            matchingStaff.push({
-                                staff_id: sId,
-                                base_zone_id: baseZone.id,
-                                fee: fee,
-                                type: (isO || isC) ? 'overflow' : 'local'
-                            })
-                        }
-                    })
-
-                    // 2. Subtract pending unassigned bookings
+                    // Handle Capacity (Subtract pending unassigned bookings)
                     const allPendingInBranch = dayBookings.filter(b => (b.scheduled_time === slot || b.scheduled_time?.startsWith(slot)) && !b.staff_id)
-                    
-                    // Simple capacity check: matchingStaff.length - allPending
-                    // To be more precise, we should sort matchingStaff by fee and pick the best one
-                    matchingStaff.sort((a, b) => a.fee - b.fee)
-                    
                     const availableCount = matchingStaff.length - allPendingInBranch.length
 
                     if (availableCount > 0) {
                         const topStaff = matchingStaff[0]
-                        console.log(`[Slot Picker] Slot: ${slot}, Staff: ${topStaff.staff_id}, Fee: ${topStaff.fee}, distToPickup: ${minDistanceToPolygon(pickupLat, pickupLng, zones.find(z => z.id === topStaff.base_zone_id)?.polygon_coords || [])}`);
+                        console.log(`[Slot Picker] Slot: ${slot}, Staff: ${topStaff.staff_id}, Fee: ${topStaff.fee}`);
                         return {
                             time_slot: slot,
                             type: topStaff.type,

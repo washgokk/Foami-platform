@@ -10,15 +10,22 @@ interface NotificationTesterModalProps {
 
 const STAFF_CASES = [
     { id: 'new_job', label: 'งานเข้าใหม่ (New Job)', icon: '🔔', desc: 'แจ้งเตือนพนักงานในโซนเมื่อมีงานใหม่รอรับ' },
-    { id: 'auto_assign', label: 'มอบหมายออโต้ (Auto Assign)', icon: '🚨', desc: 'แจ้งเตือนพนักงานเมื่อระบบบังคับมอบหมายงานให้' },
+    { id: 'reminder', label: 'แจ้งเตือนงานค้าง (Reminder)', icon: '📢', desc: 'แจ้งเตือนพนักงานเมื่อไม่มีใครรับงานสักพัก' },
+    { id: 'auto_assigned', label: 'มอบหมายออโต้ (Auto Assign)', icon: '🚨', desc: 'แจ้งเตือนพนักงานเมื่อระบบบังคับมอบหมายงานให้' },
+    { id: 'cancelled', label: 'งานถูกยกเลิก (Cancelled)', icon: '❌', desc: 'แจ้งเตือนพนักงานเมื่อลูกค้ากดยกเลิกงาน' },
+    { id: 'rescheduled', label: 'ลูกค้าเลื่อนนัด (Rescheduled)', icon: '📅', desc: 'แจ้งเตือนพนักงานเมื่อลูกค้าเลื่อนนัด' },
+    { id: 'paid_extra', label: 'ชำระเงินเพิ่ม (Paid Extra)', icon: '✨', desc: 'แจ้งเตือนพนักงานเมื่อลูกค้าชำระเงินส่วนต่างสำเร็จ' },
 ]
 
 const CUSTOMER_CASES = [
-    { id: 'accepted', label: 'พนักงานรับงาน (Accepted)', icon: '✅', desc: 'แจ้งเตือนลูกค้าเมื่อพนักงานกดรับงานแล้ว' },
-    { id: 'on_the_way', label: 'กำลังเดินทาง (On the way)', icon: '🏍️', desc: 'แจ้งเตือนลูกค้าเมื่อพนักงานกดเริ่มเดินทาง' },
-    { id: 'washing', label: 'กำลังล้าง (Washing)', icon: '🫧', desc: 'แจ้งเตือนลูกค้าเมื่อพนักงานกดเริ่มงานล้าง' },
-    { id: 'completed', label: 'เสร็จสมบูรณ์ (Completed)', icon: '🎉', desc: 'แจ้งเตือนลูกค้าเมื่อพนักงานล้างเสร็จและกดปิดงาน' },
-    { id: 'extra_fee', label: 'ค่าใช้จ่ายเพิ่ม (Extra Fee)', icon: '💰', desc: 'แจ้งเตือนลูกค้าเมื่อมีการเพิ่มค่าบริการพิเศษ' },
+    { id: 'accepted', label: 'พนักงานรับงาน (Accepted)', icon: '✅', desc: 'แจ้งลูกค้าเมื่อพนักงานกดรับงาน' },
+    { id: 'confirmed', label: 'ยืนยันนัดหมาย (Confirmed)', icon: '🤝', desc: 'แจ้งลูกค้าเมื่อยืนยันนัดหมายสำเร็จ' },
+    { id: 'picking_up', label: 'มารับรถ (Picking Up)', icon: '🏍️', desc: 'แจ้งลูกค้าเมื่อพนักงานกำลังเดินทางมารับรถ' },
+    { id: 'washing', label: 'กำลังล้าง (Washing)', icon: '🫧', desc: 'แจ้งลูกค้าเมื่อพนักงานเริ่มล้างรถ' },
+    { id: 'delivering', label: 'กำลังส่งคืน (Delivering)', icon: '🚗', desc: 'แจ้งลูกค้าเมื่อพนักงานกำลังนำรถกลับ' },
+    { id: 'payment_pending', label: 'รอชำระส่วนต่าง (Payment Pending)', icon: '💳', desc: 'แจ้งลูกค้าเมื่อมีค่าบริการเพิ่มเติมต้องชำระ' },
+    { id: 'completed', label: 'เสร็จสมบูรณ์ (Completed)', icon: '🎉', desc: 'แจ้งลูกค้าเมื่อดูแลรถเสร็จสิ้น' },
+    { id: 'auto_assigned', label: 'มอบหมายออโต้ (Auto Assigned)', icon: '🫧', desc: 'แจ้งลูกค้าเมื่อระบบเลือกพนักงานให้อัตโนมัติ' },
 ]
 
 export default function NotificationTesterModal({ isOpen, onClose }: NotificationTesterModalProps) {

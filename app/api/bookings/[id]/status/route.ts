@@ -19,44 +19,59 @@ export async function PATCH(
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
-    // Send Line notification to customer on key status changes
-    const NOTIFY_STATUSES: Record<string, string> = {
-        confirmed: '✅ การจองของคุณได้รับการยืนยันแล้ว!\nพนักงานกำลังเตรียมตัวเพื่อไปดูแลรถของคุณครับ',
-        picking_up: '🏍️ พนักงานกำลังมารับรถของคุณแล้ว!\nเตรียมกุญแจไว้ได้เลยครับ',
-        washing: '🫧 รถของคุณกำลังถูกล้างอยู่\nอย่างละพิถีพิถัน เดี๋ยวเสร็จแล้วครับ!',
-        delivering: '🚗 ล้างเสร็จแล้ว! พนักงานกำลังนำรถกลับ\nเตรียมรอรับรถสุดเงาได้เลยครับ',
-        completed: '🎉 ส่งรถเรียบร้อยแล้ว! ขอบคุณที่ใช้บริการ Foami\nอย่าลืมให้คะแนนความพึงพอใจกับเราด้วยนะครับ',
+    // Get Notification Config
+    const { NOTIFICATIONS } = await import('@/lib/notifications-config')
+
+    const CUSTOMER_NOTIFS: Record<string, any> = {
+        confirmed: NOTIFICATIONS.CUSTOMER.CONFIRMED,
+        picking_up: NOTIFICATIONS.CUSTOMER.PICKING_UP,
+        washing: NOTIFICATIONS.CUSTOMER.WASHING,
+        delivering: NOTIFICATIONS.CUSTOMER.DELIVERING,
+        completed: NOTIFICATIONS.CUSTOMER.COMPLETED,
     }
 
-    const PUSH_TITLES: Record<string, string> = {
-        confirmed: 'พนักงานรับงานแล้ว! ✅',
-        picking_up: 'พนักงานกำลังเดินทาง 🏍️',
-        washing: 'กำลังเปลี่ยนรถคุณให้ใหม่ 🫧',
-        delivering: 'กำลังส่งคืน 🚗',
-        completed: 'ขอบคุณที่ใช้บริการ! 🎉',
+    // --- SEQUENTIAL NOTIFICATION LOGIC ---
+    let actualNotifyStatus = status
+    let messageToSend = ''
+    let pushTitle = ''
+    let isPaymentPending = false
+
+    if (status === 'delivering' && data.additional_price > 0 && !data.is_additional_paid) {
+        // If unpaid additional price, send payment reminder instead of delivering message
+        actualNotifyStatus = 'payment_pending'
+        const paymentNotif = NOTIFICATIONS.CUSTOMER.PAYMENT_PENDING
+        messageToSend = paymentNotif.lineMessage(data.additional_price, data.additional_price_note)
+        pushTitle = paymentNotif.pushTitle
+        isPaymentPending = true
+    } else {
+        const notif = CUSTOMER_NOTIFS[status]
+        if (notif) {
+            messageToSend = notif.lineMessage
+            pushTitle = notif.pushTitle
+        }
     }
 
-    if (NOTIFY_STATUSES[status] && data.customers?.line_user_id) {
+    if (messageToSend && data.customers?.line_user_id) {
         try {
             await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/line/notify-customer`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     line_user_id: data.customers.line_user_id,
-                    message: NOTIFY_STATUSES[status],
+                    message: messageToSend,
                     booking_id: id,
-                    notif_type: status, // Pass status as type
+                    notif_type: actualNotifyStatus,
                 }),
             })
         } catch { /* Non-critical */ }
     }
 
     // Send Web Push notification to customer
-    if (NOTIFY_STATUSES[status]) {
+    if (messageToSend) {
         try {
             await sendPushNotification(data.customer_id, 'customer', {
-                title: PUSH_TITLES[status] || 'Foami Service Update',
-                body: NOTIFY_STATUSES[status].split('\n')[0], // Use first line for push body
+                title: pushTitle || 'Foami Service Update',
+                body: messageToSend.split('\n')[0],
                 url: `/${data.branches?.slug || 'menu'}/my-bookings`
             })
         } catch { /* Non-critical */ }

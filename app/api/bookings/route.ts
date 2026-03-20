@@ -92,24 +92,27 @@ export async function POST(req: NextRequest) {
         const lineIds = staffMembers?.map((s: any) => s.line_user_id).filter(Boolean) || []
 
         if (lineIds.length > 0) {
+            const { NOTIFICATIONS } = await import('@/lib/notifications-config')
             await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/line/notify-staff`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     line_user_ids: lineIds,
                     booking_id: data.id,
-                    message: `🔔 มีงานใหม่!\nวันที่: ${scheduled_date} เวลา: ${scheduled_time}\nกรุณาเปิดแอปเพื่อรับงาน`,
+                    message: NOTIFICATIONS.STAFF.NEW_JOB.lineMessage(scheduled_date, scheduled_time),
                 }),
             })
         }
 
         // Notify via Web Push
         if (staffIds.length > 0) {
+            const { NOTIFICATIONS } = await import('@/lib/notifications-config')
+            const newJobNotif = NOTIFICATIONS.STAFF.NEW_JOB
             await Promise.all(
                 staffIds.map(sId => 
                     sendPushNotification(sId, 'staff', {
-                        title: '🔔 มีงานใหม่เข้า!',
-                        body: `วันที่: ${scheduled_date} เวลา: ${scheduled_time}\nกดเพื่อดูรายละเอียดและรับงานเลย`,
+                        title: newJobNotif.pushTitle,
+                        body: newJobNotif.pushBody(scheduled_date, scheduled_time),
                         url: `/staff`
                     })
                 )

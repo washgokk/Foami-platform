@@ -25,161 +25,178 @@ export async function POST(req: NextRequest) {
         let pushPayload = { title: '', body: '', url: '' }
         let lineMessages: any[] = []
 
-        // Define Cases
-        switch (caseId) {
-            case 'new_job':
-                pushPayload = {
-                    title: '🔔 งานใหม่เข้าแล้ว!',
-                    body: 'มีงานล้างรถใหม่ในโซนของคุณ รอให้คุณกดรับอยู่ครับ',
-                    url: '/staff'
+        const { NOTIFICATIONS } = await import('@/lib/notifications-config')
+        
+        // Dummy Data
+        const d_id = 'BK-TEST-12345'
+        const d_date = '2024-03-25'
+        const d_time = '10:30'
+        const d_amount = 500
+        const d_note = 'ล้างอัดฉีดช่วงล่างพิเศษ'
+
+        // Define Cases Dynamically
+        if (targetType === 'staff') {
+            const staffNotifs = NOTIFICATIONS.STAFF as any
+            const n = staffNotifs[caseId.toUpperCase()]
+            if (!n) throw new Error(`Staff Case ${caseId} not found in config`)
+
+            let body = ''
+            let msgText = ''
+
+            if (typeof n.pushBody === 'function') {
+                if (caseId === 'new_job' || caseId === 'reminder' || caseId === 'auto_assigned') {
+                    body = n.pushBody(d_date, d_time)
+                } else if (caseId === 'cancelled' || caseId === 'rescheduled') {
+                    body = n.pushBody(d_id, d_date, d_time)
+                } else if (caseId === 'paid_extra') {
+                    body = n.pushBody(d_id, d_amount)
                 }
+            } else {
+                body = n.pushBody
+            }
+
+            if (typeof n.lineMessage === 'function') {
+                if (caseId === 'new_job' || caseId === 'reminder' || caseId === 'auto_assigned') {
+                    msgText = n.lineMessage(d_date, d_time)
+                } else if (caseId === 'cancelled' || caseId === 'rescheduled') {
+                    msgText = n.lineMessage(d_id, d_date, d_time)
+                } else if (caseId === 'paid_extra') {
+                    msgText = n.lineMessage(d_id, d_amount)
+                }
+            } else {
+                msgText = n.lineMessage
+            }
+
+            pushPayload = {
+                title: n.pushTitle,
+                body,
+                url: caseId === 'new_job' || caseId === 'reminder' ? '/staff' : `/staff/jobs/${d_id}`
+            }
+
+            lineMessages = [{
+                type: 'flex',
+                altText: n.pushTitle,
+                contents: {
+                    type: 'bubble',
+                    header: {
+                        type: 'box', layout: 'vertical', backgroundColor: '#1A2340', paddingAll: '16px',
+                        contents: [{ type: 'text', text: n.pushTitle, color: '#FFFFFF', weight: 'bold', size: 'md' }]
+                    },
+                    body: {
+                        type: 'box', layout: 'vertical', paddingAll: '16px',
+                        contents: [
+                            { type: 'text', text: msgText, wrap: true, size: 'sm' },
+                            {
+                                type: 'button', style: 'primary', color: '#315EC3', margin: 'lg',
+                                action: { type: 'uri', label: '📋 ดูรายละเอียด', uri: `${appUrl}${pushPayload.url}` }
+                            }
+                        ]
+                    }
+                }
+            }]
+        } else {
+            const custNotifs = NOTIFICATIONS.CUSTOMER as any
+            const n = custNotifs[caseId.toUpperCase()]
+            if (!n) throw new Error(`Customer Case ${caseId} not found in config`)
+
+            let body = ''
+            let msgText = ''
+
+            if (typeof n.pushBody === 'function') {
+                if (caseId === 'accepted' || caseId === 'auto_assigned') {
+                    body = n.pushBody(d_date, d_time)
+                } else if (caseId === 'payment_pending') {
+                    body = n.pushBody(d_amount)
+                }
+            } else {
+                body = n.pushBody
+            }
+
+            if (typeof n.lineMessage === 'function') {
+                if (caseId === 'accepted' || caseId === 'auto_assigned') {
+                    msgText = n.lineMessage(d_date, d_time)
+                } else if (caseId === 'payment_pending') {
+                    msgText = n.lineMessage(d_amount, d_note)
+                } else {
+                    msgText = n.lineMessage()
+                }
+            } else {
+                msgText = n.lineMessage
+            }
+
+            pushPayload = {
+                title: n.pushTitle,
+                body,
+                url: '/menu/my-bookings'
+            }
+            
+            // Re-use the beautiful Flex structures from notify-customer logic but with centralized text
+            if (caseId === 'completed') {
                 lineMessages = [{
-                    type: 'flex',
-                    altText: '🔔 มีงานใหม่รอคุณอยู่!',
+                    type: 'flex', altText: n.pushTitle,
                     contents: {
-                        type: 'bubble',
+                        type: 'bubble', size: 'mega',
                         header: {
-                            type: 'box', layout: 'vertical', backgroundColor: '#3B5FCC', paddingAll: '16px',
-                            contents: [{ type: 'text', text: '🔔 งานใหม่! รอรับออเดอร์', color: '#FFFFFF', weight: 'bold', size: 'md' }]
+                            type: 'box', layout: 'vertical', backgroundColor: '#1A2340', paddingAll: '20px',
+                            contents: [{ type: 'text', text: n.pushTitle, color: '#FFFFFF', weight: 'bold', size: 'md' }]
                         },
                         body: {
-                            type: 'box', layout: 'vertical', paddingAll: '16px',
+                            type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: '#FFFFFF', spacing: 'md',
                             contents: [
-                                { type: 'text', text: 'มีงานใหม่ในพื้นที่ของคุณ!\nรีบกดรับก่อนพนักงานคนอื่นนะครับ', wrap: true, size: 'sm' },
+                                { type: 'text', text: msgText, wrap: true, size: 'sm', color: '#1A2340' },
                                 {
-                                    type: 'button', style: 'primary', color: '#3B5FCC', margin: 'lg',
-                                    action: { type: 'uri', label: '📋 ดูรายการงาน', uri: `${appUrl}/staff` }
+                                    type: 'button', style: 'primary', color: '#315EC3', margin: 'lg', height: 'sm',
+                                    action: { type: 'uri', label: '⭐ ให้คะแนน & รีวิวงาน', uri: `${appUrl}/liff/my-bookings` }
                                 }
                             ]
                         }
                     }
                 }]
-                break
-
-            case 'auto_assign':
-                pushPayload = {
-                    title: '🚨 ระบบมอบหมายออโต้!',
-                    body: 'คุณได้รับมอบหมายงานด่วน กรุณาตรวจสอบรายละเอียดครับ',
-                    url: `/staff/jobs/${bookingId || ''}`
-                }
+            } else if (caseId === 'payment_pending') {
                 lineMessages = [{
-                    type: 'flex',
-                    altText: '🚨 มีงานถูกมอบหมายอัตโนมัติ!',
+                    type: 'flex', altText: n.pushTitle,
                     contents: {
-                        type: 'bubble',
+                        type: 'bubble', size: 'mega',
                         header: {
-                            type: 'box', layout: 'vertical', backgroundColor: '#E11D48', paddingAll: '16px',
-                            contents: [{ type: 'text', text: '🚨 งานด่วน! ระบบมอบหมายออโต้', color: '#FFFFFF', weight: 'bold', size: 'md' }]
+                            type: 'box', layout: 'vertical', backgroundColor: '#315EC3', paddingAll: '20px',
+                            contents: [{ type: 'text', text: n.pushTitle, color: '#FFFFFF', weight: 'bold', size: 'md' }]
                         },
                         body: {
-                            type: 'box', layout: 'vertical', paddingAll: '16px',
+                            type: 'box', layout: 'vertical', paddingAll: '20px', backgroundColor: '#FFFFFF',
                             contents: [
-                                { type: 'text', text: 'คุณได้รับมอบหมายงานใหม่แบบอัตโนมัติ\nกรุณาเตรียมตัวเข้าให้บริการตามเวลาครับ', wrap: true, size: 'sm' },
+                                { type: 'text', text: msgText, wrap: true, size: 'md', color: '#1A2340', weight: 'bold' },
                                 {
-                                    type: 'button', style: 'primary', color: '#E11D48', margin: 'lg',
-                                    action: { type: 'uri', label: '📋 ดูรายละเอียดงาน', uri: `${appUrl}/staff/jobs/${bookingId || ''}` }
+                                    type: 'button', style: 'primary', color: '#315EC3', margin: 'xl',
+                                    action: { type: 'uri', label: '💰 ไปที่หน้าชำระเงิน', uri: `${appUrl}/liff/my-bookings` }
                                 }
                             ]
                         }
                     }
                 }]
-                break
-
-            case 'accepted':
-                pushPayload = {
-                    title: 'พนักงานรับงานแล้ว! ✅',
-                    body: 'เตรียมตัวรอรับบริการได้เลย พนักงานกำลังเตรียมอุปกรณ์ครับ',
-                    url: '/menu/my-bookings'
-                }
+            } else {
                 lineMessages = [{
-                    type: 'flex',
-                    altText: '✅ พนักงานรับงานของคุณแล้ว!',
+                    type: 'flex', altText: n.pushTitle,
                     contents: {
-                        type: 'bubble',
+                        type: 'bubble', size: 'mega',
                         header: {
-                            type: 'box', layout: 'vertical', backgroundColor: '#F4B8C8', paddingAll: '16px',
-                            contents: [{ type: 'text', text: '🫧 ยืนยันพนักงานรับงาน', color: '#1A2340', weight: 'bold', size: 'md' }]
+                            type: 'box', layout: 'vertical', backgroundColor: '#F1BFDB', paddingAll: '16px',
+                            contents: [{ type: 'text', text: '🫧 Foami Update', color: '#1A2340', weight: 'bold', size: 'md', align: 'center' }]
                         },
                         body: {
-                            type: 'box', layout: 'vertical', paddingAll: '16px',
-                            contents: [
-                                { type: 'text', text: 'พนักงานยืนยันการรับงานเรียบร้อยแล้ว\nเตรียมตัวรอรับบริการได้เลยครับ!', wrap: true, size: 'sm', color: '#1A2340' },
-                                {
-                                    type: 'button', style: 'primary', color: '#3B5FCC', margin: 'lg',
-                                    action: { type: 'uri', label: '📦 ดูการจองของฉัน', uri: `${appUrl}/liff/my-bookings` }
-                                }
-                            ]
+                            type: 'box', layout: 'vertical', paddingAll: '20px',
+                            contents: [{ type: 'text', text: msgText, wrap: true, size: 'md', color: '#1A2340', align: 'center' }]
+                        },
+                        footer: {
+                            type: 'box', layout: 'vertical', paddingAll: 'md',
+                            contents: [{
+                                type: 'button', style: 'secondary', color: '#1A2340', height: 'sm',
+                                action: { type: 'uri', label: 'ดูรายละเอียดการจอง', uri: `${appUrl}/liff/my-bookings` }
+                            }]
                         }
                     }
                 }]
-                break
-
-            case 'on_the_way':
-                pushPayload = {
-                    title: 'พนักงานกำลังเดินทาง! 🏍️',
-                    body: 'อีกไม่นานพนักงานจะไปถึงที่หมายของคุณครับ',
-                    url: '/menu/my-bookings'
-                }
-                lineMessages = [{
-                    type: 'text',
-                    text: '🏍️ พนักงาน Foami กำลังเดินทางไปหาคุณแล้วครับ! เตรียมตัวรอรับบริการได้เลย'
-                }]
-                break
-
-            case 'washing':
-                pushPayload = {
-                    title: 'เริ่มขั้นตอนการล้างรถ 🫧',
-                    body: 'พนักงานกำลังดูแลรถของคุณอย่างประณีตครับ',
-                    url: '/menu/my-bookings'
-                }
-                lineMessages = [{
-                    type: 'text',
-                    text: '🫧 พนักงานเริ่มขั้นตอนการล้างรถของคุณแล้วครับ! คุณสามารถตรวจสอบสถานะได้ในแอป Foami'
-                }]
-                break
-
-            case 'completed':
-                pushPayload = {
-                    title: 'ดูแลรถของคุณเรียบร้อยแล้ว! 🎉',
-                    body: 'การล้างรถเสร็จสมบูรณ์ ขอบคุณที่ใช้บริการ Foami ครับ',
-                    url: '/menu/my-bookings'
-                }
-                lineMessages = [{
-                    type: 'flex',
-                    altText: '🎉 ล้างรถเสร็จเรียบร้อยแล้ว!',
-                    contents: {
-                        type: 'bubble',
-                        header: {
-                            type: 'box', layout: 'vertical', backgroundColor: '#3B5FCC', paddingAll: '16px',
-                            contents: [{ type: 'text', text: '🎉 บริการเสร็จสิ้น!', color: '#FFFFFF', weight: 'bold', size: 'md' }]
-                        },
-                        body: {
-                            type: 'box', layout: 'vertical', paddingAll: '16px',
-                            contents: [
-                                { type: 'text', text: 'Foami ดูแลรถของคุณเรียบร้อยแล้วครับ\nหวังว่าจะประทับใจในบริการของเรานะครับ', wrap: true, size: 'sm' },
-                                {
-                                    type: 'button', style: 'primary', color: '#3B5FCC', margin: 'lg',
-                                    action: { type: 'uri', label: '📦 ดูรูปถ่ายและประวัติ', uri: `${appUrl}/liff/my-bookings` }
-                                }
-                            ]
-                        }
-                    }
-                }]
-                break
-
-            case 'extra_fee':
-                pushPayload = {
-                    title: '💰 แจ้งค่าใช้จ่ายเพิ่มเติม',
-                    body: 'มีการเพิ่มรายการค่าบริการเพิ่มเติม (เช่น ล้างถังปั่น) กรุณาตรวจสอบและชำระเงินครับ',
-                    url: '/menu/my-bookings'
-                }
-                lineMessages = [{
-                    type: 'text',
-                    text: '💰 แจ้งอัปเดตค่าใช้จ่ายเพิ่มเติมครับ!\nเนื่องจากมีการเพิ่มบริการ (เช่น ล้างถัง/ไอเทมพิเศษ)\nรบกวนตรวจสอบรายละเอียดและชำระส่วนต่างในหน้า "การจองของฉัน" นะครับ 🙏'
-                }]
-                break
+            }
         }
-
         // Send Push
         const pushResult = await sendPushNotification(userId, targetType, pushPayload)
 

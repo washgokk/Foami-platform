@@ -45,6 +45,24 @@ export default function AdminDashboardPage() {
     const [filterDate, setFilterDate] = useState(new Date())
     const [topService, setTopService] = useState({ name: '-', count: 0 })
     const [topBranch, setTopBranch] = useState({ name: '-', count: 0, revenue: 0 })
+    
+    // Revenue logic aligned with CRM (/admin/crm)
+    const calculateBookingFullPrice = (b: any) => {
+        let rowAddonTotal = 0
+        if (Array.isArray(b.addon_ids)) {
+            b.addon_ids.forEach((a: any) => {
+                rowAddonTotal += (Number(a.price) || Number(a.selectedPrice) || Number(a.variableState?.customAmount) || 0)
+            })
+        }
+
+        const computedTotal = (Number(b.base_price) || 0) + 
+                             rowAddonTotal + 
+                             (Number(b.travel_surcharge) || 0) + 
+                             (Number(b.different_spot_fee) || 0) + 
+                             (Number(b.additional_price) || 0) - 
+                             (Number(b.discount_amount) || 0);
+        return computedTotal;
+    };
 
     useEffect(() => {
         async function load() {
@@ -127,7 +145,7 @@ export default function AdminDashboardPage() {
                     if (bName !== '-') {
                         if (!branchStats[bName]) branchStats[bName] = { count: 0, revenue: 0 }
                         branchStats[bName].count++
-                        branchStats[bName].revenue += (b.total_price || 0)
+                        branchStats[bName].revenue += calculateBookingFullPrice(b)
                     }
                 })
 
@@ -145,13 +163,14 @@ export default function AdminDashboardPage() {
                 })
 
                 const todayStr = format(new Date(), 'yyyy-MM-dd')
+
                 setStats({
                     total_bookings: filteredBookings.length,
                     today_bookings: bookings.filter((b: any) => b.scheduled_date === todayStr).length,
                     pending_bookings: filteredBookings.filter((b: any) => !['completed', 'cancelled'].includes(b.status)).length,
                     completed_bookings: filteredBookings.filter((b: any) => b.status === 'completed').length,
-                    total_revenue: filteredBookings.filter((b: any) => b.status === 'completed').reduce((s: number, b: any) => s + (b.total_price || 0), 0),
-                    today_revenue: bookings.filter((b: any) => b.scheduled_date === todayStr && b.status === 'completed').reduce((s: number, b: any) => s + (b.total_price || 0), 0),
+                    total_revenue: filteredBookings.filter((b: any) => b.status === 'completed').reduce((s: number, b: any) => s + calculateBookingFullPrice(b), 0),
+                    today_revenue: bookings.filter((b: any) => b.scheduled_date === todayStr && b.status === 'completed').reduce((s: number, b: any) => s + calculateBookingFullPrice(b), 0),
                 })
                 setRecentBookings(bookings.slice(0, 10))
             } catch (err) {
@@ -236,6 +255,7 @@ export default function AdminDashboardPage() {
                                 <th>ลูกค้า</th>
                                 <th>บริการ</th>
                                 <th>วันที่นัด</th>
+                                <th>เวลา</th>
                                 <th>ราคา</th>
                                 <th>สถานะ</th>
                             </tr>
@@ -270,7 +290,8 @@ export default function AdminDashboardPage() {
                                         })()}
                                     </td>
                                     <td>{b.scheduled_date}</td>
-                                    <td>฿{(b.total_price || 0).toLocaleString()}</td>
+                                    <td>{b.scheduled_time}</td>
+                                    <td>฿{(calculateBookingFullPrice(b)).toLocaleString()}</td>
                                     <td>
                                         <span className="badge" style={{ background: `${STATUS_COLORS[b.status]}15`, color: STATUS_COLORS[b.status] }}>
                                             {STATUS_TH[b.status] || b.status}
