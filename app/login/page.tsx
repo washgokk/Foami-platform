@@ -147,15 +147,24 @@ export default function LoginPage() {
 
         // Case D-fresh: Show login button
         // For iOS PWA: pre-generate the OAuth breakout URL
-        if (isIOSPWA && LIFF_ID) {
+        // v45: Treat ALL iOS/iPad (not just PWA) with the breakout workaround
+        // because iOS Safari often blocks cookies/session needed for liff.login()
+        if (isIOS && LIFF_ID) {
             const channelId = LIFF_ID.includes('-') ? LIFF_ID.split('-')[0] : LIFF_ID
             const bridgeId = crypto.randomUUID()
             const nonce = crypto.randomUUID()
             const redirectUri = encodeURIComponent(`${window.location.origin}/login`)
-            // v44 Fix: Remove 'openid' and add 'nonce' as a safety measure for access.line.me
+            
+            // v45: Use only 'profile' scope to avoid mandatory OIDC requirements 
             const url = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${redirectUri}&state=${bridgeId}&scope=profile&nonce=${nonce}`
+            
             localStorage.setItem('pwa_bridge_id', bridgeId)
             setIosBridgeUrl(url)
+
+            if (pwaBridgeId) {
+                setPhase('waiting_safari')
+                return
+            }
         }
         // Non-iOS: just show button (handleNormalLogin uses LIFF SDK)
     }, [])
@@ -275,7 +284,7 @@ export default function LoginPage() {
                 {showButton && (
                     <button
                         className={styles.lineBtn}
-                        onClick={isIOSPWA ? handleIOSPWALogin : handleNormalLogin}
+                        onClick={isIOS ? handleIOSPWALogin : handleNormalLogin}
                     >
                         <div className={styles.lineIconWrapper}>
                             <img
