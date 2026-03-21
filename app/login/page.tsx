@@ -150,8 +150,10 @@ export default function LoginPage() {
         if (isIOSPWA && LIFF_ID) {
             const channelId = LIFF_ID.includes('-') ? LIFF_ID.split('-')[0] : LIFF_ID
             const bridgeId = crypto.randomUUID()
+            const nonce = crypto.randomUUID()
             const redirectUri = encodeURIComponent(`${window.location.origin}/login`)
-            const url = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${redirectUri}&state=${bridgeId}&scope=profile%20openid`
+            // v44 Fix: Remove 'openid' and add 'nonce' as a safety measure for access.line.me
+            const url = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${redirectUri}&state=${bridgeId}&scope=profile&nonce=${nonce}`
             localStorage.setItem('pwa_bridge_id', bridgeId)
             setIosBridgeUrl(url)
         }
