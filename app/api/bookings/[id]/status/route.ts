@@ -38,7 +38,7 @@ export async function PATCH(
 
     if (status === 'delivering' && data.additional_price > 0 && !data.is_additional_paid) {
         // If unpaid additional price, send payment reminder instead of delivering message
-        actualNotifyStatus = 'payment_pending'
+        actualNotifyStatus = 'payment_forward'
         const paymentNotif = NOTIFICATIONS.CUSTOMER.PAYMENT_PENDING
         messageToSend = paymentNotif.lineMessage(data.additional_price, data.additional_price_note)
         pushTitle = paymentNotif.pushTitle
@@ -46,8 +46,12 @@ export async function PATCH(
     } else {
         const notif = CUSTOMER_NOTIFS[status]
         if (notif) {
-            messageToSend = notif.lineMessage
-            pushTitle = notif.pushTitle
+            messageToSend = typeof notif.lineMessage === 'function' 
+                ? notif.lineMessage(data.scheduled_date, data.scheduled_time)
+                : notif.lineMessage
+            pushTitle = typeof notif.pushTitle === 'function'
+                ? notif.pushTitle(data.scheduled_date, data.scheduled_time)
+                : notif.pushTitle
         }
     }
 

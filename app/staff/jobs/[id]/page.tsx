@@ -347,9 +347,12 @@ export default function JobDetailPage() {
 
             if (updateError) throw updateError
 
-            // Trigger notification to customer if price increased
+            // Trigger notification to customer if price increased significantly
             if (job.customer_id && newAdditionalPrice > oldAdditionalPrice) {
-                const message = `💰 มีค่าใช้จ่ายเพิ่มเติมครับ\nยอดเงิน: ฿${newAdditionalPrice.toLocaleString()}\nรายละเอียด: ${additionalNote || 'ค่าบริการเพิ่มเติม'}\n\nรบกวนตรวจสอบและชำระเพื่อดำเนินการต่อครับ`
+                const { NOTIFICATIONS } = await import('@/lib/notifications-config')
+                const notif = NOTIFICATIONS.CUSTOMER.PAYMENT_PENDING
+                const message = notif.lineMessage(newAdditionalPrice, additionalNote || 'ค่าบริการเพิ่มเติม')
+                const pushTitle = notif.pushTitle
                 
                 // Web Push
                 fetch('/api/push/notify-customer', {
@@ -357,7 +360,7 @@ export default function JobDetailPage() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         customer_id: job.customer_id,
-                        title: 'มีค่าใช้จ่ายเพิ่มเติม 💰',
+                        title: pushTitle,
                         body: message,
                         url: `/${job.branches?.slug || 'menu'}/my-bookings`
                     })

@@ -32,9 +32,9 @@ export const NOTIFICATIONS = {
             lineMessage: '🚗 ล้างเสร็จแล้ว! พนักงานกำลังนำรถกลับ\nเตรียมรอรับรถสุดเงาได้เลยครับ'
         },
         PAYMENT_PENDING: {
-            pushTitle: 'รอการชำระเงินค่าส่วนต่าง 💳',
-            pushBody: (amount: number) => `มีค่าใช้จ่ายเพิ่มเติม ฿${amount.toLocaleString()} รบกวนตรวจสอบและชำระเพื่อดำเนินการต่อครับ`,
-            lineMessage: (amount: number, note?: string) => `💰 มีค่าใช้จ่ายเพิ่มเติมครับ\nยอดเงิน: ฿${amount.toLocaleString()}${note ? `\nรายละเอียด: ${note}` : ''}\n\nรบกวนตรวจสอบและชำระเพื่อดำเนินการต่อครับ`
+            pushTitle: 'รอการชำระเงินเพิ่มเติม 💳',
+            pushBody: (amount: number) => `มียอดคงเหลือ ฿${amount.toLocaleString()} รบกวนตรวจสอบและชำระเพื่อดำเนินการต่อครับ`,
+            lineMessage: (amount: number, note?: string) => `💰 มียอดชำระเพิ่มเติมครับ\nยอดเงิน: ฿${amount.toLocaleString()}${note ? `\nรายละเอียด: ${note}` : ''}\n\nรบกวนตรวจสอบและชำระเพื่อดำเนินการต่อครับ`
         },
         COMPLETED: {
             pushTitle: 'ดูแลรถเรียบร้อยแล้ว! 🎉',

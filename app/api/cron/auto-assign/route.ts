@@ -86,16 +86,28 @@ export async function GET(req: NextRequest) {
 
         console.log(`[Auto-Assign] Assigning booking ${booking.id} to staff ${picked.staff_id} (Fee: ${picked.fee})`)
 
-        // Update Booking
-        const { error: updateError } = await supabase.from('bookings').update({
+        // Update Booking - Resilient to missing columns
+        const updateData: any = {
             staff_id: picked.staff_id,
             status: 'confirmed',
             auto_assigned: true,
-            travel_surcharge: picked.fee, // Record the calculated fee
-            staff_extra_payout: picked.fee * 0.5, // 50/50 split or as per branch policy
             zone_id: picked.base_zone_id,
             updated_at: new Date().toISOString(),
-        }).eq('id', booking.id)
+        }
+
+        // Try to include extra reporting fields
+        const extraData = {
+            travel_surcharge: picked.fee,
+            staff_extra_payout: picked.fee * 0.5,
+        }
+
+        let { error: updateError } = await supabase.from('bookings').update({ ...updateData, ...extraData }).eq('id', booking.id)
+
+        if (updateError && (updateError as any).code === 'PGRST204') {
+            console.warn(`[Auto-Assign] Missing reporting columns, falling back to core update for ${booking.id}`)
+            const fallback = await supabase.from('bookings').update(updateData).eq('id', booking.id)
+            updateError = fallback.error
+        }
 
         if (updateError) {
             console.error(`[Auto-Assign] Update error for ${booking.id}:`, updateError)
