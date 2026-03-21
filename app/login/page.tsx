@@ -190,7 +190,8 @@ export default function LoginPage() {
             const { default: liff } = await import('@line/liff')
             await liff.init({ liffId: LIFF_ID })
             if (!liff.isLoggedIn()) {
-                liff.login() // in-tab redirect → page reloads with code+state (Case C)
+                // Ensure redirectUri is explicit to avoid issues with dynamic query parameters on iOS
+                liff.login({ redirectUri: `${window.location.origin}/login` })
                 return
             }
             // Edge case: LIFF session still active, no redirect needed
