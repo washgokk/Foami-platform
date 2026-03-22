@@ -65,6 +65,7 @@ export async function PATCH(
                     message: messageToSend,
                     booking_id: id,
                     notif_type: actualNotifyStatus,
+                    branch_slug: data.branches?.slug || 'menu'
                 }),
             })
         } catch { /* Non-critical */ }

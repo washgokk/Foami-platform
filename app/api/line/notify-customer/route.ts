@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
-    const { line_user_id, message, booking_id, notif_type } = await req.json()
+    const { line_user_id, message, booking_id, notif_type, branch_slug = 'menu' } = await req.json()
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN
 
     if (!token) return NextResponse.json({ error: 'No Line token' }, { status: 500 })
+
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+    const bookingUrl = `${baseUrl}/${branch_slug}/my-bookings`
+    const reviewUrl = `${baseUrl}/${branch_slug}/my-bookings?booking_id=${booking_id}` // Simplified for now since /review might not exist
 
     // Fetch Job Photos if needed (Completed or Status updates)
     let beforePhoto = ''
@@ -59,7 +63,7 @@ export async function POST(req: NextRequest) {
                     { type: 'text', text: message, wrap: true, size: 'sm', color: '#1A2340', margin: 'md' },
                     {
                         type: 'button', style: 'primary', color: '#315EC3', margin: 'lg', height: 'sm',
-                        action: { type: 'uri', label: '⭐ ให้คะแนน & รีวิวงาน', uri: `${process.env.NEXT_PUBLIC_APP_URL}/liff/my-bookings/${booking_id}/review` }
+                        action: { type: 'uri', label: '⭐ ให้คะแนน & รีวิวงาน', uri: reviewUrl }
                     }
                 ]
             }
@@ -81,7 +85,7 @@ export async function POST(req: NextRequest) {
                     { type: 'text', text: message, wrap: true, size: 'md', color: '#1A2340', weight: 'bold' },
                     {
                         type: 'button', style: 'primary', color: '#315EC3', margin: 'xl',
-                        action: { type: 'uri', label: '💰 ไปที่หน้าชำระเงิน', uri: `${process.env.NEXT_PUBLIC_APP_URL}/liff/my-bookings/${booking_id}/payment` }
+                        action: { type: 'uri', label: '💰 ไปที่หน้าชำระเงิน', uri: bookingUrl }
                     }
                 ]
             }
@@ -99,7 +103,6 @@ export async function POST(req: NextRequest) {
             body: {
                 type: 'box', layout: 'vertical', paddingAll: '20px',
                 contents: [
-                    // [PLACEHOLDER: Add Sticker here if available]
                     { type: 'text', text: message, wrap: true, size: 'md', color: '#1A2340', align: 'center' }
                 ]
             },
@@ -108,25 +111,40 @@ export async function POST(req: NextRequest) {
                 contents: [
                     {
                         type: 'button', style: 'secondary', color: '#1A2340', height: 'sm',
-                        action: { type: 'uri', label: 'ดูรายละเอียดการจอง', uri: `${process.env.NEXT_PUBLIC_APP_URL}/liff/my-bookings` }
+                        action: { type: 'uri', label: 'ดูรายละเอียดการจอง', uri: bookingUrl }
                     }
                 ]
             }
         }
     }
 
-    await fetch('https://api.line.me/v2/bot/message/push', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            to: line_user_id,
-            messages: [{
-                type: 'flex',
-                altText: 'Foami Notification',
-                contents: flexContent
-            }]
+    try {
+        const lineResponse = await fetch('https://api.line.me/v2/bot/message/push', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                to: line_user_id,
+                messages: [{
+                    type: 'flex',
+                    altText: 'Foami Notification',
+                    contents: flexContent
+                }]
+            })
         })
-    })
 
-    return NextResponse.json({ sent: true })
+        if (!lineResponse.ok) {
+            const errorText = await lineResponse.text()
+            console.error('[LINE Notify] API Error:', {
+                status: lineResponse.status,
+                statusText: lineResponse.statusText,
+                body: errorText
+            })
+            return NextResponse.json({ error: 'LINE API Error', details: errorText }, { status: lineResponse.status })
+        }
+
+        return NextResponse.json({ sent: true })
+    } catch (err: any) {
+        console.error('[LINE Notify] Critical Error:', err)
+        return NextResponse.json({ error: err.message }, { status: 500 })
+    }
 }

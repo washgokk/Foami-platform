@@ -24,7 +24,10 @@ import {
     X,
     User,
     ClipboardList,
-    AlertCircle
+    AlertCircle,
+    Bell,
+    BellOff,
+    Send
 } from 'lucide-react'
 import styles from './my-bookings.module.css'
 import { loadStripe } from '@stripe/stripe-js'
@@ -37,6 +40,8 @@ import { th } from 'date-fns/locale'
 import { TIME_SLOTS } from '@/lib/types'
 import { findMatchingStaffForJob } from '@/lib/staff-matching'
 import { isPointInPolygon } from '@/lib/geo-utils'
+import { usePushNotifications } from '@/lib/hooks/usePushNotifications'
+import SuccessModal from '@/components/Global/SuccessModal'
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '')
 
@@ -64,6 +69,16 @@ export default function MyBookingsPage() {
     const [selectedBooking, setSelectedBooking] = useState<any>(null)
     const [rating, setRating] = useState(0)
     const [comment, setComment] = useState('')
+    const [customer, setCustomer] = useState<any>(null)
+
+    const {
+        subscribe,
+        isSubscribed,
+        loading: pushLoading
+    } = usePushNotifications(customer?.id, 'customer', '/')
+
+    const [showPushSuccess, setShowPushSuccess] = useState(false)
+    const [dismissedPush, setDismissedPush] = useState(false)
     const [submitting, setSubmitting] = useState(false)
     const [clientSecret, setClientSecret] = useState('')
     const [zoomConfig, setZoomConfig] = useState<{ images: { src: string; alt?: string }[]; initialIndex: number } | null>(null)
@@ -77,9 +92,13 @@ export default function MyBookingsPage() {
     const [dateRange] = useState<Date[]>(() => Array.from({ length: 7 }, (_, i) => addDays(new Date(), i)))
 
     useEffect(() => {
-        const customer = localStorage.getItem('liff_customer')
-        if (!customer) { router.replace(`/${branchSlug}`); return }
-        const { id } = JSON.parse(customer)
+        const c = localStorage.getItem('liff_customer')
+        if (!c) { router.replace(`/${branchSlug}`); return }
+        const parsed = JSON.parse(c)
+        setCustomer(parsed)
+        const { id } = parsed
+
+        if (localStorage.getItem('dismissed_push_banner')) setDismissedPush(true)
 
         supabase.from('bookings')
             .select('*, services(name), zones(name), staff(full_name, phone)')
@@ -461,6 +480,58 @@ export default function MyBookingsPage() {
                 <Logo width={110} variant="landscape" />
                 <div style={{ width: 44 }} />
             </div>
+
+            {/* Push Notification Banner */}
+            {!isSubscribed && !dismissedPush && customer?.id && (
+                <div style={{ 
+                    margin: '0 16px 16px', 
+                    background: 'var(--brand-dominant)', 
+                    borderRadius: '20px', 
+                    padding: '16px',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    position: 'relative',
+                    boxShadow: '0 8px 20px rgba(49, 94, 195, 0.2)',
+                }}>
+                    <div style={{ 
+                        width: 40, 
+                        height: 40, 
+                        borderRadius: '12px', 
+                        background: 'rgba(255,255,255,0.2)', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        flexShrink: 0
+                    }}>
+                        <Bell size={20} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>เปิดแจ้งเตือนสถานะ?</div>
+                        <div style={{ fontSize: '0.7rem', opacity: 0.9 }}>รับทราบทันทีเมื่อล้างรถเสร็จ หรือพนักงานมาถึง</div>
+                    </div>
+                    <button 
+                        type="button"
+                        className="btn btn-sm" 
+                        style={{ background: 'white', color: 'var(--brand-dominant)', borderRadius: '10px', fontWeight: 800, fontSize: '0.75rem', height: 32 }}
+                        onClick={() => subscribe(() => setShowPushSuccess(true))}
+                        disabled={pushLoading}
+                    >
+                        {pushLoading ? <div className="spinner spinner-white" style={{ width: 16, height: 16 }} /> : 'เปิดเลย'}
+                    </button>
+                    <button 
+                        type="button"
+                        style={{ position: 'absolute', top: -8, right: -8, background: 'var(--surface-3)', border: 'none', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}
+                        onClick={() => {
+                            setDismissedPush(true)
+                            localStorage.setItem('dismissed_push_banner', 'true')
+                        }}
+                    >
+                        <X size={14} color="var(--text-secondary)" />
+                    </button>
+                </div>
+            )}
 
             {success === '1' && (
                 <div style={{ margin: 'var(--space-4)', animation: 'slideDown 0.5s cubic-bezier(0.16, 1, 0.3, 1)' }}>
@@ -1039,6 +1110,20 @@ export default function MyBookingsPage() {
                     onClose={() => setZoomConfig(null)} 
                 />
             )}
+            
+            <SuccessModal 
+                isOpen={showPushSuccess}
+                onClose={() => setShowPushSuccess(false)}
+                title="เปิดแจ้งเตือนสำเร็จ!"
+                message="คุณจะได้รับการแจ้งเตือนสถานะงานผ่านหน้าจอมือถือทันทีครับ"
+            />
+
+            <style jsx>{`
+                @keyframes slideIn {
+                    from { transform: translateY(-20px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                }
+            `}</style>
         </div>
     )
 }
