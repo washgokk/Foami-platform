@@ -35,6 +35,8 @@ import ImageZoom from '@/components/Global/ImageZoom'
 import { format, addDays, isBefore, subHours, parseISO } from 'date-fns'
 import { th } from 'date-fns/locale'
 import { TIME_SLOTS } from '@/lib/types'
+import { findMatchingStaffForJob } from '@/lib/staff-matching'
+import { isPointInPolygon } from '@/lib/geo-utils'
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '')
 
@@ -247,21 +249,23 @@ export default function MyBookingsPage() {
         if (!date || !booking) return
         setRescheduleLoading(true)
         try {
-            const { data: branch } = await supabase.from('branches').select('id, max_out_of_zone_km').eq('slug', branchSlug).single()
+            // 1. Fetch Branch and Zones
+            const { data: branch } = await supabase.from('branches').select('*').eq('slug', branchSlug).single()
             if (!branch) return
 
-            // 1. Fetch Staff Schedules for the zone
-            const { data: schedules } = await supabase
-                .from('staff_schedules')
-                .select('time_slot, zone_id, is_booked, staff_id, work_type')
-                .eq('date', date)
-                .eq('zone_id', booking.zone_id)
-                .eq('is_booked', false)
+            const { data: zones } = await supabase.from('zones').select('*').eq('branch_id', branch.id).eq('is_active', true)
+            if (!zones) return
 
-            // 2. Fetch Existing Bookings for the slot
-            const { data: bookings } = await supabase
+            // 2. Fetch ALL Staff Schedules for the date (not just one zone)
+            const { data: allSchedules } = await supabase
+                .from('staff_schedules')
+                .select('date, time_slot, zone_id, is_booked, staff_id, work_type')
+                .eq('date', date)
+
+            // 3. Fetch ALL Bookings for the date in this branch
+            const { data: allBookings } = await supabase
                 .from('bookings')
-                .select('scheduled_time, staff_id')
+                .select('scheduled_date, scheduled_time, zone_id, staff_id, branch_id')
                 .eq('scheduled_date', date)
                 .eq('branch_id', branch.id)
                 .not('status', 'eq', 'cancelled')
@@ -271,6 +275,13 @@ export default function MyBookingsPage() {
             const todayStr = format(thTime, 'yyyy-MM-dd')
             const nowMinutes = thTime.getHours() * 60 + thTime.getMinutes()
 
+            // Configuration for showing delivery
+            const pickupLat = booking.pickup_lat
+            const pickupLng = booking.pickup_lng
+            const deliveryLat = booking.delivery_lat || pickupLat
+            const deliveryLng = booking.delivery_lng || pickupLng
+            const showDelivery = !!(booking.delivery_address && booking.delivery_address !== booking.pickup_address)
+
             const availableSlots = TIME_SLOTS.map(slot => {
                 if (date === todayStr) {
                     const [sh, sm] = slot.split(':').map(Number)
@@ -278,14 +289,20 @@ export default function MyBookingsPage() {
                     if (slotMinutes <= nowMinutes + 20) return null
                 }
 
-                const slotSchedules = (schedules || []).filter(s => s.time_slot === slot)
-                if (slotSchedules.length === 0) return null
+                const matchingStaff = findMatchingStaffForJob({
+                    pickupLat, pickupLng, deliveryLat, deliveryLng, showDelivery,
+                    zones, branch,
+                    daySchedules: allSchedules || [],
+                    dayBookings: allBookings || [],
+                    timeSlot: slot
+                })
 
-                const slotBookings = (bookings || []).filter(b => b.scheduled_time === slot && !b.staff_id)
-                const availableCount = slotSchedules.length - slotBookings.length
+                // Handle Capacity (Subtract pending unassigned bookings)
+                const allPendingInBranch = (allBookings || []).filter(b => (b.scheduled_time === slot || b.scheduled_time?.startsWith(slot)) && !b.staff_id)
+                const availableCount = matchingStaff.length - allPendingInBranch.length
 
                 if (availableCount > 0) {
-                    return { time_slot: slot, available_staff_ids: slotSchedules.map(s => s.staff_id) }
+                    return { time_slot: slot, available_staff_ids: matchingStaff.slice(0, availableCount).map(s => s.staff_id) }
                 }
                 return null
             }).filter(Boolean)
