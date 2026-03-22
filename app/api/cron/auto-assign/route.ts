@@ -17,11 +17,11 @@ export async function GET(req: NextRequest) {
     const cutoff = new Date(now.getTime() + 4 * 60 * 60 * 1000) // Extend to 4 hours from now
 
     // Get pending bookings happening soon
-    const { data: pendingBookings, error: mainQueryError } = await supabase
+    const { data: pendingBookings } = await supabase
         .from('bookings')
         .select(`
             id, branch_id, zone_id, customer_id, scheduled_date, scheduled_time,
-            pickup_lat, pickup_lng, delivery_lat, delivery_lng, show_delivery,
+            pickup_lat, pickup_lng, delivery_lat, delivery_lng,
             customers(full_name, line_user_id)
         `)
         .eq('status', 'pending')
@@ -29,17 +29,6 @@ export async function GET(req: NextRequest) {
         .order('scheduled_date', { ascending: true })
         .order('scheduled_time', { ascending: true })
 
-    // DEBUG: Count all pending overall to see if status is the issue
-    const { count: totalPending } = await supabase
-        .from('bookings')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending')
-    
-    const { count: totalPendingAndUnassigned } = await supabase
-        .from('bookings')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending')
-        .is('staff_id', null)
 
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN
 
@@ -81,13 +70,20 @@ export async function GET(req: NextRequest) {
             continue
         }
 
+        // Determine if there is a different delivery spot
+        const showDelivery = !!(
+            booking.delivery_lat && 
+            booking.delivery_lng && 
+            (booking.delivery_lat !== booking.pickup_lat || booking.delivery_lng !== booking.pickup_lng)
+        )
+
         // Find available staff using SHARED logic
         const matches = findMatchingStaffForJob({
             pickupLat: Number(booking.pickup_lat),
             pickupLng: Number(booking.pickup_lng),
             deliveryLat: Number(booking.delivery_lat),
             deliveryLng: Number(booking.delivery_lng),
-            showDelivery: !!booking.show_delivery,
+            showDelivery,
             zones,
             branch,
             daySchedules: schedules,
@@ -204,13 +200,5 @@ export async function GET(req: NextRequest) {
         assigned++
     }
 
-    return NextResponse.json({ 
-        assigned, 
-        checked: pendingBookings?.length || 0,
-        debug: {
-            total_pending_status: totalPending,
-            total_pending_and_unassigned: totalPendingAndUnassigned,
-            main_query_error: mainQueryError
-        }
-    })
+    return NextResponse.json({ assigned, checked: pendingBookings?.length || 0 })
 }
