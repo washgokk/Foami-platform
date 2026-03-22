@@ -29,6 +29,18 @@ export async function GET(req: NextRequest) {
         .order('scheduled_date', { ascending: true })
         .order('scheduled_time', { ascending: true })
 
+    // DEBUG: Count all pending overall to see if status is the issue
+    const { count: totalPending } = await supabase
+        .from('bookings')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending')
+    
+    const { count: totalUnassigned } = await supabase
+        .from('bookings')
+        .select('*', { count: 'exact', head: true })
+        .is('staff_id', null)
+        .not('status', 'eq', 'cancelled')
+
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN
 
     // Caches to avoid redundant DB calls in the loop
@@ -192,5 +204,12 @@ export async function GET(req: NextRequest) {
         assigned++
     }
 
-    return NextResponse.json({ assigned, checked: pendingBookings?.length || 0 })
+    return NextResponse.json({ 
+        assigned, 
+        checked: pendingBookings?.length || 0,
+        debug: {
+            total_pending_status: totalPending,
+            total_unassigned_not_cancelled: totalUnassigned
+        }
+    })
 }
