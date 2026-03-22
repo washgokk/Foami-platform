@@ -32,23 +32,12 @@ export function usePushNotifications(
 
                 // Wait for SW to be active if it's not
                 if (!registration.active) {
-                    console.log('SW not active - waiting for activation...')
-                    await new Promise<void>((resolve) => {
-                        const checkActive = () => {
-                            if (registration?.active) {
-                                console.log('SW is now active!')
-                                resolve()
-                            } else if (registration?.waiting) {
-                                registration.waiting.postMessage({ type: 'SKIP_WAITING' })
-                                setTimeout(checkActive, 500)
-                            } else {
-                                setTimeout(checkActive, 500)
-                            }
-                        }
-                        checkActive()
-                        // Force resolve after 4 seconds to avoid infinite loop
-                        setTimeout(resolve, 4000)
-                    })
+                    console.log('SW not active - waiting for activation...');
+                    await navigator.serviceWorker.ready;
+                    // Additional check to force activation if needed
+                    if (registration.waiting) {
+                        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    }
                 }
 
                 // Get current subscription
@@ -173,14 +162,18 @@ export function usePushNotifications(
                         const regs = await navigator.serviceWorker.getRegistrations();
                         for (const r of regs) await r.unregister();
                         
-                        // 2. Wait a bit for the browser to catch up
-                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        // 2. Wait 1 second (faster than 2)
+                        await new Promise(resolve => setTimeout(resolve, 1000));
                         
-                        // 3. Re-register
+                        // 3. Re-register and wait for ready
                         const newReg = await navigator.serviceWorker.register('/sw.js', { scope });
                         await navigator.serviceWorker.ready;
                         
-                        // 4. Recursive retry
+                        // 4. Ensure it's active
+                        if (newReg.waiting) newReg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        
+                        // 5. Recursive retry
                         return attemptSubscribe(newReg);
                     }
                     throw err;

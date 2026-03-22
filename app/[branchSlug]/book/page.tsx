@@ -371,13 +371,12 @@ export default function BookPage() {
             for (const b of data || []) {
                 // Pickup
                 if (b.pickup_address) {
-                    // Logic to extract original components to avoid duplication
-                    // Format: "Detail (Note) RawAddr"
-                    const detail = b.pickup_address.split(' (')[0]
-                    const note = b.pickup_address.includes('(') ? b.pickup_address.split('(')[1].split(')')[0] : ''
-                    const raw = b.pickup_address.split(') ').length > 1 ? b.pickup_address.split(') ').slice(1).join(') ') : b.pickup_address
+                    const full = b.pickup_address
+                    const detail = full.split(' (')[0]
+                    const note = full.includes('(') ? full.split('(')[1].split(')')[0] : ''
+                    const raw = full.includes(') ') ? full.split(') ').slice(1).join(') ') : (detail ? full.replace(detail, '').trim() : full)
 
-                    const nameKey = detail || b.pickup_address
+                    const nameKey = detail || full
                     if (!unique[nameKey]) {
                         let name = detail || 'สถานที่เดิม'
                         if (name.length > 25) name = name.slice(0, 22) + '...'
@@ -392,11 +391,12 @@ export default function BookPage() {
                 }
                 // Delivery
                 if (b.delivery_address) {
-                    const detail = b.delivery_address.split(' (')[0]
-                    const note = b.delivery_address.includes('(') ? b.delivery_address.split('(')[1].split(')')[0] : ''
-                    const raw = b.delivery_address.split(') ').length > 1 ? b.delivery_address.split(') ').slice(1).join(') ') : b.delivery_address
+                    const full = b.delivery_address
+                    const detail = full.split(' (')[0]
+                    const note = full.includes('(') ? full.split('(')[1].split(')')[0] : ''
+                    const raw = full.includes(') ') ? full.split(') ').slice(1).join(') ') : (detail ? full.replace(detail, '').trim() : full)
 
-                    const nameKey = detail || b.delivery_address
+                    const nameKey = detail || full
                     if (!unique[nameKey]) {
                         let name = detail || 'สถานที่เดิม'
                         if (name.length > 25) name = name.slice(0, 22) + '...'

@@ -168,17 +168,24 @@ export default function SettingsPage() {
 
             const unique: Record<string, any> = {}
             for (const b of data || []) {
-                const detail = b.pickup_address?.split(' (')[0]
-                if (detail && !unique[detail]) {
-                    // Check if already in savedLocations (compare by detail/name)
-                    const isSaved = parsed.saved_locations?.some((sl: any) => sl.detail === detail || sl.name === detail)
-                    if (isSaved) continue
+                if (b.pickup_address) {
+                    const full = b.pickup_address
+                    const detail = full.split(' (')[0]
+                    const note = full.includes('(') ? full.split('(')[1].split(')')[0] : ''
+                    const raw = full.includes(') ') ? full.split(') ').slice(1).join(') ') : (full.replace(detail, '').trim())
 
-                    unique[detail] = {
-                        name: `${detail}`, lat: b.pickup_lat, lng: b.pickup_lng,
-                        address: b.pickup_address, detail: detail,
-                        note: b.pickup_address.includes('(') ? b.pickup_address.split('(')[1].split(')')[0] : '',
-                        isHistory: true
+                    if (detail && !unique[detail]) {
+                        // Check if already in savedLocations
+                        const isSaved = parsed.saved_locations?.some((sl: any) => sl.detail === detail || sl.name === detail)
+                        if (isSaved) continue
+
+                        unique[detail] = {
+                            name: `${detail}`, lat: b.pickup_lat, lng: b.pickup_lng,
+                            address: raw,
+                            detail: detail,
+                            note: note,
+                            isHistory: true
+                        }
                     }
                 }
             }

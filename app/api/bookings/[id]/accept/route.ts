@@ -13,7 +13,7 @@ export async function POST(
     // 1. Get booking details to verify zone and time
     const { data: booking, error: fetchError } = await supabase
         .from('bookings')
-        .select('*, customers(full_name, line_user_id)')
+        .select('*, customers(full_name, line_user_id), branches(slug)')
         .eq('id', id)
         .single()
 
@@ -75,7 +75,7 @@ export async function POST(
                 booking.scheduled_date,
                 booking.scheduled_time
             ),
-            url: `/menu/my-bookings`
+            url: `/${booking.branches?.slug || 'menu'}/my-bookings`
         })
     } catch { /* Non-critical */ }
 

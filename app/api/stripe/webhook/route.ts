@@ -91,8 +91,8 @@ export async function POST(req: NextRequest) {
                 }
             }
         } else {
-            // Initial Booking Payment
-            await supabase
+            // Initial Booking Payment Success
+            const { data: booking, error } = await supabase
                 .from('bookings')
                 .update({ 
                     payment_status: 'paid', 
@@ -100,6 +100,34 @@ export async function POST(req: NextRequest) {
                     stripe_payment_id: pi.id 
                 })
                 .eq('id', bookingId)
+                .select('*, customers(full_name), zones(id, branch_id)')
+                .single()
+
+            if (booking) {
+                // [NEW] Notify all relevant staff in this zone/branch about the NEW JOB
+                try {
+                    const { NOTIFICATIONS } = await import('@/lib/notifications-config')
+                    const { notifyTargetStaff } = await import('@/lib/push')
+                    
+                    // Find eligible staff for this zone
+                    const { data: staffIds } = await supabase
+                        .from('staff')
+                        .select('id')
+                        .eq('branch_id', booking.zones?.branch_id)
+                        .eq('is_active', true)
+
+                    if (staffIds && staffIds.length > 0) {
+                        const targetIds = staffIds.map(s => s.id)
+                        await notifyTargetStaff(targetIds, {
+                            title: NOTIFICATIONS.STAFF.NEW_JOB.pushTitle,
+                            body: NOTIFICATIONS.STAFF.NEW_JOB.pushBody(booking.scheduled_date, booking.scheduled_time),
+                            url: `/staff/jobs/${bookingId}`
+                        })
+                    }
+                } catch (e) {
+                    console.error('[Webhook] Failed to notify staff of new job:', e)
+                }
+            }
         }
     }
 

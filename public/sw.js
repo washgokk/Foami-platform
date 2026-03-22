@@ -1,4 +1,18 @@
-// SW Version: 2026-03-20-v5
+// SW Version: 2026-03-24-v6
+self.addEventListener('install', function (event) {
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', function (event) {
+    event.waitUntil(clients.claim());
+});
+
+self.addEventListener('message', function (event) {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
+});
+
 self.addEventListener('push', function (event) {
     console.log('[SW] Push Received V5');
 
