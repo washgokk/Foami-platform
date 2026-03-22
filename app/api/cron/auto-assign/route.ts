@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     const cutoff = new Date(now.getTime() + 4 * 60 * 60 * 1000) // Extend to 4 hours from now
 
     // Get pending bookings happening soon
-    const { data: pendingBookings } = await supabase
+    const { data: pendingBookings, error: mainQueryError } = await supabase
         .from('bookings')
         .select(`
             id, branch_id, zone_id, customer_id, scheduled_date, scheduled_time,
@@ -209,7 +209,8 @@ export async function GET(req: NextRequest) {
         checked: pendingBookings?.length || 0,
         debug: {
             total_pending_status: totalPending,
-            total_pending_and_unassigned: totalPendingAndUnassigned
+            total_pending_and_unassigned: totalPendingAndUnassigned,
+            main_query_error: mainQueryError
         }
     })
 }
