@@ -35,11 +35,11 @@ export async function GET(req: NextRequest) {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'pending')
     
-    const { count: totalUnassigned } = await supabase
+    const { count: totalPendingAndUnassigned } = await supabase
         .from('bookings')
         .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending')
         .is('staff_id', null)
-        .not('status', 'eq', 'cancelled')
 
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN
 
@@ -209,7 +209,7 @@ export async function GET(req: NextRequest) {
         checked: pendingBookings?.length || 0,
         debug: {
             total_pending_status: totalPending,
-            total_unassigned_not_cancelled: totalUnassigned
+            total_pending_and_unassigned: totalPendingAndUnassigned
         }
     })
 }
