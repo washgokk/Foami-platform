@@ -145,15 +145,25 @@ export default function LoginPage() {
             return
         }
 
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
+        const baseRedirectUri = appUrl.endsWith('/') ? appUrl.slice(0, -1) : appUrl
+        const redirectUri = encodeURIComponent(`${baseRedirectUri}/login`)
+
         // Case D-fresh: Show login button
-        // For iOS: pre-generate the OAuth breakout URL (Safari or PWA)
+        // For ALL iOS: pre-generate the OAuth breakout URL as a fallback or primary
         if (isIOS && LIFF_ID) {
             const channelId = LIFF_ID.includes('-') ? LIFF_ID.split('-')[0] : LIFF_ID
             const bridgeId = crypto.randomUUID()
             const nonce = crypto.randomUUID()
-            const redirectUri = encodeURIComponent(`${window.location.origin}/login`)
-            // v44 Fix: Remove 'openid' and add 'nonce' as a safety measure for access.line.me
-            const url = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${redirectUri}&state=${bridgeId}&scope=profile&nonce=${nonce}`
+            
+            // Debugging for user (visible in console for testers)
+            console.log('--- LINE Login (iOS Breakout) Debug ---')
+            console.log('Base App URL:', baseRedirectUri)
+            console.log('Redirect URI (Unencoded):', `${baseRedirectUri}/login`)
+            console.log('Channel ID:', channelId)
+            console.log('---')
+
+            const url = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${channelId}&redirect_uri=${redirectUri}&state=${bridgeId}&scope=profile%20openid&nonce=${nonce}`
             localStorage.setItem('pwa_bridge_id', bridgeId)
             setIosBridgeUrl(url)
         }
@@ -190,8 +200,9 @@ export default function LoginPage() {
             const { default: liff } = await import('@line/liff')
             await liff.init({ liffId: LIFF_ID })
             if (!liff.isLoggedIn()) {
-                // Ensure redirectUri is explicit to avoid issues with dynamic query parameters on iOS
-                liff.login({ redirectUri: `${window.location.origin}/login` })
+                const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
+                const baseRedirectUri = appUrl.endsWith('/') ? appUrl.slice(0, -1) : appUrl
+                liff.login({ redirectUri: `${baseRedirectUri}/login` })
                 return
             }
             // Edge case: LIFF session still active, no redirect needed

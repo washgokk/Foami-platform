@@ -18,7 +18,9 @@ export async function POST(req: NextRequest) {
         }
 
         const channelId = liffId.includes('-') ? liffId.split('-')[0] : liffId;
-        const redirectUri = clientRedirectUri || `${process.env.NEXT_PUBLIC_APP_URL || 'https://foami-app.vercel.app'}/login`
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://foami-app.vercel.app'
+    const baseServerRedirectUri = appUrl.endsWith('/') ? appUrl.slice(0, -1) : appUrl
+    const redirectUri = clientRedirectUri || `${baseServerRedirectUri}/login`
 
         // 1. Exchange Code for Token
         const tokenParams = new URLSearchParams()
