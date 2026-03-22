@@ -77,6 +77,11 @@ export const NOTIFICATIONS = {
             pushTitle: 'ลูกค้าชำระเงินแล้ว! ✨',
             pushBody: (id: string, amount: number) => `ยอดเพิ่มเติม ฿${amount.toLocaleString()} (งาน #${id.slice(0, 8)}) ชำระเรียบร้อย`,
             lineMessage: (id: string, amount: number) => `💰 ลูกค้าชำระเงินเพิ่มแล้ว!\nยอดเงิน ฿${amount.toLocaleString()} (งาน #${id.slice(0, 8)}) ชำระเรียบร้อย\nคุณสามารถดำเนินการต่อได้เลยครับ`
+        },
+        UPCOMING_JOB: {
+            pushTitle: '🔔 พรุ่งนี้มีงาน! (หรือเร็วๆ นี้)',
+            pushBody: (date: string, time: string) => `อย่าลืม! คุณมีนัดหมายวันที่ ${date} เวลา ${time} เตรียมตัวให้พร้อมนะครับ`,
+            lineMessage: (date: string, time: string) => `🔔 แจ้งเตือนคิวงาน!\nอย่าลืมนะครับ คุณมีนัดหมายวันที่ ${date} เวลา ${time}\nเตรียมตัวออกเดินทางตามกำหนดการนะครับ`
         }
     }
 }

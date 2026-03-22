@@ -313,6 +313,7 @@ export interface Booking {
     rental_cost?: number
     fuel_cost?: number
     reschedule_count?: number
+    reminder_sent?: boolean
     created_at: string
     updated_at: string
     // Joins
