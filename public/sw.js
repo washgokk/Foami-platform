@@ -1,4 +1,4 @@
-// SW Version: 2026-03-24-v6
+// SW Version: 2026-03-24-v7
 self.addEventListener('install', function (event) {
     self.skipWaiting();
 });
@@ -14,7 +14,7 @@ self.addEventListener('message', function (event) {
 });
 
 self.addEventListener('push', function (event) {
-    console.log('[SW] Push Received V5');
+    console.log('[SW] Push Received V7');
 
     // Parse data SYNCHRONOUSLY before any async calls
     // This prevents race conditions against the browser push event timeout

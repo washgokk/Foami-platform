@@ -318,41 +318,90 @@ export default function MyBookingsPage() {
     const handleRescheduleSubmit = async () => {
         if (!selectedBooking || !rescheduleDate || !rescheduleSlot) return
         
-        const confirm = window.confirm('คุณแน่ใจหรือไม่ว่าต้องการเลื่อนนัดเป็นวันที่ ' + format(parseISO(rescheduleDate), 'd MMM yyyy', { locale: th }) + ' เวลา ' + rescheduleSlot + ' น.?')
-        if (!confirm) return
+        const confirmStr = `คุณแน่ใจหรือไม่ว่าต้องการเลื่อนนัดเป็นวันที่ ${format(parseISO(rescheduleDate), 'd MMM yyyy', { locale: th })} เวลา ${rescheduleSlot} น.?`
+        if (!window.confirm(confirmStr)) return
 
         setSubmitting(true)
         try {
+            // 1. Release OLD slot if it was confirmed
+            if (selectedBooking.staff_id && selectedBooking.status === 'confirmed') {
+                await supabase.from('staff_schedules')
+                    .update({ is_booked: false })
+                    .eq('staff_id', selectedBooking.staff_id)
+                    .eq('date', selectedBooking.scheduled_date)
+                    .eq('time_slot', selectedBooking.scheduled_time)
+                    .eq('zone_id', selectedBooking.zone_id)
+            }
+
+            // 2. Update booking (Reset to unassigned/pending)
             const newCount = (selectedBooking.reschedule_count || 0) + 1
-            const { error } = await supabase.from('bookings')
+            const { error: updateError } = await supabase.from('bookings')
                 .update({
                     scheduled_date: rescheduleDate,
                     scheduled_time: rescheduleSlot,
                     reschedule_count: newCount,
+                    staff_id: null, // Reset to unassigned
+                    status: 'pending', // Re-open for acceptance
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', selectedBooking.id)
 
-            if (error) throw error
+            if (updateError) throw updateError
 
-            // Notify Staff
+            // 3. Notify OLD Staff (if any) that job was removed
             if (selectedBooking.staff_id) {
-                const { NOTIFICATIONS } = await import('@/lib/notifications-config')
-                const notif = NOTIFICATIONS.STAFF.RESCHEDULED
                 fetch('/api/push/notify-staff', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         staff_id: selectedBooking.staff_id,
-                        title: notif.pushTitle,
-                        body: notif.pushBody(selectedBooking.id, rescheduleDate, rescheduleSlot),
-                        url: `/staff/jobs/${selectedBooking.id}`
+                        title: 'งานถูกเลื่อนนัด (ถูกถอดจากตาราง)',
+                        body: `งาน #${selectedBooking.id.slice(0, 8)} ถูกเลื่อนไปเวลาอื่น และถูกถอดจากตารางงานของคุณแล้ว`,
+                        url: '/staff/jobs'
                     })
-                }).catch(() => {})
+                }).catch(() => { })
             }
 
-            alert('เลื่อนนัดสำเร็จแล้ว!')
-            setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, scheduled_date: rescheduleDate, scheduled_time: rescheduleSlot, reschedule_count: newCount } : b))
+            // 4. Notify ALL Staff who are scheduled for this new slot/zone
+            const zoneId = selectedBooking.zone_id
+            if (zoneId) {
+                const { data: schedules } = await supabase
+                    .from('staff_schedules')
+                    .select('staff_id')
+                    .eq('zone_id', zoneId)
+                    .eq('date', rescheduleDate)
+                    .eq('time_slot', rescheduleSlot)
+                    .eq('is_booked', false)
+                
+                const targetStaffIds = schedules?.map((s: any) => s.staff_id).filter(Boolean) || []
+                
+                if (targetStaffIds.length > 0) {
+                    fetch('/api/push/notify-staff', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            staff_ids: targetStaffIds,
+                            title: 'มีงานใหม่! (ลูกค้าเลื่อนนัดมา)',
+                            body: `มีงานใหม่ในวันที่ ${format(parseISO(rescheduleDate), 'd MMM', { locale: th })} เวลา ${rescheduleSlot} น. กดรับงานได้เลย!`,
+                            url: `/staff/jobs/${selectedBooking.id}`
+                        })
+                    }).catch(() => { })
+                }
+            }
+
+            alert('เลื่อนนัดสำเร็จแล้ว! กรุณารอพนักงานคนใหม่รับงานในช่วงเวลาดังกล่าวครับ')
+            
+            // Update local state
+            setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { 
+                ...b, 
+                scheduled_date: rescheduleDate, 
+                scheduled_time: rescheduleSlot, 
+                reschedule_count: newCount,
+                staff_id: null,
+                status: 'pending',
+                staff: null 
+            } : b))
+            
             setSelectedBooking(null)
             setIsRescheduling(false)
         } catch (e: any) {

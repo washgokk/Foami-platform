@@ -51,7 +51,10 @@ export async function sendPushNotification(
                     title: payload.title,
                     body: payload.body,
                     url: payload.url || '/'
-                })
+                }),
+                {
+                    TTL: 60 * 60 * 24 // 24 hours
+                }
             )
             console.log(`[Push] Device ${idx + 1} Success! Status:`, response.statusCode)
             return true

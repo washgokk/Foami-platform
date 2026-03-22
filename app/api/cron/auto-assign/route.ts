@@ -14,9 +14,9 @@ export async function GET(req: NextRequest) {
 
     const supabase = createServiceClient()
     const now = new Date()
-    const cutoff = new Date(now.getTime() + 2 * 60 * 60 * 1000) // 2 hours from now
+    const cutoff = new Date(now.getTime() + 4 * 60 * 60 * 1000) // Extend to 4 hours from now
 
-    // Get pending bookings happening within 2 hours
+    // Get pending bookings happening soon
     const { data: pendingBookings } = await supabase
         .from('bookings')
         .select(`
@@ -26,6 +26,8 @@ export async function GET(req: NextRequest) {
         `)
         .eq('status', 'pending')
         .is('staff_id', null)
+        .order('scheduled_date', { ascending: true })
+        .order('scheduled_time', { ascending: true })
 
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN
 
@@ -61,6 +63,12 @@ export async function GET(req: NextRequest) {
 
         const { zones, branch, schedules, bookings } = cache[cacheKey]
 
+        // CRITICAL: Skip if branch data is missing to avoid crashes in matching logic
+        if (!branch) {
+            console.log(`[Auto-Assign] Skipping booking ${booking.id}: Branch data NOT FOUND for branch_id ${booking.branch_id}`)
+            continue
+        }
+
         // Find available staff using SHARED logic
         const matches = findMatchingStaffForJob({
             pickupLat: Number(booking.pickup_lat),
@@ -76,7 +84,7 @@ export async function GET(req: NextRequest) {
         })
 
         if (!matches || matches.length === 0) {
-            console.log(`[Auto-Assign] No matching staff found for booking ${booking.id}`)
+            console.log(`[Auto-Assign] No matching staff found for booking ${booking.id} (Slot: ${booking.scheduled_time}, Zone: ${booking.zone_id})`)
             continue
         }
 
