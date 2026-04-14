@@ -9,6 +9,7 @@ import {
     User, HelpCircle, BadgeDollarSign, Receipt, History, FileText
 } from 'lucide-react'
 import ImageZoom from '@/components/Global/ImageZoom'
+import BookingChat from '@/components/Chat/BookingChat'
 import { supabase } from '@/lib/supabase'
 import { Booking, JobPhoto, Service, VEHICLE_SIZE_LABEL, BOOKING_STATUS_LABEL, BookingStatus } from '@/lib/types'
 import styles from './job.module.css'
@@ -193,6 +194,8 @@ export default function JobDetailPage() {
     const [showConfirmModal, setShowConfirmModal] = useState(false)
     const [copySuccess, setCopySuccess] = useState(false)
     const [zoomConfig, setZoomConfig] = useState<{ images: { src: string; alt?: string }[]; initialIndex: number } | null>(null)
+    const [showStaffChat, setShowStaffChat] = useState(false)
+    const [staffId, setStaffId] = useState('')
 
     const load = useCallback(async () => {
         try {
@@ -272,6 +275,11 @@ export default function JobDetailPage() {
     }, [id])
 
     useEffect(() => { load() }, [load])
+
+    useEffect(() => {
+        const data = localStorage.getItem('staff_data')
+        if (data) setStaffId(JSON.parse(data).id || '')
+    }, [])
 
     const handleAccept = async () => {
         const staffData = JSON.parse(localStorage.getItem('staff_data') || '{}')
@@ -512,7 +520,6 @@ export default function JobDetailPage() {
 
         const { error: statusError } = await supabase.from('bookings').update({ status: nextStatus }).eq('id', id)
         if (statusError) console.error('[handleUpload] Status update failed:', statusError)
-
         if (localStorage.getItem('foami_mock_db_enabled') !== 'true') {
             fetch(`/api/bookings/${id}/status`, {
                 method: 'PATCH',
@@ -551,7 +558,7 @@ export default function JobDetailPage() {
 
     return (
         <>
-            <div className="animate-fade" style={{ paddingBottom: 'calc(100px + env(safe-area-inset-bottom))' }}>
+            <div className="animate-fade" style={{ paddingBottom: 'calc(160px + env(safe-area-inset-bottom, 20px))' }}>
                 <div className={styles.header}>
                     <button className="btn btn-ghost btn-sm" style={{ gap: 6, display: 'flex', alignItems: 'center' }} onClick={() => router.back()}><ChevronLeft size={18} /> กลับ</button>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
@@ -813,21 +820,49 @@ export default function JobDetailPage() {
                 )}
             </div>
 
+            {/* Bottom Action Bar */}
             {((job.status === 'pending' && !job.staff_id) || action) && (
-                <div className={styles.actionBar}>
-                    {job.status === 'pending' && !job.staff_id && (
-                        <button className="btn btn-primary btn-full btn-lg" style={{ gap: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowConfirmModal(true)} disabled={actionLoading}>
-                            {actionLoading ? <span className="spinner" /> : <><CheckCircle size={20} /> รับงานนี้</>}
+                <div style={{
+                    position: 'fixed', bottom: 0, left: 0, right: 0,
+                    padding: '12px 20px calc(24px + env(safe-area-inset-bottom, 16px))',
+                    background: 'white',
+                    borderTop: '1px solid var(--border)',
+                    boxShadow: '0 -10px 40px rgba(0,0,0,0.06)',
+                    zIndex: 200, 
+                    display: 'flex', flexDirection: 'column'
+                }}>
+                    {job.status === 'pending' && !job.staff_id ? (
+                        <button 
+                            className="btn btn-primary" 
+                            style={{ 
+                                height: 58, borderRadius: 20, fontSize: '1.1rem', fontWeight: 800, 
+                                background: 'var(--brand-dominant)', border: 'none',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                                boxShadow: '0 8px 25px rgba(49,94,195,0.3)',
+                                width: '100%'
+                            }} 
+                            onClick={() => setShowConfirmModal(true)} 
+                            disabled={actionLoading}
+                        >
+                            {actionLoading ? <span className="spinner" /> : <><CheckCircle size={22} /> รับงานนี้</>}
                         </button>
-                    )}
-                    {action && (
+                    ) : action && (
                         <button
-                            className="btn btn-full btn-lg"
+                            className="btn btn-primary"
                             style={{
                                 background: action.color,
-                                color: '#fff',
-                                borderRadius: '16px',
+                                border: 'none',
+                                borderRadius: '20px',
+                                height: 58,
+                                fontSize: '1.1rem',
+                                fontWeight: 800,
+                                color: 'white',
+                                boxShadow: `0 8px 25px ${action.color}44`,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
                                 gap: 10,
+                                width: '100%',
                                 opacity: (
                                     (job.status === 'washing' && Number(additionalPrice) > 0 && additionalSlipFiles.length === 0 && (!job.additional_price_slips || job.additional_price_slips.length === 0)) ||
                                     (job.status === 'washing' && isFuelJob && (Number(additionalPrice) === 0 || additionalPrice === '')) ||
@@ -841,12 +876,13 @@ export default function JobDetailPage() {
                                 (job.status === 'delivering' && Number(job.additional_price) > 0 && !job.is_additional_paid)
                             }
                         >
-                            {actionLoading ? <span className="spinner" /> : <>{action.icon && <action.icon size={20} />} {action.label}</>}
+                            {actionLoading ? <span className="spinner" /> : <>{action.icon && <action.icon size={22} />} {action.label}</>}
                         </button>
                     )}
                 </div>
             )}
 
+            {/* Overlays */}
             {showPhotoUpload && (
                 <div className="overlay" onClick={() => setShowPhotoUpload(false)}>
                     <div className="modal" onClick={e => e.stopPropagation()}>
@@ -920,6 +956,84 @@ export default function JobDetailPage() {
                     onClose={() => setZoomConfig(null)}
                 />
             )}
+
+            {/* Floating Chat Button */}
+            {['confirmed', 'picking_up', 'washing', 'delivering'].includes(job.status) && (
+                <button
+                    onClick={() => setShowStaffChat(true)}
+                    style={{
+                        position: 'fixed', bottom: 'calc(140px + env(safe-area-inset-bottom, 20px))', right: 24,
+                        width: 68, height: 68, borderRadius: '50%',
+                        background: '#315EC3',
+                        border: '5px solid white',
+                        boxShadow: '0 12px 36px rgba(49,94,195,0.4)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', zIndex: 1000, 
+                        transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                        padding: 0,
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'scale(1.15) rotate(-5deg)'
+                        e.currentTarget.style.boxShadow = '0 16px 48px rgba(49,94,195,0.6)'
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'scale(1) rotate(0deg)'
+                        e.currentTarget.style.boxShadow = '0 12px 36px rgba(49,94,195,0.4)'
+                    }}
+                >
+                    <MessageCircle size={34} color="white" fill="white" fillOpacity={0.2} />
+                </button>
+            )}
+
+            {/* Chat Slide-up Panel */}
+            {showStaffChat && (
+                <div
+                    style={{
+                        position: 'fixed', inset: 0, zIndex: 5000,
+                        background: 'rgba(0,0,0,0.3)',
+                        backdropFilter: 'blur(8px)',
+                        WebkitBackdropFilter: 'blur(8px)',
+                        display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+                    }}
+                    onClick={() => setShowStaffChat(false)}
+                >
+                    <div
+                        className="animate-slide-up"
+                        style={{ 
+                            height: '84vh',
+                            background: 'white', 
+                            borderRadius: '32px 32px 0 0', 
+                            overflow: 'hidden',
+                            boxShadow: '0 -20px 60px rgba(0,0,0,0.2)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            position: 'relative'
+                        }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div style={{ flex: 1, overflow: 'hidden' }}>
+                            <BookingChat
+                                bookingId={id}
+                                senderId={staffId}
+                                senderType="staff"
+                                senderName={job.staff?.full_name || 'พนักงาน'}
+                                onClose={() => setShowStaffChat(false)}
+                                isOpen={true}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            <style jsx>{`
+                @keyframes slideUp {
+                    from { transform: translateY(100%); }
+                    to { transform: translateY(0); }
+                }
+                .animate-slide-up {
+                    animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+                }
+            `}</style>
         </>
     )
 }

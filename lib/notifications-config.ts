@@ -45,6 +45,12 @@ export const NOTIFICATIONS = {
             pushTitle: 'ยืนยันพนักงานรับงาน! ✅',
             pushBody: (date: string, time: string) => `พนักงานรับงานแล้ว! จะเข้าดูแลรถของคุณในวันที่ ${date} เวลา ${time}`,
             lineMessage: (date: string, time: string) => `✅ พนักงานรับงานของคุณแล้ว!\nวันที่: ${date}\nเวลา: ${time}\nเตรียมตัวรอรับบริการได้เลยครับ`
+        },
+        CHAT: {
+            pushTitle: '💬 มีข้อความใหม่จากพนักงาน',
+            pushBody: (senderName: string, msg: string) => `${senderName}: ${msg.length > 60 ? msg.slice(0, 57) + '...' : msg}`,
+            lineMessage: (senderName: string, msg: string, bookingId: string, branchSlug: string) =>
+                `💬 พนักงาน ${senderName} ส่งข้อความถึงคุณ\n"${msg.length > 80 ? msg.slice(0, 77) + '...' : msg}"\n\nดูและตอบกลับได้ที่ลิงก์ด้านล่าง`
         }
     },
     STAFF: {
@@ -82,6 +88,10 @@ export const NOTIFICATIONS = {
             pushTitle: '🔔 พรุ่งนี้มีงาน! (หรือเร็วๆ นี้)',
             pushBody: (date: string, time: string) => `อย่าลืม! คุณมีนัดหมายวันที่ ${date} เวลา ${time} เตรียมตัวให้พร้อมนะครับ`,
             lineMessage: (date: string, time: string) => `🔔 แจ้งเตือนคิวงาน!\nอย่าลืมนะครับ คุณมีนัดหมายวันที่ ${date} เวลา ${time}\nเตรียมตัวออกเดินทางตามกำหนดการนะครับ`
+        },
+        CHAT: {
+            pushTitle: '💬 มีข้อความใหม่จากลูกค้า',
+            pushBody: (customerName: string, msg: string) => `${customerName}: ${msg.length > 60 ? msg.slice(0, 57) + '...' : msg}`,
         }
     }
 }

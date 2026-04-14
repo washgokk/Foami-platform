@@ -2,8 +2,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { BOOKING_STATUS_LABEL, BOOKING_STATUS_CSS, BookingStatus } from '@/lib/types'
-import { Search, Filter, ClipboardList, Trash2, X, ChevronRight, User, Package, Calendar as CalendarIcon, MapPin, Phone, CreditCard } from 'lucide-react'
+import { Search, Filter, ClipboardList, Trash2, X, ChevronRight, User, Package, Calendar as CalendarIcon, MapPin, Phone, CreditCard, MessageCircle } from 'lucide-react'
 import ImageZoom from '@/components/Global/ImageZoom'
+import BookingChat from '@/components/Chat/BookingChat'
 
 export default function AdminBookingsPage() {
     const [bookings, setBookings] = useState<any[]>([])
@@ -13,6 +14,7 @@ export default function AdminBookingsPage() {
     const [selected, setSelected] = useState<any>(null)
     const [addons, setAddons] = useState<any[]>([])
     const [zoomConfig, setZoomConfig] = useState<{ images: { src: string; alt?: string }[]; initialIndex: number } | null>(null)
+    const [showChat, setShowChat] = useState(false)
 
     const load = useCallback(async () => {
         setLoading(true)
@@ -203,9 +205,22 @@ export default function AdminBookingsPage() {
                     <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-6)' }}>
                             <h2 style={{ fontSize: '1.1rem', fontWeight: 700 }}>รายละเอียดการจอง</h2>
-                            <button className="btn btn-ghost btn-sm" onClick={() => setSelected(null)}>✕</button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => { setSelected(null); setShowChat(false); }}>✕</button>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', fontSize: '0.9rem' }}>
+                        
+                        <div style={{ display: 'flex', gap: 8, marginBottom: 'var(--space-5)', background: 'var(--surface-2)', padding: 5, borderRadius: 16 }}>
+                            <button 
+                                onClick={() => setShowChat(false)}
+                                style={{ flex: 1, padding: '7px', borderRadius: 12, border: 'none', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', background: !showChat ? 'white' : 'transparent', color: !showChat ? 'var(--brand-dominant)' : 'var(--text-muted)', boxShadow: !showChat ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                            ><ClipboardList size={15} /> ข้อมูล</button>
+                            <button 
+                                onClick={() => setShowChat(true)}
+                                style={{ flex: 1, padding: '7px', borderRadius: 12, border: 'none', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', background: showChat ? 'white' : 'transparent', color: showChat ? 'var(--brand-dominant)' : 'var(--text-muted)', boxShadow: showChat ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                            ><MessageCircle size={15} /> แชท {['confirmed', 'picking_up', 'washing', 'delivering'].includes(selected.status) && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--danger)' }} />} </button>
+                        </div>
+
+                        {!showChat ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', fontSize: '0.9rem' }}>
                             {[
                                 ['Booking ID', selected.id.slice(0, 8) + '...'],
                                 ['ลูกค้า', selected.customers?.full_name],
@@ -246,6 +261,17 @@ export default function AdminBookingsPage() {
                                 </div>
                             )}
                         </div>
+                        ) : (
+                            <div style={{ height: 550, overflow: 'hidden', margin: '0 -24px -24px', position: 'relative', background: '#F8F9FC', borderRadius: '0 0 20px 20px' }}>
+                                <BookingChat 
+                                    bookingId={selected.id}
+                                    senderId="admin-system"
+                                    senderType="admin"
+                                    senderName="Admin"
+                                    isOpen={true}
+                                />
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

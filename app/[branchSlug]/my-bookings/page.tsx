@@ -26,7 +26,7 @@ import {
     ClipboardList,
     AlertCircle,
     Bell,
-    BellOff,
+    MessageCircle,
     Send
 } from 'lucide-react'
 import styles from './my-bookings.module.css'
@@ -42,6 +42,7 @@ import { findMatchingStaffForJob } from '@/lib/staff-matching'
 import { isPointInPolygon } from '@/lib/geo-utils'
 import { usePushNotifications } from '@/lib/hooks/usePushNotifications'
 import SuccessModal from '@/components/Global/SuccessModal'
+import BookingChat from '@/components/Chat/BookingChat'
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '')
 
@@ -90,6 +91,7 @@ export default function MyBookingsPage() {
     const [rescheduleSlots, setRescheduleSlots] = useState<any[]>([])
     const [rescheduleLoading, setRescheduleLoading] = useState(false)
     const [dateRange] = useState<Date[]>(() => Array.from({ length: 7 }, (_, i) => addDays(new Date(), i)))
+    const [showChat, setShowChat] = useState(false)
 
     useEffect(() => {
         const c = localStorage.getItem('liff_customer')
@@ -654,9 +656,38 @@ export default function MyBookingsPage() {
                                     sessionStorage.setItem('dismissed_popup_' + selectedBooking.id, 'true')
                                 }
                                 setSelectedBooking(null)
+                                setShowChat(false)
                             }}><X size={24} /></button>
                         </div>
 
+                        {/* Chat Tab Toggle — show only for active bookings */}
+                        {['confirmed', 'picking_up', 'washing', 'delivering'].includes(selectedBooking.status) && selectedBooking.staff_id && (
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 8, background: 'var(--surface-2)', padding: 6, borderRadius: 16 }}>
+                                <button
+                                    onClick={() => setShowChat(false)}
+                                    style={{ flex: 1, padding: '8px', borderRadius: 12, border: 'none', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', background: !showChat ? 'white' : 'transparent', color: !showChat ? 'var(--brand-dominant)' : 'var(--text-muted)', boxShadow: !showChat ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                                ><ClipboardList size={16} /> รายละเอียด</button>
+                                <button
+                                    onClick={() => setShowChat(true)}
+                                    style={{ flex: 1, padding: '8px', borderRadius: 12, border: 'none', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', background: showChat ? 'white' : 'transparent', color: showChat ? 'var(--brand-dominant)' : 'var(--text-muted)', boxShadow: showChat ? '0 1px 4px rgba(0,0,0,0.08)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                                ><MessageCircle size={16} /> แชทพนักงาน</button>
+                            </div>
+                        )}
+
+                        {/* Chat Panel */}
+                        {showChat && customer && (
+                            <div style={{ height: 520, borderRadius: 20, overflow: 'hidden', border: '1px solid var(--border)', background: '#F8F9FC' }}>
+                                <BookingChat
+                                    bookingId={selectedBooking.id}
+                                    senderId={customer.id}
+                                    senderType="customer"
+                                    senderName={customer.full_name || 'ลูกค้า'}
+                                    isOpen={true}
+                                />
+                            </div>
+                        )}
+
+                        {!showChat && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                             {/* Status Section */}
                             <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -1100,6 +1131,7 @@ export default function MyBookingsPage() {
                                 </div>
                             )}
                         </div>
+                        )}
                     </div>
                 </div>
             )}

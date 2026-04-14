@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { BOOKING_STATUS_LABEL, BOOKING_STATUS_CSS, BookingStatus } from '@/lib/types'
-import { Wrench, Search, Calendar, Clock, ClipboardList, CheckCircle2, Droplets, Truck, XCircle, Bike } from 'lucide-react'
+import { Wrench, Search, Calendar, Clock, ClipboardList, CheckCircle2, Droplets, Truck, XCircle, Bike, MessageCircle } from 'lucide-react'
 import styles from './jobs.module.css'
 
 const STATUS_FILTERS: { label: string; value: string }[] = [
@@ -133,7 +133,13 @@ export default function StaffJobsPage() {
                             key={job.id}
                             href={`/staff/jobs/${job.id}`}
                             className={styles.jobCard}
+                            style={{ position: 'relative' }}
                         >
+                            {['confirmed', 'picking_up', 'washing', 'delivering'].includes(job.status) && (
+                                <div title="ช่องทางแชท" style={{ position: 'absolute', top: 12, right: 12, color: 'var(--brand-dominant)', opacity: 0.4 }}>
+                                    <MessageCircle size={16} />
+                                </div>
+                            )}
                             <div className={styles.jobTime} style={{ minWidth: '75px' }}>
                                 <span style={{ fontSize: '1.2rem', fontWeight: 900 }}>{job.scheduled_time?.slice(0, 5)}</span>
                                 <span className={styles.jobDate}>{job.scheduled_date}</span>
