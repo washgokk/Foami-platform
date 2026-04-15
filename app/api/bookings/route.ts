@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
         pickup_lat, pickup_lng, pickup_address,
         delivery_lat, delivery_lng, delivery_address,
         scheduled_date, scheduled_time,
-        zone_id, extra_fee, base_price, total_price,
+        zone_id, branch_id, extra_fee, base_price, total_price,
         discount_code, discount_amount,
         payment_method, stripe_payment_intent_id, slip_url,
         vehicle_data
@@ -62,22 +62,20 @@ export async function POST(req: NextRequest) {
 
         let staffIds = schedules?.map((s: any) => s.staff_id).filter(Boolean) || []
         
-        // 2. Fallback: If no scheduled staff found, notify ALL staff in this zone (Marketplace style)
+        // 2. Fallback: If no scheduled staff found, notify ALL staff in this branch
         if (staffIds.length === 0) {
-            console.log(`[Booking] No scheduled staff found. Falling back to all staff in zone.`)
-            const { data: zoneStaff } = await supabase
-                .from('staff')
-                .select('id, line_user_id')
-                .eq('branch_id', zone_id) // Assuming zone_id maps to branch_id or similar in this context, 
-                                          // or adjust based on your schema. 
-                                          // Let's use a broader fetch if zone specific staff table exists.
-            
-            // If the above assumption is wrong, just notify all staff for now to be safe during debug
-            if (!zoneStaff || zoneStaff.length === 0) {
-                const { data: allStaff } = await supabase.from('staff').select('id, line_user_id')
-                staffIds = allStaff?.map(s => s.id) || []
+            console.log(`[Booking] No scheduled staff found. Falling back to all staff in branch.`)
+            let fallbackQuery = supabase.from('staff').select('id, line_user_id').eq('is_active', true)
+            if (branch_id) {
+                fallbackQuery = (fallbackQuery as any).eq('branch_id', branch_id)
+            }
+            const { data: branchStaff } = await fallbackQuery
+
+            if (branchStaff && branchStaff.length > 0) {
+                staffIds = branchStaff.map(s => s.id)
             } else {
-                staffIds = zoneStaff.map(s => s.id)
+                const { data: allStaff } = await supabase.from('staff').select('id, line_user_id').eq('is_active', true)
+                staffIds = allStaff?.map(s => s.id) || []
             }
         }
 

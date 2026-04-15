@@ -80,7 +80,7 @@ export default function StaffJobsPage() {
             if (filter !== 'all') q = (q as any).eq('status', filter)
 
             const { data: bRes } = await (q as any)
-            const { data: aRes } = await supabase.from('addons').select('*')
+            const { data: aRes } = await supabase.from('service_addons').select('*')
             
             if (aRes) setAddons(aRes)
             const finalJobs = await resolveRelations(bRes || [])

@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
         .from('bookings')
         .select(`
             id, branch_id, zone_id, scheduled_date, scheduled_time,
-            pickup_lat, pickup_lng, delivery_lat, delivery_lng, show_delivery
+            pickup_lat, pickup_lng, delivery_lat, delivery_lng
         `)
         .eq('status', 'pending')
         .is('staff_id', null)
@@ -62,7 +62,11 @@ export async function GET(req: NextRequest) {
             pickupLng: Number(booking.pickup_lng),
             deliveryLat: Number(booking.delivery_lat),
             deliveryLng: Number(booking.delivery_lng),
-            showDelivery: !!booking.show_delivery,
+            showDelivery: !!(
+                booking.delivery_lat &&
+                booking.delivery_lng &&
+                (booking.delivery_lat !== booking.pickup_lat || booking.delivery_lng !== booking.pickup_lng)
+            ),
             zones,
             branch,
             daySchedules: schedules,

@@ -194,7 +194,7 @@ export async function GET(req: NextRequest) {
         sendPushNotification(booking.customer_id, 'customer', {
             title: NOTIFICATIONS.CUSTOMER.AUTO_ASSIGNED.pushTitle,
             body: NOTIFICATIONS.CUSTOMER.AUTO_ASSIGNED.pushBody(booking.scheduled_date, booking.scheduled_time),
-            url: `/menu/my-bookings`
+            url: `/staff/jobs/${booking.id}`
         }).catch(() => {})
 
         assigned++
