@@ -311,39 +311,46 @@ export default function BookPage() {
                 const localDeliveryMatched = zones.find(z => z.is_active && isPointInPolygon(deliveryLat, deliveryLng, z.polygon_coords))
 
                 const slotsForDay = TIME_SLOTS.map(slot => {
-                    const dateKey = format(d, 'yyyy-MM-dd')
-                    if (dateKey === todayStr) {
-                        const [sh, sm] = slot.split(':').map(Number)
-                        const slotMinutes = sh * 60 + sm
-                        if (slotMinutes <= nowMinutes) return null
-                        if (slotMinutes < nowMinutes + 20) return { time_slot: slot, type: 'timed_out' }
+                const dateKey = format(d, 'yyyy-MM-dd')
+
+                // 1. ดึงข้อมูลพนักงานออกมาก่อน
+                const matchingStaff = findMatchingStaffForJob({
+                    pickupLat, pickupLng, deliveryLat, deliveryLng, showDelivery,
+                    zones, branch: branches[0],
+                    daySchedules, dayBookings, timeSlot: slot
+                })
+                const hasAnyStaff = daySchedules.some(s => (s.time_slot === slot || s.time_slot?.startsWith(slot)))
+
+                // 2. ถ้าไม่มีพนักงานคนไหนลงเวลานี้ไว้เลย ให้ซ่อนคิวนี้ไปเลย (ไม่ให้มันดันทุรังไปโชว์ว่า "หมดเวลา")
+                if (!hasAnyStaff && matchingStaff.length === 0) return null
+
+                // 3. ค่อยมาเช็คเรื่องเวลาหมด (Timed out) สำหรับคิวที่มีพนักงานลงไว้
+                if (dateKey === todayStr) {
+                    const [sh, sm] = slot.split(':').map(Number)
+                    const slotMinutes = sh * 60 + sm
+                    const nowMinutes = thTime.getHours() * 60 + thTime.getMinutes()
+
+                    if (slotMinutes <= nowMinutes) return null
+                    if (slotMinutes < nowMinutes + 20) return { time_slot: slot, type: 'timed_out' }
+                }
+
+                // 4. คำนวณความจุ (Capacity)
+                const allPendingInBranch = dayBookings.filter(b => (b.scheduled_time === slot || b.scheduled_time?.startsWith(slot)) && !b.staff_id)
+                const availableCount = matchingStaff.length - allPendingInBranch.length
+
+                if (availableCount > 0) {
+                    const topStaff = matchingStaff[0]
+                    return {
+                        time_slot: slot,
+                        type: topStaff.type,
+                        serving_zone_id: topStaff.base_zone_id,
+                        available_staff_ids: matchingStaff.slice(0, availableCount).map(ms => ms.staff_id),
+                        calculated_fee: topStaff.fee
                     }
-
-                    const matchingStaff = findMatchingStaffForJob({
-                        pickupLat, pickupLng, deliveryLat, deliveryLng, showDelivery,
-                        zones, branch: branches[0],
-                        daySchedules, dayBookings, timeSlot: slot
-                    })
-
-                    // Handle Capacity (Subtract pending unassigned bookings)
-                    const allPendingInBranch = dayBookings.filter(b => (b.scheduled_time === slot || b.scheduled_time?.startsWith(slot)) && !b.staff_id)
-                    const availableCount = matchingStaff.length - allPendingInBranch.length
-
-                    if (availableCount > 0) {
-                        const topStaff = matchingStaff[0]
-                        console.log(`[Slot Picker] Slot: ${slot}, Staff: ${topStaff.staff_id}, Fee: ${topStaff.fee}`);
-                        return {
-                            time_slot: slot,
-                            type: topStaff.type,
-                            serving_zone_id: topStaff.base_zone_id,
-                            available_staff_ids: matchingStaff.slice(0, availableCount).map(ms => ms.staff_id),
-                            calculated_fee: topStaff.fee
-                        }
-                    } else {
-                        const hasAnyStaff = daySchedules.some(s => (s.time_slot === slot || s.time_slot?.startsWith(slot)))
-                        return hasAnyStaff ? { time_slot: slot, type: 'full' } : null
-                    }
-                }).filter(Boolean) as any[]
+                } else {
+                    return { time_slot: slot, type: 'full' }
+                }
+            }).filter(Boolean) as any[]
 
                 if (slotsForDay.length > 0) availabilityMap[dateKey] = slotsForDay
             })
@@ -624,7 +631,7 @@ export default function BookPage() {
 
             let amountToDiscount = 0
             if (discount.discount_type === 'percent') {
-                amountToDiscount = Math.floor(pkgPrice * (discount.discount_value / 100))
+                amountToDiscount = Math.ceil(pkgPrice * (discount.discount_value / 100))
                 if (discount.max_discount_amount) amountToDiscount = Math.min(amountToDiscount, discount.max_discount_amount)
             } else {
                 amountToDiscount = discount.discount_value
