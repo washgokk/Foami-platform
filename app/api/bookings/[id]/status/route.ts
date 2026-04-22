@@ -22,47 +22,39 @@ export async function PATCH(
     // Get Notification Config
     const { NOTIFICATIONS } = await import('@/lib/notifications-config')
 
-    const CUSTOMER_NOTIFS: Record<string, any> = {
-        confirmed: NOTIFICATIONS.CUSTOMER.CONFIRMED,
-        picking_up: NOTIFICATIONS.CUSTOMER.PICKING_UP,
-        washing: NOTIFICATIONS.CUSTOMER.WASHING,
-        delivering: NOTIFICATIONS.CUSTOMER.DELIVERING,
-        completed: NOTIFICATIONS.CUSTOMER.COMPLETED,
-    }
+    // --- LINE: ส่ง 3 กรณี ---
+    // 1. confirmed    → ยืนยันการจอง
+    // 2. completed    → งานเสร็จแล้ว
+    // 3. delivering + มียอดค้างชำระ → รอชำระส่วนต่าง (payment_pending)
 
-    // --- SEQUENTIAL NOTIFICATION LOGIC ---
+    let lineMessageToSend = ''
     let actualNotifyStatus = status
-    let messageToSend = ''
-    let pushTitle = ''
-    let isPaymentPending = false
 
     if (status === 'delivering' && data.additional_price > 0 && !data.is_additional_paid) {
-        // If unpaid additional price, send payment reminder instead of delivering message
-        actualNotifyStatus = 'payment_forward'
-        const paymentNotif = NOTIFICATIONS.CUSTOMER.PAYMENT_PENDING
-        messageToSend = paymentNotif.lineMessage(data.additional_price, data.additional_price_note)
-        pushTitle = paymentNotif.pushTitle
-        isPaymentPending = true
-    } else {
-        const notif = CUSTOMER_NOTIFS[status]
-        if (notif) {
-            messageToSend = typeof notif.lineMessage === 'function' 
-                ? notif.lineMessage(data.scheduled_date, data.scheduled_time)
-                : notif.lineMessage
-            pushTitle = typeof notif.pushTitle === 'function'
-                ? notif.pushTitle(data.scheduled_date, data.scheduled_time)
-                : notif.pushTitle
-        }
+        // กรณีพิเศษ: ส่ง payment_pending แทน
+        actualNotifyStatus = 'payment_pending'
+        lineMessageToSend = NOTIFICATIONS.CUSTOMER.PAYMENT_PENDING
+            .lineMessage(data.additional_price, data.additional_price_note)
+    } else if (status === 'confirmed') {
+        const notif = NOTIFICATIONS.CUSTOMER.CONFIRMED
+        lineMessageToSend = typeof notif.lineMessage === 'function'
+            ? notif.lineMessage(data.scheduled_date, data.scheduled_time)
+            : notif.lineMessage
+    } else if (status === 'completed') {
+        const notif = NOTIFICATIONS.CUSTOMER.COMPLETED
+        lineMessageToSend = typeof notif.lineMessage === 'function'
+            ? notif.lineMessage(data.scheduled_date, data.scheduled_time)
+            : notif.lineMessage
     }
 
-    if (messageToSend && data.customers?.line_user_id) {
+    if (lineMessageToSend && data.customers?.line_user_id) {
         try {
             await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/line/notify-customer`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     line_user_id: data.customers.line_user_id,
-                    message: messageToSend,
+                    message: lineMessageToSend,
                     booking_id: id,
                     notif_type: actualNotifyStatus,
                     branch_slug: data.branches?.slug || 'menu'
@@ -71,12 +63,40 @@ export async function PATCH(
         } catch { /* Non-critical */ }
     }
 
-    // Send Web Push notification to customer
-    if (messageToSend) {
+    // --- WEB PUSH: ส่งทุก status เหมือนเดิม (ไม่กระทบ LINE limit) ---
+    const PUSH_NOTIFS: Record<string, any> = {
+        confirmed: NOTIFICATIONS.CUSTOMER.CONFIRMED,
+        picking_up: NOTIFICATIONS.CUSTOMER.PICKING_UP,
+        washing: NOTIFICATIONS.CUSTOMER.WASHING,
+        delivering: NOTIFICATIONS.CUSTOMER.DELIVERING,
+        completed: NOTIFICATIONS.CUSTOMER.COMPLETED,
+    }
+
+    let pushTitle = ''
+    let pushMessage = ''
+
+    if (status === 'delivering' && data.additional_price > 0 && !data.is_additional_paid) {
+        const paymentNotif = NOTIFICATIONS.CUSTOMER.PAYMENT_PENDING
+        pushTitle = paymentNotif.pushTitle
+        pushMessage = paymentNotif.lineMessage(data.additional_price, data.additional_price_note)
+    } else {
+        const notif = PUSH_NOTIFS[status]
+        if (notif) {
+            pushMessage = typeof notif.lineMessage === 'function'
+                ? notif.lineMessage(data.scheduled_date, data.scheduled_time)
+                : notif.lineMessage
+            pushTitle = typeof notif.pushTitle === 'function'
+                ? notif.pushTitle(data.scheduled_date, data.scheduled_time)
+                : notif.pushTitle
+        }
+    }
+
+    // Send Web Push notification to customer (ส่งทุก status)
+    if (pushMessage) {
         try {
             await sendPushNotification(data.customer_id, 'customer', {
                 title: pushTitle || 'Foami Service Update',
-                body: messageToSend.split('\n')[0],
+                body: pushMessage.split('\n')[0],
                 url: `/${data.branches?.slug || 'menu'}/my-bookings`
             })
         } catch { /* Non-critical */ }
