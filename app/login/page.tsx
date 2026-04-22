@@ -43,6 +43,7 @@ export default function LoginPage() {
         (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
     const isIOSPWA = isIOS && isStandalone
+    const isLineBrowser = typeof navigator !== 'undefined' && /Line/i.test(navigator.userAgent)
 
     // ─── Central Redirect ───
     const resolveAndRedirect = (data: any) => {
@@ -141,7 +142,7 @@ export default function LoginPage() {
         }
 
         // Case C: LIFF returning (code + non-UUID state = LIFF's own state)
-        if (code && state && !isUUID(state) && !isStandalone) {
+        if (code && state && !isUUID(state)) {
             handleLIFFReturn()
             return
         }
@@ -322,7 +323,7 @@ export default function LoginPage() {
                 {showButton && (
                     <button
                         className={styles.lineBtn}
-                        onClick={isIOS ? handleIOSPWALogin : handleNormalLogin}
+                        onClick={(isIOS && !isLineBrowser) ? handleIOSPWALogin : handleNormalLogin}
                     >
                         <div className={styles.lineIconWrapper}>
                             <img
