@@ -733,7 +733,7 @@ export default function StaffPage() {
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: 24, marginBottom: 28 }}>
                                 {Object.entries(selectedByStaff).map(([staffId, data]) => {
                                     const s = staff.find(x => x.id === staffId)
-                                    const total = data.laborTotal + data.rentalTotal + data.fuelTotal + data.capitalTotal + data.extraFromJobs
+                                    const total = data.laborTotal + data.rentalTotal + data.fuelTotal + data.capitalTotal + data.extraFromJobs + data.bonusTotal
                                     return (
                                         <div key={staffId} style={{ background: 'var(--surface)', padding: 28, borderRadius: '24px', border: '1px solid var(--border)', boxShadow: '0 8px 24px rgba(0,0,0,0.05)' }}>
                                             <div style={{ fontWeight: 900, color: 'var(--brand-dominant)', marginBottom: 20, fontSize: '1.2rem', borderBottom: '2px solid var(--brand-dominant-ghost)', paddingBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
