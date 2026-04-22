@@ -50,7 +50,9 @@ export default function LoginPage() {
             localStorage.setItem('liff_line_user_id', data.line_user_id || '')
         }
         const branch = data?.last_branch_slug || localStorage.getItem('last_branch_slug')
-        router.replace(branch ? `/${branch}/menu` : '/search')
+        
+        // ใช้ window.location.href แทน router.replace เพื่อเลี่ยงปัญหา Next.js Router Conflict
+        window.location.href = branch ? `/${branch}/menu` : '/search'
     }
 
     // ─── Case B: Bridge Sync (iPad PWA Safari OAuth return) ───
@@ -99,8 +101,12 @@ export default function LoginPage() {
                 .from('customers').select('*')
                 .eq('line_user_id', profile.userId).maybeSingle()
 
-            if (data) resolveAndRedirect(data)
-            else router.replace('/register')
+            if (data) {
+                resolveAndRedirect(data)
+            } else {
+                // เปลี่ยนเป็น window.location.href สำหรับผู้ใช้ใหม่ที่ต้องไปหน้าลงทะเบียน
+                window.location.href = '/register'
+            }
         } catch (e: any) {
             console.error('[Login] LIFF return error:', e)
             setPhase('idle')
