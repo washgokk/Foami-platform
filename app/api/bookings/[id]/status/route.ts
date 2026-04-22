@@ -36,15 +36,9 @@ export async function PATCH(
         lineMessageToSend = NOTIFICATIONS.CUSTOMER.PAYMENT_PENDING
             .lineMessage(data.additional_price, data.additional_price_note)
     } else if (status === 'confirmed') {
-        const notif = NOTIFICATIONS.CUSTOMER.CONFIRMED
-        lineMessageToSend = typeof notif.lineMessage === 'function'
-            ? notif.lineMessage(data.scheduled_date, data.scheduled_time)
-            : notif.lineMessage
+        lineMessageToSend = NOTIFICATIONS.CUSTOMER.CONFIRMED.lineMessage as string
     } else if (status === 'completed') {
-        const notif = NOTIFICATIONS.CUSTOMER.COMPLETED
-        lineMessageToSend = typeof notif.lineMessage === 'function'
-            ? notif.lineMessage(data.scheduled_date, data.scheduled_time)
-            : notif.lineMessage
+        lineMessageToSend = NOTIFICATIONS.CUSTOMER.COMPLETED.lineMessage as string
     }
 
     if (lineMessageToSend && data.customers?.line_user_id) {
@@ -83,11 +77,11 @@ export async function PATCH(
         const notif = PUSH_NOTIFS[status]
         if (notif) {
             pushMessage = typeof notif.lineMessage === 'function'
-                ? notif.lineMessage(data.scheduled_date, data.scheduled_time)
-                : notif.lineMessage
+                ? (notif.lineMessage as Function)(data.scheduled_date, data.scheduled_time)
+                : (notif.lineMessage as string)
             pushTitle = typeof notif.pushTitle === 'function'
-                ? notif.pushTitle(data.scheduled_date, data.scheduled_time)
-                : notif.pushTitle
+                ? (notif.pushTitle as Function)(data.scheduled_date, data.scheduled_time)
+                : (notif.pushTitle as string)
         }
     }
 
