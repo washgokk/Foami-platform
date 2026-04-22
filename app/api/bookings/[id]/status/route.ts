@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 import { sendPushNotification } from '@/lib/push'
-
+//update
 export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
