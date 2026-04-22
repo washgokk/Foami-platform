@@ -174,6 +174,35 @@ export default function LoginPage() {
             localStorage.setItem('pwa_bridge_id', bridgeId)
             setIosBridgeUrl(url)
         }
+        
+        // 👇 --- เริ่มเพิ่มโค้ดใหม่ตรงนี้ (Silent Auto Check) --- 👇
+        // เช็คการล็อคอินกับ LIFF และระบบหลังบ้านแบบเงียบๆ ทันทีที่เข้าหน้านี้
+        // ถ้าไม่มี code ใน URL (แสดงว่าเพิ่งเปิดเข้ามาสดๆ) ให้ทำการรีเช็ค
+        if (!code && LIFF_ID) { 
+            const silentCheck = async () => {
+                try {
+                    const { default: liff } = await import('@line/liff')
+                    await liff.init({ liffId: LIFF_ID })
+                    
+                    if (liff.isLoggedIn()) {
+                        const profile = await liff.getProfile()
+                        
+                        // เช็คกับฐานข้อมูลว่ามี User นี้อยู่จริง
+                        const { data } = await supabase.from('customers').select('*')
+                            .eq('line_user_id', profile.userId).maybeSingle()
+                        
+                        // ถ้ามีข้อมูลครบ ถีบส่งไปหน้าถัดไปเลย!
+                        if (data) resolveAndRedirect(data)
+                    }
+                } catch (e) {
+                    // หากเช็คไม่ผ่านหรือยังไม่ล็อคอิน ก็ไม่ต้องทำอะไร ปล่อยให้แสดงปุ่ม Login ต่อไป
+                    console.error('[Login] Silent check failed:', e)
+                }
+            }
+            silentCheck()
+        }
+        // 👆 --- สิ้นสุดโค้ดที่เพิ่มใหม่ --- 👆
+        
         // Non-iOS: just show button (handleNormalLogin uses LIFF SDK)
     }, [])
 
