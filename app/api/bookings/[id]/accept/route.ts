@@ -75,7 +75,8 @@ export async function POST(
                 booking.scheduled_date,
                 booking.scheduled_time
             ),
-            url: `/${booking.branches?.slug || 'menu'}/my-bookings`
+            url: `/${booking.branches?.slug || 'menu'}/my-bookings`,
+            notifKey: 'accepted'
         })
     } catch { /* Non-critical */ }
 

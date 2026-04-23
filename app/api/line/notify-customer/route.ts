@@ -23,6 +23,15 @@ export async function POST(req: NextRequest) {
 
     if (!token) return NextResponse.json({ error: 'No Line token' }, { status: 500 })
 
+    // ─── Check Global Settings ───────────────
+    const supabase = createServiceClient()
+    const { data: settingsData } = await supabase.from('system_settings').select('value').eq('key', 'notification_preferences').single()
+    const settings = settingsData?.value as any
+    if (settings && settings.customer && settings.customer[notif_type] && settings.customer[notif_type].line === false) {
+        console.log(`[LINE Notify] Skipped (notif_type: ${notif_type}) due to global settings.`)
+        return NextResponse.json({ sent: false, skipped: true })
+    }
+
     const baseUrl    = process.env.NEXT_PUBLIC_APP_URL || ''
     const bookingUrl = `${baseUrl}/${branch_slug}/my-bookings`
     const reviewUrl  = `${baseUrl}/${branch_slug}/my-bookings?booking_id=${booking_id}`

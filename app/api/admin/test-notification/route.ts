@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
     try {
-        const { targetType, userId, caseId, bookingId } = await req.json()
+        const { targetType, userId, caseId, bookingId, enablePush = true, enableLine = true } = await req.json()
         const token = process.env.LINE_CHANNEL_ACCESS_TOKEN
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
         // ใช้ localhost เมื่อ test locally เพื่อไม่ให้เรียก production
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
             }
 
             // Staff LINE — simple branded flex
-            if (lineUserId && token) {
+            if (enableLine && lineUserId && token) {
                 const res = await fetch('https://api.line.me/v2/bot/message/push', {
                     method: 'POST',
                     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -184,7 +184,7 @@ export async function POST(req: NextRequest) {
             const notif_type = notifTypeMap[caseId] ?? 'generic'
 
             // ✅ เรียก LINE API โดยตรงด้วย token จาก env (ไม่ผ่าน HTTP fetch ไปหา appUrl)
-            if (lineUserId && token) {
+            if (enableLine && lineUserId && token) {
                 const res = await fetch(`${internalUrl}/api/line/notify-customer`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -206,7 +206,10 @@ export async function POST(req: NextRequest) {
         }
 
         // Send Web Push
-        const pushResult = await sendPushNotification(userId, targetType, pushPayload)
+        let pushResult = false
+        if (enablePush) {
+            pushResult = await sendPushNotification(userId, targetType, pushPayload)
+        }
 
         return NextResponse.json({ push: pushResult, line: lineResult })
     } catch (err: any) {

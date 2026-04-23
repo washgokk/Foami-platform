@@ -91,7 +91,8 @@ export async function PATCH(
             await sendPushNotification(data.customer_id, 'customer', {
                 title: pushTitle || 'Foami Service Update',
                 body: pushMessage.split('\n')[0],
-                url: `/${data.branches?.slug || 'menu'}/my-bookings`
+                url: `/${data.branches?.slug || 'menu'}/my-bookings`,
+                notifKey: actualNotifyStatus || status
             })
         } catch { /* Non-critical */ }
     }

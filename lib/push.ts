@@ -18,6 +18,7 @@ interface PushNotificationPayload {
     title: string
     body: string
     url?: string
+    notifKey?: string // e.g. 'accepted', 'completed'
     actions?: Array<{ action: string; title: string; icon?: string }>
 }
 
@@ -30,6 +31,15 @@ export async function sendPushNotification(
     payload: PushNotificationPayload
 ) {
     const supabase = createServiceClient()
+
+    if (payload.notifKey) {
+        const { data: settingsData } = await supabase.from('system_settings').select('value').eq('key', 'notification_preferences').single()
+        const settings = settingsData?.value as any
+        if (settings && settings[platform] && settings[platform][payload.notifKey] && settings[platform][payload.notifKey].push === false) {
+            console.log(`[Push] Skipped (notifKey: ${payload.notifKey}) due to global settings on platform ${platform}.`)
+            return false
+        }
+    }
 
     // 1. Get subscription from DB
     const { data: subs, error } = await supabase
