@@ -376,18 +376,7 @@ function ZoneOverviewMap({ center, zones, onRedraw, maxKm }: {
 
             L.marker(center, { icon: branchIcon }).addTo(map).bindTooltip('ที่ตั้งสาขา', { permanent: true, direction: 'top', offset: [0, -32], className: 'leaflet-branch-label' })
 
-            // Draw Max Radius Circle
-            if (maxKm) {
-                L.circle(center, {
-                    radius: maxKm * 1000,
-                    color: 'var(--brand-dominant)',
-                    fillColor: 'var(--brand-dominant)',
-                    fillOpacity: 0.03,
-                    dashArray: '10, 10',
-                    weight: 1,
-                    interactive: false
-                }).addTo(map)
-            }
+            // Removed Max Radius Circle around branch pin as requested
 
             layerGroupRef.current = L.featureGroup().addTo(map)
             mapInstanceRef.current = map
@@ -563,18 +552,7 @@ function ZoneDrawMap({ center, zones, editingZoneId, title, accentColor, existin
             });
             L.marker(center, { icon: branchIcon }).addTo(map).bindTooltip('ที่ตั้งสาขา')
 
-            // Draw Max Radius Circle
-            if (maxKm) {
-                L.circle(center, {
-                    radius: maxKm * 1000,
-                    color: 'var(--brand-dominant)',
-                    fillColor: 'var(--brand-dominant)',
-                    fillOpacity: 0.03,
-                    dashArray: '10, 10',
-                    weight: 1,
-                    interactive: false
-                }).addTo(map)
-            }
+            // Removed Max Radius Circle around branch pin as requested
 
             // Show OTHER zones for reference
             zones.forEach((z, idx) => {

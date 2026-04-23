@@ -85,12 +85,7 @@ export function findMatchingStaffForJob({
             // Check branch-level distance limit from anchor
             if (maxDist > (branch.max_out_of_zone_km || 2)) return
 
-            // Rule: If job is Out-of-Zone AND Anchor has Rocket, fee is 0.
-            const anchorHasRocket = anchor.work_type === 'out_of_zone'
             let fee = dPickup * 2 * (branch.out_of_zone_fee || 10)
-            if (isO && anchorHasRocket) {
-                fee = 0
-            }
             
             matchingStaff.push({
                 staff_id: sId,

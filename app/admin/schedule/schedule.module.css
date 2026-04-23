@@ -63,8 +63,8 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
-    overflow-x: hidden; /* Changed from auto to hidden on desktop */
-    overflow-y: visible;
+    max-height: calc(100vh - 220px);
+    overflow: auto;
     box-shadow: var(--shadow-sm);
     box-sizing: border-box;
     position: relative;
@@ -72,7 +72,7 @@
 
 @media (max-width: 1023px) {
     .grid {
-        overflow: auto; /* Allow scrolling on mobile */
+        max-height: calc(100vh - 280px);
     }
 }
 
@@ -111,7 +111,8 @@
 
 .today {
     color: var(--brand-dominant);
-    background: rgba(49, 94, 195, 0.05);
+    background-color: var(--surface-2);
+    background-image: linear-gradient(rgba(49, 94, 195, 0.05), rgba(49, 94, 195, 0.05));
 }
 
 .today .dayNum {
@@ -191,24 +192,24 @@
 
 .staffList {
     display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+    align-items: stretch;
+    width: 100%;
 }
 
 .staffPill {
     font-size: 0.7rem;
     line-height: 1.2;
-    padding: 3px 6px;
-    border-radius: 4px;
+    padding: 4px 6px;
+    border-radius: 6px;
     font-weight: 600;
     max-width: 100%;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
     gap: 3px;
+    width: 100%;
 }
 
 .status-available {
@@ -218,10 +219,21 @@
 }
 
 .status-booked {
-    background-color: rgba(160, 217, 246, 0.15); /* Brand secondary tint */
-    color: var(--brand-dominant);
-    border: 1px solid rgba(160, 217, 246, 0.3);
-    border-style: dashed;
+    background-color: #10b981; /* Solid emerald green */
+    color: white;
+    border: 1px solid #059669;
+}
+
+.status-past-available {
+    background-color: var(--surface-2);
+    color: var(--text-muted);
+    border: 1px dashed var(--border);
+}
+
+.status-past-booked {
+    background-color: #8fa89b; /* Grayish green */
+    color: white;
+    border: 1px solid #758e81;
 }
 
 .loadingEmpty {
