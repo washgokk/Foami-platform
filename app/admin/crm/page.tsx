@@ -276,7 +276,7 @@ export default function CRMPage() {
             'Scheduled Date', 'Scheduled Time', 'Branch', 'Zone', 'Service', 'Addons',
             'Original Base Price', 'Branch Markup', 'CC Adjustment', 'Addon Price',
             'Travel Surcharge', 'Different Spot Fee', 'Additional Price', 'Discount', 'Total Bill',
-            'Labor Cost', 'Rental Cost', 'Fuel Cost', 'Capital Cost', 'Bonus Payout', 'Extra Staff Payment', 'Net Profit to Branch',
+            'Labor Cost', 'Rental Cost', 'Fuel Cost', 'Capital Cost', 'Bonus Payout', 'Extra Staff Payment', 'Stripe Fee 1st (1.76%)', 'Stripe Fee 2nd (1.76%)', 'Net Profit to Branch',
             'Payment Status', 'Job Status', 'Rating', 'Pickup Address', 'Delivery Address'
         ]
 
@@ -312,8 +312,11 @@ export default function CRMPage() {
             const capital = b.capital_cost || 0;
             const bonus = b.staff_extra_payout || 0;
             const extraStaff = b.additional_price || 0;
+            const firstTransfer = computedTotal - extraStaff;
+            const stripeFee1 = firstTransfer * 0.0176;
+            const stripeFee2 = extraStaff * 0.0176;
             const staffTotal = labor + rental + fuel + capital + bonus + extraStaff;
-            const branchProfit = computedTotal - staffTotal;
+            const branchProfit = computedTotal - staffTotal - stripeFee1 - stripeFee2;
 
             const row = [
                 new Date(b.created_at).toLocaleString('th-TH'),
@@ -345,7 +348,9 @@ export default function CRMPage() {
                 capital,
                 bonus,
                 extraStaff,
-                branchProfit,
+                stripeFee1.toFixed(2),
+                stripeFee2.toFixed(2),
+                branchProfit.toFixed(2),
                 b.payment_status || '',
                 b.status || '',
                 b.rating || '',
@@ -676,7 +681,7 @@ export default function CRMPage() {
                                         <th colSpan={3} className={styles.bgGroupVehicle} style={{ textAlign: 'center', borderBottom: 'none' }}>ข้อมูลรถ</th>
                                         <th colSpan={4} className={styles.bgGroupDetail} style={{ textAlign: 'center', borderBottom: 'none' }}>รายละเอียดงาน</th>
                                         <th colSpan={10} className={styles.bgGroupPricing} style={{ textAlign: 'center', borderBottom: 'none' }}>การเงิน & ส่วนลด</th>
-                                        <th colSpan={7} className={styles.bgGroupCosts} style={{ textAlign: 'center', borderBottom: 'none' }}>คำนวนต้นทุนจ่ายพนักงาน</th>
+                                        <th colSpan={9} className={styles.bgGroupCosts} style={{ textAlign: 'center', borderBottom: 'none' }}>คำนวนต้นทุนจ่ายพนักงาน</th>
                                         <th colSpan={3} className={styles.bgGroupStatus} style={{ textAlign: 'center', borderBottom: 'none' }}>สถานะ & รีวิว</th>
                                         <th colSpan={2} style={{ textAlign: 'center', borderBottom: 'none' }}>รับ/ส่ง</th>
                                     </tr>
@@ -715,6 +720,8 @@ export default function CRMPage() {
                                         <th className={styles.bgGroupCosts}>ต้นทุน</th>
                                         <th className={styles.bgGroupCosts}>โบนัส</th>
                                         <th className={styles.bgGroupCosts}>เพิ่มเติม(สตาฟ)</th>
+                                        <th className={styles.bgGroupCosts}>หัก Stripe แรก (1.76%)</th>
+                                        <th className={styles.bgGroupCosts}>หัก Stripe เพิ่ม (1.76%)</th>
                                         <th className={styles.bgGroupCosts}>เข้าสาขา</th>
 
                                         {/* Status */}
@@ -826,8 +833,11 @@ export default function CRMPage() {
                                                     const capital = b.capital_cost || 0;
                                                     const bonus = b.staff_extra_payout || 0;
                                                     const extraStaff = b.additional_price || 0;
+                                                    const firstTransfer = computedTotal - extraStaff;
+                                                    const stripeFee1 = firstTransfer * 0.0176;
+                                                    const stripeFee2 = extraStaff * 0.0176;
                                                     const staffTotal = labor + rental + fuel + capital + bonus + extraStaff;
-                                                    const branchProfit = computedTotal - staffTotal;
+                                                    const branchProfit = computedTotal - staffTotal - stripeFee1 - stripeFee2;
 
                                                     return (
                                                         <>
@@ -842,8 +852,10 @@ export default function CRMPage() {
                                                             <td className={styles.bgGroupCosts}>฿{capital.toLocaleString()}</td>
                                                             <td className={styles.bgGroupCosts} style={{ fontWeight: 600 }}>฿{bonus.toLocaleString()}</td>
                                                             <td className={styles.bgGroupCosts}>฿{extraStaff.toLocaleString()}</td>
-                                                            <td className={styles.bgGroupCosts} style={{ fontWeight: 800, color: 'var(--success)', borderLeft: '2px solid var(--border)' }}>
-                                                                ฿{branchProfit.toLocaleString()}
+                                                            <td className={styles.bgGroupCosts} style={{ color: 'var(--danger)' }}>-฿{stripeFee1.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                            <td className={styles.bgGroupCosts} style={{ color: 'var(--danger)' }}>-฿{stripeFee2.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                                                            <td className={styles.bgGroupCosts} style={{ fontWeight: 800, color: branchProfit >= 0 ? 'var(--success)' : 'var(--danger)', borderLeft: '2px solid var(--border)' }}>
+                                                                ฿{branchProfit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                                             </td>
                                                         </>
                                                     )
@@ -881,7 +893,7 @@ export default function CRMPage() {
                                         )
                                     })}
                                     {filteredTransactions.length === 0 && (
-                                        <tr><td colSpan={21} style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>ไม่พบข้อมูลธุรกรรมในช่วงเวลานี้</td></tr>
+                                        <tr><td colSpan={34} style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>ไม่พบข้อมูลธุรกรรมในช่วงเวลานี้</td></tr>
                                     )}
                                 </tbody>
                             </table>
