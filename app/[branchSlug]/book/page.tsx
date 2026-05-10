@@ -756,6 +756,28 @@ export default function BookPage() {
         const initAdditionalNote = currentAddonDisplayTotal > 0 ? 'บริการเสริม (รอชำระ)' : null
 
         try {
+            // ── Guard: ตรวจสอบว่าเวลาที่เลือกยังไม่เลยมาแล้ว ณ เวลา submit จริง ──
+            const nowAtSubmit = new Date()
+            const thAtSubmit = new Date(nowAtSubmit.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }))
+            const thDateStr = thAtSubmit.getFullYear() + '-' + String(thAtSubmit.getMonth() + 1).padStart(2, '0') + '-' + String(thAtSubmit.getDate()).padStart(2, '0')
+            if (selectedDate === thDateStr) {
+                const [sh, sm] = selectedSlot.split(':').map(Number)
+                const slotMins = sh * 60 + sm
+                const nowMins = thAtSubmit.getHours() * 60 + thAtSubmit.getMinutes()
+                if (slotMins <= nowMins) {
+                    alert('ขออภัยครับ เวลาที่เลือกผ่านมาแล้ว กรุณาเลือกเวลาใหม่')
+                    setSubmitting(false)
+                    setStep(2) // กลับไปหน้าเลือกเวลา
+                    return
+                }
+                if (slotMins < nowMins + 20) {
+                    alert('ขออภัยครับ กรุณาจองล่วงหน้าอย่างน้อย 20 นาที กรุณาเลือกเวลาใหม่')
+                    setSubmitting(false)
+                    setStep(2)
+                    return
+                }
+            }
+
             const { data: bookingData, error } = await supabase.from('bookings').insert({
                 id: bookingId,
                 customer_id: customer.id,
