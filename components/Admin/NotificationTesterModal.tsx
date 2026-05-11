@@ -268,7 +268,8 @@ export default function NotificationTesterModal({ isOpen, onClose }: Notificatio
             localStorage.setItem('liff_customer', JSON.stringify(data))
             localStorage.setItem('liff_line_user_id', data.line_user_id || '')
             localStorage.setItem('last_branch_slug', branch)
-            window.open(`/${branch}/menu`, '_blank')
+            // Open the entry page (not /menu directly) so liff_customer is picked up correctly
+            window.open(`/${branch}`, '_blank')
             setStatus({ type: 'success', msg: `จำลองเป็น ${data.full_name} สำเร็จ!` })
         } catch (err: any) {
             setStatus({ type: 'error', msg: `จำลองล้มเหลว: ${err.message}` })
@@ -411,7 +412,7 @@ export default function NotificationTesterModal({ isOpen, onClose }: Notificatio
                                 {targetType === 'customer' && selectedUser && (
                                     <div style={{ marginTop: 12, padding: 14, background: '#EFF3FD', borderRadius: 12, border: '1px dashed var(--brand-dominant)' }}>
                                         <p style={{ fontSize: '0.83rem', fontWeight: 700, color: 'var(--brand-dominant)', marginBottom: 10 }}>
-                                            🛠️ ตัวจำลองลูกค้า (Local Testing)
+                                            🛠️ ตัวจำลองลูกค้า
                                         </p>
                                         <button
                                             className="btn btn-primary"
