@@ -648,7 +648,7 @@ export default function BookPage() {
             }
 
             let amountToDiscount = 0
-            // ── Refund codes apply discount on total price (all fees), normal codes apply on pkgPrice only ──
+            // ── Rebooking codes apply discount on total price (all fees), normal codes apply on pkgPrice only ──
             const discountBase = discount.is_refund_code ? displayTotal : pkgPrice
             if (discount.discount_type === 'percent') {
                 amountToDiscount = Math.ceil(discountBase * (discount.discount_value / 100))
@@ -660,8 +660,8 @@ export default function BookPage() {
 
             setDiscountAmount(amountToDiscount)
             setIsRefundCode(discount.is_refund_code === true)
-            const refundLabel = discount.is_refund_code ? ' (คืนเงิน - ลดจากยอดรวม)' : ''
-            setDiscountMsg(`✅ ลด ${amountToDiscount} บาท${refundLabel}`)
+            const rebookingLabel = discount.is_refund_code ? ' (Rebooking - ลดจากยอดรวม)' : ''
+            setDiscountMsg(`✅ ลด ${amountToDiscount} บาท${rebookingLabel}`)
         } catch (e: any) {
             setDiscountMsg(`❌ ${e.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่'}`)
             setDiscountAmount(0)
@@ -671,7 +671,7 @@ export default function BookPage() {
     }
     const fetchPaymentIntent = async () => {
         if (clientSecret || submitting) return
-        if (total <= 0) return // Refund code covers full amount — skip Stripe
+        if (total <= 0) return // Rebooking code covers full amount — skip Stripe
         setSubmitting(true)
         const bId = pendingBookingId || generateScalableId('BK')
         setPendingBookingId(bId)
