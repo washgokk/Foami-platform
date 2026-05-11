@@ -536,9 +536,13 @@ export default function BookPage() {
         const pricingType = dbA.pricing_type || (dbA.description.includes('[Pricing: Variable]') ? 'notify_later' : 'fixed')
 
         if (pricingType === 'notify_later') {
+            // Non-fuel notify-later addons: no mode selector shown, always complete
+            if (!addonName.includes('เติมน้ำมัน')) return true
+
+            // Fuel addons: require note + mode selection
             const vState = addonVariableStates[addonName]
             if (!vState) return false
-            if (addonName.includes('น้ำมัน') && !vState.note?.trim()) return false
+            if (!vState.note?.trim()) return false
             if (vState.mode === 'full_tank') return true
             if (vState.mode === 'custom' && (Number(vState.customAmount) || 0) > 0) return true
             return false
