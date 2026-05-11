@@ -62,21 +62,10 @@ export async function POST(req: NextRequest) {
 
         let staffIds = schedules?.map((s: any) => s.staff_id).filter(Boolean) || []
         
-        // 2. Fallback: If no scheduled staff found, notify ALL staff in this branch
+        // [Fix 3] No more all-branch fallback — if no scheduled staff found, skip notification
+        // (Webhook will handle payment-confirmed bookings separately)
         if (staffIds.length === 0) {
-            console.log(`[Booking] No scheduled staff found. Falling back to all staff in branch.`)
-            let fallbackQuery = supabase.from('staff').select('id, line_user_id').eq('is_active', true)
-            if (branch_id) {
-                fallbackQuery = (fallbackQuery as any).eq('branch_id', branch_id)
-            }
-            const { data: branchStaff } = await fallbackQuery
-
-            if (branchStaff && branchStaff.length > 0) {
-                staffIds = branchStaff.map(s => s.id)
-            } else {
-                const { data: allStaff } = await supabase.from('staff').select('id, line_user_id').eq('is_active', true)
-                staffIds = allStaff?.map(s => s.id) || []
-            }
+            console.log(`[Booking] No scheduled staff found for zone ${zone_id} at ${scheduled_time} on ${scheduled_date}. Skipping notification.`)
         }
 
         console.log(`[Booking] Notifying staff members:`, staffIds)

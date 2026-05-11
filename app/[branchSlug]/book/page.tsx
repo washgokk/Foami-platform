@@ -126,6 +126,7 @@ export default function BookPage() {
     const [discountAmount, setDiscountAmount] = useState(0)
     const [discountLoading, setDiscountLoading] = useState(false)
     const [discountMsg, setDiscountMsg] = useState('')
+    const [isRefundCode, setIsRefundCode] = useState(false)
 
     // Step 5 — Payment
     const [payMethod, setPayMethod] = useState<'transfer' | 'stripe'>('stripe')
@@ -196,6 +197,14 @@ export default function BookPage() {
                     return settings ? settings.is_active : true
                 })
 
+                // Pre-compute active addon names for filtering (must be done before parsing packages)
+                const activeAddonNames = new Set(
+                    (ads || []).filter(a => {
+                        const settings = a.branch_settings?.[branch.id]
+                        return settings ? settings.is_active : true
+                    }).map(a => a.name)
+                )
+
                 const parsed = filteredSvcs.map(s => {
                     const settings = s.branch_settings?.[branch.id]
                     const markup = Number(settings?.price_markup || 0)
@@ -203,6 +212,10 @@ export default function BookPage() {
                     const parts = s.description.split('\n[Addons: ')
                     const desc = parts[0]
                     const addonsStr = parts.length > 1 ? parts[1].replace(']', '') : ''
+
+                    // [Fix] Only show addons that are currently active — filter against activeAddonNames
+                    const allAddons = addonsStr ? addonsStr.split(',').map((a: string) => a.trim()).filter(Boolean) : []
+                    const activeAddons = allAddons.filter((addonName: string) => activeAddonNames.has(addonName))
 
                     return {
                         id: s.id,
@@ -217,7 +230,7 @@ export default function BookPage() {
                         icon: s.name.includes('เคลือบ') ? 'sparkles' : s.name.includes('บำรุง') ? 'wrench' : 'droplets',
                         color: s.name.includes('เคลือบ') ? 'var(--brand-accent)' : s.name.includes('บำรุง') ? 'var(--brand-subordinate)' : 'var(--brand-dominant)',
                         image_url: s.image_url,
-                        availableAddons: addonsStr ? addonsStr.split(',') : [],
+                        availableAddons: activeAddons,
                         is_addon_required: s.is_addon_required,
                         branch_markup: markup
                     }
@@ -630,16 +643,20 @@ export default function BookPage() {
             }
 
             let amountToDiscount = 0
+            // ── Refund codes apply discount on total price (all fees), normal codes apply on pkgPrice only ──
+            const discountBase = discount.is_refund_code ? displayTotal : pkgPrice
             if (discount.discount_type === 'percent') {
-                amountToDiscount = Math.ceil(pkgPrice * (discount.discount_value / 100))
+                amountToDiscount = Math.ceil(discountBase * (discount.discount_value / 100))
                 if (discount.max_discount_amount) amountToDiscount = Math.min(amountToDiscount, discount.max_discount_amount)
             } else {
                 amountToDiscount = discount.discount_value
             }
-            amountToDiscount = Math.min(amountToDiscount, pkgPrice)
+            amountToDiscount = Math.min(amountToDiscount, discountBase)
 
             setDiscountAmount(amountToDiscount)
-            setDiscountMsg(`✅ ลด ${amountToDiscount} บาท`)
+            setIsRefundCode(discount.is_refund_code === true)
+            const refundLabel = discount.is_refund_code ? ' (คืนเงิน - ลดจากยอดรวม)' : ''
+            setDiscountMsg(`✅ ลด ${amountToDiscount} บาท${refundLabel}`)
         } catch (e: any) {
             setDiscountMsg(`❌ ${e.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่'}`)
             setDiscountAmount(0)
@@ -649,6 +666,7 @@ export default function BookPage() {
     }
     const fetchPaymentIntent = async () => {
         if (clientSecret || submitting) return
+        if (total <= 0) return // Refund code covers full amount — skip Stripe
         setSubmitting(true)
         const bId = pendingBookingId || generateScalableId('BK')
         setPendingBookingId(bId)
@@ -683,7 +701,7 @@ export default function BookPage() {
 
     // Auto-fetch when reaching payment step or when total price changes
     useEffect(() => {
-        if (step === 4 && payMethod === 'stripe') {
+        if (step === 4 && payMethod === 'stripe' && total > 0) {
             fetchPaymentIntent()
         }
     }, [step, payMethod, total]) // Re-fetch if total price changes
@@ -691,6 +709,11 @@ export default function BookPage() {
     const handleStripeSuccess = async (paymentIntentId: string) => {
         setPaymentSuccessful(true)
         await submit(paymentIntentId)
+    }
+
+    // Handle free booking via refund code (no Stripe needed)
+    const handleFreeBooking = async () => {
+        await submit(undefined)
     }
 
     // ─── Submit ──────────────────────────────────────────────────
@@ -778,55 +801,69 @@ export default function BookPage() {
                 }
             }
 
-            const { data: bookingData, error } = await supabase.from('bookings').insert({
-                id: bookingId,
-                customer_id: customer.id,
-                service_id: selectedPkg?.id,
-                addon_ids: richAddons,
-                pickup_lat: pickupLat, pickup_lng: pickupLng, pickup_address: finalPickupAddr,
-                delivery_lat: finalDeliveryLat, delivery_lng: finalDeliveryLng, delivery_address: finalDeliveryAddr,
-                scheduled_date: selectedDate, scheduled_time: selectedSlot,
-                branch_id: activeBranchId,
-                zone_id: zoneId || null,
-                extra_fee: extraFee,
-                travel_surcharge: travelSurchargeState,
-                different_spot_fee: differentSpotFee,
-                staff_extra_payout: (travelSurchargeState + differentSpotFee) * 0.5,
-                base_price: basePrice, 
-                total_price: total, // Only paid amount (Package + Fees - Discount)
-                additional_price: 0,
-                additional_price_note: richAddons.length > 0 ? `บริการเสริมที่เลือก: ${richAddons.map(a => a.name).join(', ')} (รอเรียกเก็บ)` : null,
-                is_additional_paid: false,
-                discount_code: discountCode || null, discount_amount: discountAmount,
-                payment_method: payMethod,
-                payment_status: stripeId ? 'paid' : (payMethod === 'stripe' ? 'paid' : 'pending'),
-                stripe_payment_id: stripeId || null,
-                vehicle_data: selectedVehicle,
-                vehicle_photos: [], // Start with empty
-                customer_note: customerNote || null,
-                status: 'pending',
-                auto_assigned: false,
-                package_markup_amount: (selectedPkg as any)?.branch_markup || 0,
-                original_base_price: (selectedPkg?.vehicle_size === 'S' ? (selectedPkg as any).original_price_s : selectedPkg?.vehicle_size === 'M' ? (selectedPkg as any).original_price_m : (selectedPkg as any).original_price_l) || 0,
-                labor_cost: bSettings?.labor_cost_per_job || 0,
-                capital_cost: bSettings?.max_capital_per_job || 0,
-                rental_cost: bSettings?.vehicle_rental_per_job || 0,
-                fuel_cost: bSettings?.fuel_cost_per_job || 0
-            }).select().single()
+            // ── [Root Cause Fix] Use server-side API with service client (bypasses RLS) ──
+            const commitRes = await fetch('/api/bookings/commit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: bookingId,
+                    customer_id: customer.id,
+                    service_id: selectedPkg?.id,
+                    addon_ids: richAddons,
+                    pickup_lat: pickupLat, pickup_lng: pickupLng, pickup_address: finalPickupAddr,
+                    delivery_lat: finalDeliveryLat, delivery_lng: finalDeliveryLng, delivery_address: finalDeliveryAddr,
+                    scheduled_date: selectedDate, scheduled_time: selectedSlot,
+                    branch_id: activeBranchId,
+                    zone_id: zoneId || null,
+                    extra_fee: extraFee,
+                    travel_surcharge: travelSurchargeState,
+                    different_spot_fee: differentSpotFee,
+                    staff_extra_payout: (travelSurchargeState + differentSpotFee) * 0.5,
+                    base_price: basePrice,
+                    gross_total: displayTotal, // [Fix ข้อ2] Gross before discount — accurate DB record
+                    discount_code: discountCode || null,
+                    discount_amount: discountAmount,
+                    payment_method: payMethod,
+                    payment_status: stripeId ? 'paid' : (payMethod === 'stripe' ? 'paid' : 'pending'),
+                    stripe_payment_id: stripeId || null,
+                    vehicle_data: selectedVehicle,
+                    customer_note: customerNote || null,
+                    package_markup_amount: (selectedPkg as any)?.branch_markup || 0,
+                    original_base_price: (selectedPkg?.vehicle_size === 'S' ? (selectedPkg as any).original_price_s : selectedPkg?.vehicle_size === 'M' ? (selectedPkg as any).original_price_m : (selectedPkg as any).original_price_l) || 0,
+                    labor_cost: bSettings?.labor_cost_per_job || 0,
+                    capital_cost: bSettings?.max_capital_per_job || 0,
+                    rental_cost: bSettings?.vehicle_rental_per_job || 0,
+                    fuel_cost: bSettings?.fuel_cost_per_job || 0,
+                }),
+            })
 
-            if (error) throw error
-            const insertedBooking: any = bookingData
-            if (!insertedBooking) throw new Error('ไม่พบข้อมูลการจองหลังบันทึก')
-
-            // Increment discount code usage if applicable
-            if (discountCode) {
-                const { data: disc } = await supabase.from('discount_codes').select('used_count').eq('code', discountCode.toUpperCase()).single()
-                if (disc) {
-                    await supabase.from('discount_codes').update({ used_count: (disc.used_count || 0) + 1 }).eq('code', discountCode.toUpperCase())
+            // ── [Fix A] Handle commit failure → auto-refund Stripe ──
+            if (!commitRes.ok) {
+                const errData = await commitRes.json().catch(() => ({}))
+                const errMsg = errData.error || `HTTP ${commitRes.status}`
+                if (stripeId) {
+                    try {
+                        await fetch('/api/stripe/refund', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ paymentIntentId: stripeId, reason: 'duplicate' }),
+                        })
+                        alert(`เกิดข้อผิดพลาดในการบันทึกการจอง\nเราได้คืนเงินให้คุณโดยอัตโนมัติแล้ว กรุณารอ 5-10 วันทำการ\n\nรายละเอียด: ${errMsg}`)
+                    } catch {
+                        alert(`เกิดข้อผิดพลาดในการบันทึกการจอง กรุณาติดต่อเราเพื่อขอคืนเงิน\n\nรายละเอียด: ${errMsg}`)
+                    }
+                    setSubmitting(false)
+                    return
                 }
+                throw new Error(errMsg)
             }
 
-            // Upload slip if transfer
+            const { booking: insertedBooking } = await commitRes.json()
+            if (!insertedBooking) throw new Error('ไม่พบข้อมูลการจองหลังบันทึก')
+
+            // (Discount increment + staff notification handled server-side in /api/bookings/commit)
+
+            // Upload slip if transfer (client-side — needs file object)
             if (payMethod === 'transfer' && slip && insertedBooking.id) {
                 const fd = new FormData()
                 fd.append('booking_id', insertedBooking.id)
@@ -834,7 +871,7 @@ export default function BookPage() {
                 await fetch('/api/upload-slip', { method: 'POST', body: fd }).catch(e => console.error('Slip upload error:', e))
             }
 
-            // Upload vehicle photos if any
+            // Upload vehicle photos if any (client-side — needs file objects)
             if (vehicleFiles.length > 0 && insertedBooking.id) {
                 const photoUrls: string[] = []
                 for (const file of vehicleFiles) {
@@ -844,7 +881,6 @@ export default function BookPage() {
                         const { data: uData, error: uError } = await supabase.storage
                             .from('job-photos')
                             .upload(path, file, { contentType: file.type })
-
                         if (!uError && uData) {
                             const { data: { publicUrl } } = supabase.storage.from('job-photos').getPublicUrl(path)
                             photoUrls.push(publicUrl)
@@ -856,77 +892,25 @@ export default function BookPage() {
                 }
             }
 
-            // Notify staff (non-blocking)
-            try {
-                const { data: schedules } = await supabase
-                    .from('staff_schedules')
-                    .select('staff_id, staff(line_user_id)')
-                    .eq('zone_id', zoneId)
-                    .eq('date', selectedDate)
-                    .eq('time_slot', selectedSlot)
-                    .eq('is_booked', false)
-
-                const lineIds = schedules?.map((s: any) => s.staff?.line_user_id).filter(Boolean) || []
-                const staffIds = schedules?.map((s: any) => s.staff_id).filter(Boolean) || []
-
-                // Send Line Notifications
-                if (lineIds.length > 0) {
-                    fetch('/api/line/notify-staff', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            line_user_ids: lineIds, 
-                            booking_id: insertedBooking.id, 
-                            message: `🔔 มีงานใหม่!\nวันที่: ${selectedDate} เวลา: ${selectedSlot?.slice(0, 5)} น.\nกรุณาเปิดแอปเพื่อรับงาน` 
-                        }),
-                    }).catch(() => { })
-                }
-
-                // Send Web Push Notifications
-                if (staffIds.length > 0) {
-                    const payload = {
-                        title: '🔔 มีงานใหม่เข้า!',
-                        body: `วันที่: ${selectedDate} เวลา: ${selectedSlot?.slice(0, 5)} น.\nกดเพื่อดูรายละเอียดและรับงานเลย`,
-                        url: '/staff'
-                    }
-                    
-                    if (localStorage.getItem('foami_mock_db_enabled') === 'true') {
-                        // LOCAL BRIDGE for Mock DB Testing:
-                        // Search for staff subscriptions directly in local storage for same-device testing
-                        const localSubs = JSON.parse(localStorage.getItem('foami_mock_db_push_subscriptions') || '[]')
-                        const targetSubs = localSubs.filter((s: any) => staffIds.includes(s.user_id) && s.platform === 'staff')
-                        
-                        targetSubs.forEach((s: any) => {
-                            fetch('/api/push/send-test', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ 
-                                    subscription: s.subscription,
-                                    ...payload 
-                                }),
-                            }).catch(() => {})
-                        })
-                    } else {
-                        // Standard Production Flow
-                        fetch('/api/push/notify-staff', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                staff_ids: staffIds,
-                                payload
-                            })
-                        }).catch(e => console.error('Push notify error:', e))
-                    }
-                }
-            } catch (err) {
-                console.error('Notification error:', err)
-            }
-
             setSubmitting(false)
             router.replace(`/${branchSlug}/my-bookings?success=1`)
         } catch (e: any) {
             console.error('Submit Error:', e)
-            alert('เกิดข้อผิดพลาดในการจอง: ' + (e.message || 'กรุณาลองใหม่อีกครั้ง'))
+            // ── [Fix A] Outer catch: also try to refund if stripe was charged ──
+            if (stripeId) {
+                try {
+                    await fetch('/api/stripe/refund', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ paymentIntentId: stripeId, reason: 'duplicate' }),
+                    })
+                    alert(`เกิดข้อผิดพลาดในการจอง เราได้คืนเงินให้คุณโดยอัตโนมัติแล้ว กรุณารอ 5-10 วันทำการ\n\nรายละเอียด: ${e.message || 'กรุณาลองใหม่อีกครั้ง'}`)
+                } catch {
+                    alert('เกิดข้อผิดพลาดในการจอง กรุณาติดต่อเราเพื่อขอคืนเงิน: ' + (e.message || 'กรุณาลองใหม่อีกครั้ง'))
+                }
+            } else {
+                alert('เกิดข้อผิดพลาดในการจอง: ' + (e.message || 'กรุณาลองใหม่อีกครั้ง'))
+            }
             setSubmitting(false)
         }
     }
@@ -1754,13 +1738,26 @@ export default function BookPage() {
                         </h2>
 
                         {/* Total reminder */}
-                        <div style={{ textAlign: 'center', padding: 'var(--space-6)', background: 'var(--primary-ghost)', borderRadius: 'var(--radius-xl)', marginBottom: 'var(--space-5)' }}>
+                        <div style={{ textAlign: 'center', padding: 'var(--space-6)', background: total <= 0 ? 'rgba(16,185,129,0.08)' : 'var(--primary-ghost)', borderRadius: 'var(--radius-xl)', marginBottom: 'var(--space-5)', border: total <= 0 ? '2px solid rgba(16,185,129,0.3)' : 'none' }}>
                             <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>ยอดชำระ</div>
-                            <div style={{ fontSize: '2.2rem', fontWeight: 900, color: 'var(--primary)' }}>฿{total.toLocaleString()}</div>
+                            <div style={{ fontSize: '2.2rem', fontWeight: 900, color: total <= 0 ? 'var(--success)' : 'var(--primary)' }}>
+                                {total <= 0 ? 'ฟรี! ✨' : `฿${total.toLocaleString()}`}
+                            </div>
+                            {isRefundCode && total <= 0 && (
+                                <div style={{ fontSize: '0.8rem', color: 'var(--success)', marginTop: 4, fontWeight: 600 }}>
+                                    โค้ดคืนเงินถูกใช้แล้ว — ไม่ต้องชำระเงิน
+                                </div>
+                            )}
                         </div>
 
-                        {/* Payment method - Hidden if only one option or already fetching */}
-                        {paymentError ? (
+                        {/* Free booking via refund code */}
+                        {isRefundCode && total <= 0 ? (
+                            <div style={{ background: 'rgba(16,185,129,0.06)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-6)', border: '1.5px solid rgba(16,185,129,0.25)', textAlign: 'center' }}>
+                                <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>🎉</div>
+                                <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--success)', marginBottom: 4 }}>จองฟรีด้วยโค้ดคืนเงิน</div>
+                                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>เพียงกดปุ่มด้านล่างเพื่อยืนยันการจอง</div>
+                            </div>
+                        ) : paymentError ? (
                             <div className="alert alert-danger" style={{ marginBottom: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', textAlign: 'center' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                     <AlertTriangle size={20} />
@@ -1812,18 +1809,30 @@ export default function BookPage() {
                             ถัดไป <ChevronRight size={18} />
                         </button>
                     ) : (
-                        // Hide main footer button when Stripe form is active (CheckoutForm has its own button)
-                        clientSecret && step === 4 ? null : (
+                        // Free booking path (refund code, total = 0)
+                        isRefundCode && total <= 0 && step === 4 ? (
                             <button
                                 className="btn btn-primary"
-                                style={{ flex: 2, gap: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)' }}
-                                disabled={submitting || !currentCanNext}
-                                onClick={payMethod === 'stripe' ? fetchPaymentIntent : () => submit()}
+                                style={{ flex: 2, gap: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)' }}
+                                disabled={submitting}
+                                onClick={handleFreeBooking}
                             >
-                                {submitting ? <span className="spinner" /> :
-                                    payMethod === 'stripe' ? <><CreditCard size={18} /> ชำระเงิน</> :
-                                        <><CheckCircle size={18} /> ยืนยันการจอง</>}
+                                {submitting ? <span className="spinner" /> : <><CheckCircle size={18} /> ยืนยันจองฟรี 🎉</>}
                             </button>
+                        ) : (
+                            // Hide main footer button when Stripe form is active (CheckoutForm has its own button)
+                            clientSecret && step === 4 ? null : (
+                                <button
+                                    className="btn btn-primary"
+                                    style={{ flex: 2, gap: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)' }}
+                                    disabled={submitting || !currentCanNext}
+                                    onClick={payMethod === 'stripe' ? fetchPaymentIntent : () => submit()}
+                                >
+                                    {submitting ? <span className="spinner" /> :
+                                        payMethod === 'stripe' ? <><CreditCard size={18} /> ชำระเงิน</> :
+                                            <><CheckCircle size={18} /> ยืนยันการจอง</>}
+                                </button>
+                            )
                         )
                     )}
                 </div>

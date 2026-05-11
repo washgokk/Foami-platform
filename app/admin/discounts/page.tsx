@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import styles from './discounts.module.css'
-import { Ticket, Sparkles, Edit2, CheckCircle, AlertCircle, Trash2, Calendar, ClipboardList, Clock } from 'lucide-react'
+import { Ticket, Sparkles, Edit2, CheckCircle, AlertCircle, Trash2, Calendar, ClipboardList, Clock, RefreshCcw } from 'lucide-react'
 import ConfirmModal from '@/components/Global/ConfirmModal'
 import { trackAuditLog } from '@/lib/audit'
 
@@ -29,7 +29,8 @@ export default function AdvancedDiscountsPage() {
         max_uses: '10',
         max_uses_per_customer: '1',
         target_segment: 'all',
-        expires_at: ''
+        expires_at: '',
+        is_refund_code: false
     })
 
     const loadData = async () => {
@@ -67,7 +68,8 @@ export default function AdvancedDiscountsPage() {
             max_uses_per_customer: formData.max_uses_per_customer ? Number(formData.max_uses_per_customer) : null,
             target_segment: targetValue,
             expires_at: formData.expires_at ? new Date(formData.expires_at).toISOString() : null,
-            is_active: true
+            is_active: true,
+            is_refund_code: formData.is_refund_code
         }
 
         if (editingId) {
@@ -105,7 +107,7 @@ export default function AdvancedDiscountsPage() {
         setFormData({
             code: '', discount_type: 'percent', discount_value: '',
             max_discount_amount: '100', max_uses: '10', max_uses_per_customer: '1',
-            target_segment: 'all', expires_at: ''
+            target_segment: 'all', expires_at: '', is_refund_code: false
         })
     }
 
@@ -130,7 +132,8 @@ export default function AdvancedDiscountsPage() {
             max_uses: code.max_uses?.toString() || '',
             max_uses_per_customer: code.max_uses_per_customer?.toString() || '',
             target_segment: parsedSegmentId,
-            expires_at: code.expires_at ? new Date(code.expires_at).toISOString().slice(0, 16) : ''
+            expires_at: code.expires_at ? new Date(code.expires_at).toISOString().slice(0, 16) : '',
+            is_refund_code: code.is_refund_code || false
         })
         setShowModal(true)
     }
@@ -226,7 +229,14 @@ export default function AdvancedDiscountsPage() {
                         {codes.map(c => (
                             <div key={c.id} className={styles.codeItem} style={{ opacity: c.is_active ? 1 : 0.6 }}>
                                 <div className={styles.codeItemLeft}>
-                                    <div className={styles.codeName}>{c.code}</div>
+                                    <div className={styles.codeName} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        {c.code}
+                                        {c.is_refund_code && (
+                                            <span style={{ fontSize: '0.65rem', padding: '2px 7px', background: 'var(--danger)', color: 'white', borderRadius: 20, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                <RefreshCcw size={10} /> คืนเงิน
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className={styles.codeDetails}>
                                         ลด {c.discount_value}{c.discount_type === 'percent' ? '%' : '฿'}
                                         {c.max_discount_amount && ` (สูงสุด ฿${c.max_discount_amount})`}
@@ -346,6 +356,27 @@ export default function AdvancedDiscountsPage() {
                                 <div className={styles.formRow}>
                                     <label className={styles.label}>วันหมดอายุคูปอง</label>
                                     <input type="datetime-local" className={styles.input} value={formData.expires_at} onChange={e => setFormData({ ...formData, expires_at: e.target.value })} />
+                                </div>
+
+                                {/* Refund Code Toggle */}
+                                <div className={styles.formRow} style={{ background: 'rgba(239,68,68,0.06)', border: '1.5px solid rgba(239,68,68,0.2)', borderRadius: 12, padding: '14px 16px' }}>
+                                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.is_refund_code}
+                                            onChange={e => setFormData({ ...formData, is_refund_code: e.target.checked })}
+                                            style={{ marginTop: 3, width: 16, height: 16, accentColor: 'var(--danger)', cursor: 'pointer' }}
+                                        />
+                                        <div>
+                                            <div style={{ fontWeight: 700, color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <RefreshCcw size={14} /> โค้ดคืนเงิน (Refund Code)
+                                            </div>
+                                            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 3 }}>
+                                                เมื่อติ๊ก: ส่วนลดจะคำนวณจาก <strong>ยอดรวมทั้งหมด</strong> (แพ็กเกจ + ค่าเดินทาง + บริการเสริม)
+                                                แทนที่จะลดแค่ราคาแพ็กเกจ เหมาะสำหรับให้ลูกค้าที่เคยโดนตัดเงินแล้วจองใหม่ฟรี
+                                            </div>
+                                        </div>
+                                    </label>
                                 </div>
 
                                 <div className={styles.formRow} style={{ marginTop: 'var(--space-3)', display: 'flex', gap: 'var(--space-3)' }}>
