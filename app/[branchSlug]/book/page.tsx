@@ -732,9 +732,11 @@ export default function BookPage() {
             const detail: any = { name, isFree: desc.includes('[Pricing: Free]') }
             if (dbA) {
                 if (desc.includes('[Pricing: Variable]')) {
-                    const vState = addonVariableStates[name] || { mode: 'full_tank', customAmount: '' }
+                    // Only fuel addons have mode selection; others are just notify-later
+                    const defaultMode = name.includes('เติมน้ำมัน') ? 'full_tank' : 'notify_later'
+                    const vState = addonVariableStates[name] || { mode: defaultMode, customAmount: '' }
                     detail.variableState = vState
-                    if (vState.note && name.includes('น้ำมัน')) {
+                    if (vState.note && name.includes('เติมน้ำมัน')) {
                         detail.name = `${name} (${vState.note.trim()})`
                     }
                 } else if (desc.includes('[Prices:')) {
@@ -1718,7 +1720,7 @@ export default function BookPage() {
                                     return (
                                         <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', marginBottom: 8, alignItems: 'center' }}>
                                             <span style={{ color: 'var(--text-secondary)' }}>
-                                                {vState?.mode === 'full_tank' ? `${label} (เต็มถัง)` : label}
+                                                {name.includes('เติมน้ำมัน') && vState?.mode === 'full_tank' ? `${label} (เต็มถัง)` : label}
                                             </span>
                                             <span style={{ fontWeight: 600, color: 'var(--warning-dark)' }}>
                                                 {priceDisplay}
