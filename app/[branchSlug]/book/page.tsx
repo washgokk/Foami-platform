@@ -1203,40 +1203,49 @@ export default function BookPage() {
                                                     </div>
                                                 )}
 
-                                                {/* Variable sub-options */}
+                                                {/* Variable sub-options — only for fuel addons */}
                                                 {addons[addon] && isNotifyLater && (
                                                     <div style={{ marginTop: 8, paddingLeft: 32 }}>
-                                                        {addon.includes('น้ำมัน') && (
-                                                            <div style={{ marginBottom: 12 }}>
-                                                                <label style={{ fontSize: '0.8rem', fontWeight: 700, display: 'block', marginBottom: 6 }}>
-                                                                    ประเภทน้ำมันที่ต้องการ/รายละเอียด <span style={{ color: 'var(--danger)' }}>*</span>
-                                                                </label>
-                                                                <textarea
-                                                                    className="form-input"
-                                                                    placeholder="เช่น เติม 95, ดีเซล B7..."
-                                                                    rows={2}
-                                                                    value={addonVariableStates[addon]?.note || ''}
-                                                                    onChange={e => setAddonVariableStates(p => ({ ...p, [addon]: { ...p[addon], note: e.target.value } }))}
-                                                                    style={{ borderRadius: 'var(--radius)', fontSize: '0.85rem' }}
-                                                                />
+                                                        {addon.includes('เติมน้ำมัน') ? (
+                                                            <>
+                                                                {/* Fuel note field */}
+                                                                <div style={{ marginBottom: 12 }}>
+                                                                    <label style={{ fontSize: '0.8rem', fontWeight: 700, display: 'block', marginBottom: 6 }}>
+                                                                        ประเภทน้ำมันที่ต้องการ/รายละเอียด <span style={{ color: 'var(--danger)' }}>*</span>
+                                                                    </label>
+                                                                    <textarea
+                                                                        className="form-input"
+                                                                        placeholder="เช่น เติม 95, ดีเซล B7..."
+                                                                        rows={2}
+                                                                        value={addonVariableStates[addon]?.note || ''}
+                                                                        onChange={e => setAddonVariableStates(p => ({ ...p, [addon]: { ...p[addon], note: e.target.value } }))}
+                                                                        style={{ borderRadius: 'var(--radius)', fontSize: '0.85rem' }}
+                                                                    />
+                                                                </div>
+                                                                {/* Full-tank / Custom buttons — fuel only */}
+                                                                <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                                                                    <button onClick={() => setAddonVariableStates(p => ({ ...p, [addon]: { ...p[addon], mode: 'full_tank' } }))} className={`btn btn-sm ${addonVariableStates[addon]?.mode === 'full_tank' ? 'btn-primary' : 'btn-outline'}`} style={{ gap: 6 }}>
+                                                                        <Droplets size={14} /> เต็มถัง
+                                                                    </button>
+                                                                    <button onClick={() => setAddonVariableStates(p => ({ ...p, [addon]: { ...p[addon], mode: 'custom' } }))} className={`btn btn-sm ${addonVariableStates[addon]?.mode === 'custom' ? 'btn-primary' : 'btn-outline'}`} style={{ gap: 6 }}>
+                                                                        <Coins size={14} /> กำหนดเอง
+                                                                    </button>
+                                                                </div>
+                                                                {addonVariableStates[addon]?.mode === 'custom' && (
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                                        <input type="number" className="form-input" placeholder="ราคา" value={addonVariableStates[addon]?.customAmount || ''} onChange={e => setAddonVariableStates(p => ({ ...p, [addon]: { ...p[addon], customAmount: e.target.value } }))} style={{ maxWidth: 120, fontSize: '0.9rem' }} />
+                                                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>บาท</span>
+                                                                    </div>
+                                                                )}
+                                                                {addonVariableStates[addon]?.mode === 'full_tank' && (
+                                                                    <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 600 }}>* ทีมงานจะแจ้งราคาหน้างานตามจริง</div>
+                                                                )}
+                                                            </>
+                                                        ) : (
+                                                            // Non-fuel notify-later addons: just show info note
+                                                            <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 600 }}>
+                                                                * พนักงานจะแจ้งราคาและเรียกเก็บหน้างานตามจริง
                                                             </div>
-                                                        )}
-                                                        <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-                                                            <button onClick={() => setAddonVariableStates(p => ({ ...p, [addon]: { ...p[addon], mode: 'full_tank' } }))} className={`btn btn-sm ${addonVariableStates[addon]?.mode === 'full_tank' ? 'btn-primary' : 'btn-outline'}`} style={{ gap: 6 }}>
-                                                                <Droplets size={14} /> เต็มถัง
-                                                            </button>
-                                                            <button onClick={() => setAddonVariableStates(p => ({ ...p, [addon]: { ...p[addon], mode: 'custom' } }))} className={`btn btn-sm ${addonVariableStates[addon]?.mode === 'custom' ? 'btn-primary' : 'btn-outline'}`} style={{ gap: 6 }}>
-                                                                <Coins size={14} /> กำหนดเอง
-                                                            </button>
-                                                        </div>
-                                                        {addonVariableStates[addon]?.mode === 'custom' && (
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                                <input type="number" className="form-input" placeholder="ราคา" value={addonVariableStates[addon]?.customAmount || ''} onChange={e => setAddonVariableStates(p => ({ ...p, [addon]: { ...p[addon], customAmount: e.target.value } }))} style={{ maxWidth: 120, fontSize: '0.9rem' }} />
-                                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>บาท</span>
-                                                            </div>
-                                                        )}
-                                                        {addonVariableStates[addon]?.mode === 'full_tank' && (
-                                                            <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 600 }}>* ทีมงานจะแจ้งราคาหน้างานตามจริง</div>
                                                         )}
                                                     </div>
                                                 )}
