@@ -601,6 +601,7 @@ export default function BookPage() {
     const currentAddonDisplayTotal = addonTotal()
     const currentAddonPaymentTotal = addonPaymentTotal()
     const extraFeeValue = Math.round(extraFee)
+    const grossTotal = Math.round(pkgPrice + currentAddonDisplayTotal + extraFeeValue) // Pre-discount — for DB recording
     const total = Math.round(pkgPrice + currentAddonPaymentTotal + extraFeeValue - discountAmount)
     const displayTotal = Math.round(pkgPrice + currentAddonDisplayTotal + extraFeeValue - discountAmount)
     const basePrice = pkgPrice
@@ -762,10 +763,11 @@ export default function BookPage() {
             scheduled_date: selectedDate, scheduled_time: selectedSlot,
             zone_id: zoneId, extra_fee: extraFee,
             base_price: selectedPkg?.price || 0, // ONLY Package Price
-            total_price: total,
+            total_price: grossTotal, // ← Gross total (before discount) — discount tracked separately
             discount_code: discountCode,
             discount_amount: discountAmount,
-            payment_method: payMethod,
+            payment_method: total <= 0 ? 'discount_code' : payMethod, // Mark free bookings correctly
+            payment_status: total <= 0 ? 'paid' : (stripeId ? 'paid' : 'pending'), // Free bookings are always "paid"
             vehicle_data: selectedVehicle,
             vehicle_photos: []
         }
