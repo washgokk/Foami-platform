@@ -83,6 +83,9 @@ export default function AdminBookingsPage() {
     )
 
     const calcTotal = (b: any) => {
+        // Prefer total_price from DB (stored as gross pre-discount by booking flow)
+        // Fallback: compute from fields if total_price not stored yet
+        if (b.total_price != null && b.total_price > 0) return b.total_price
         let addonTotal = 0
         if (Array.isArray(b.addon_ids)) {
             b.addon_ids.forEach((a: any) => {
@@ -97,7 +100,7 @@ export default function AdminBookingsPage() {
                 }
             })
         }
-        return (b.base_price || 0) + addonTotal + (b.travel_surcharge || 0) + (b.different_spot_fee || 0) + (b.additional_price || 0) - (b.discount_amount || 0)
+        return (b.base_price || 0) + addonTotal + (b.travel_surcharge || 0) + (b.different_spot_fee || 0) + (b.additional_price || 0)
     }
 
     const STATUS_OPTIONS = ['all', 'pending', 'confirmed', 'picking_up', 'washing', 'delivering', 'completed', 'cancelled']
@@ -498,6 +501,14 @@ export default function AdminBookingsPage() {
                                                     </span>
                                                 } />
                                                 <DrawerRow label="ยอดรวม" value={<span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--brand-dominant)' }}>฿{calcTotal(selected).toLocaleString()}</span>} />
+                                                {selected.discount_code && (
+                                                    <DrawerRow label="โค้ดส่วนลด" value={
+                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                                            <span style={{ fontFamily: 'monospace', fontWeight: 700, background: 'var(--surface-2)', padding: '2px 8px', borderRadius: 6, fontSize: '0.88rem' }}>{selected.discount_code}</span>
+                                                            {selected.discount_amount > 0 && <span style={{ color: 'var(--success)', fontWeight: 700, fontSize: '0.85rem' }}>-฿{selected.discount_amount.toLocaleString()}</span>}
+                                                        </span>
+                                                    } />
+                                                )}
                                             </SectionCard>
 
                                             {/* Slip */}

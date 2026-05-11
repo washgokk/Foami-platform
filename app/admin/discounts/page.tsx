@@ -232,8 +232,8 @@ export default function AdvancedDiscountsPage() {
                                     <div className={styles.codeName} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                         {c.code}
                                         {c.is_refund_code && (
-                                            <span style={{ fontSize: '0.65rem', padding: '2px 7px', background: 'var(--danger)', color: 'white', borderRadius: 20, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                                <RefreshCcw size={10} /> คืนเงิน
+                                            <span style={{ fontSize: '0.65rem', padding: '2px 7px', background: '#7C3AED', color: 'white', borderRadius: 20, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                <RefreshCcw size={10} /> Rebooking
                                             </span>
                                         )}
                                     </div>
@@ -358,22 +358,22 @@ export default function AdvancedDiscountsPage() {
                                     <input type="datetime-local" className={styles.input} value={formData.expires_at} onChange={e => setFormData({ ...formData, expires_at: e.target.value })} />
                                 </div>
 
-                                {/* Refund Code Toggle */}
-                                <div className={styles.formRow} style={{ background: 'rgba(239,68,68,0.06)', border: '1.5px solid rgba(239,68,68,0.2)', borderRadius: 12, padding: '14px 16px' }}>
+                                {/* Rebooking Code Toggle */}
+                                <div className={styles.formRow} style={{ background: 'rgba(124,58,237,0.06)', border: '1.5px solid rgba(124,58,237,0.2)', borderRadius: 12, padding: '14px 16px' }}>
                                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer' }}>
                                         <input
                                             type="checkbox"
                                             checked={formData.is_refund_code}
                                             onChange={e => setFormData({ ...formData, is_refund_code: e.target.checked })}
-                                            style={{ marginTop: 3, width: 16, height: 16, accentColor: 'var(--danger)', cursor: 'pointer' }}
+                                            style={{ marginTop: 3, width: 16, height: 16, accentColor: '#7C3AED', cursor: 'pointer' }}
                                         />
                                         <div>
-                                            <div style={{ fontWeight: 700, color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                <RefreshCcw size={14} /> โค้ดคืนเงิน (Refund Code)
+                                            <div style={{ fontWeight: 700, color: '#7C3AED', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <RefreshCcw size={14} /> โค้ดจองใหม่ทดแทน (Rebooking Code)
                                             </div>
                                             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 3 }}>
                                                 เมื่อติ๊ก: ส่วนลดจะคำนวณจาก <strong>ยอดรวมทั้งหมด</strong> (แพ็กเกจ + ค่าเดินทาง + บริการเสริม)
-                                                แทนที่จะลดแค่ราคาแพ็กเกจ เหมาะสำหรับให้ลูกค้าที่เคยโดนตัดเงินแล้วจองใหม่ฟรี
+                                                เหมาะสำหรับให้ลูกค้าที่เคยโดนตัดเงินแล้วแต่การจองไม่สำเร็จ ให้จองใหม่ได้เลย
                                             </div>
                                         </div>
                                     </label>

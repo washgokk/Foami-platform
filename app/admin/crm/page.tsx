@@ -711,6 +711,7 @@ export default function CRMPage() {
                                         <th className={styles.bgGroupPricing}>ต่างจุด</th>
                                         <th className={styles.bgGroupPricing}>เพิ่มเติม</th>
                                         <th className={styles.bgGroupPricing}>ส่วนลด</th>
+                                        <th className={styles.bgGroupPricing}>โค้ด</th>
                                         <th className={styles.bgGroupPricing}>ยอดรวม</th>
 
                                         {/* Staff Costs */}
@@ -822,9 +823,19 @@ export default function CRMPage() {
                                                 <td className={styles.bgGroupPricing} style={{ color: 'var(--danger)' }}>
                                                     {b.discount_amount ? `-฿${b.discount_amount.toLocaleString()}` : '฿0'}
                                                 </td>
+                                                <td className={styles.bgGroupPricing} style={{ fontSize: '0.75rem' }}>
+                                                    {b.discount_code ? (
+                                                        <span style={{ fontFamily: 'monospace', fontWeight: 700, background: 'rgba(124,58,237,0.1)', color: '#7C3AED', padding: '2px 6px', borderRadius: 4 }}>
+                                                            {b.discount_code}
+                                                        </span>
+                                                    ) : '-'}
+                                                </td>
 
                                                 {(() => {
-                                                    const computedTotal = (b.base_price || 0) + rowAddonTotal + (b.travel_surcharge || 0) + (b.different_spot_fee || 0) + (b.additional_price || 0) - (b.discount_amount || 0);
+                                                    // Use total_price from DB (gross pre-discount) when available
+                                                    const computedTotal = b.total_price && b.total_price > 0
+                                                        ? b.total_price
+                                                        : (b.base_price || 0) + rowAddonTotal + (b.travel_surcharge || 0) + (b.different_spot_fee || 0) + (b.additional_price || 0);
 
                                                     // Costs (using snapshots or 0)
                                                     const labor = b.labor_cost || 0;
