@@ -1755,24 +1755,52 @@ export default function BookPage() {
                         </h2>
 
                         {/* Total reminder */}
-                        <div style={{ textAlign: 'center', padding: 'var(--space-6)', background: total <= 0 ? 'rgba(16,185,129,0.08)' : 'var(--primary-ghost)', borderRadius: 'var(--radius-xl)', marginBottom: 'var(--space-5)', border: total <= 0 ? '2px solid rgba(16,185,129,0.3)' : 'none' }}>
-                            <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>ยอดชำระ</div>
-                            <div style={{ fontSize: '2.2rem', fontWeight: 900, color: total <= 0 ? 'var(--success)' : 'var(--primary)' }}>
-                                {total <= 0 ? 'ฟรี! ✨' : `฿${total.toLocaleString()}`}
-                            </div>
-                            {isRefundCode && total <= 0 && (
-                                <div style={{ fontSize: '0.8rem', color: 'var(--success)', marginTop: 4, fontWeight: 600 }}>
-                                    โค้ดคืนเงินถูกใช้แล้ว — ไม่ต้องชำระเงิน
+                        <div style={{ textAlign: 'center', padding: 'var(--space-6)', background: total <= 0 ? 'linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(5,150,105,0.05) 100%)' : 'var(--primary-ghost)', borderRadius: 'var(--radius-xl)', marginBottom: 'var(--space-5)', border: total <= 0 ? '1.5px solid rgba(16,185,129,0.25)' : 'none' }}>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 4 }}>ยอดชำระ</div>
+                            {total <= 0 ? (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                                    <CheckCircle size={28} color="var(--success)" strokeWidth={2.5} />
+                                    <span style={{ fontSize: '2rem', fontWeight: 900, color: 'var(--success)' }}>ฟรี!</span>
                                 </div>
+                            ) : (
+                                <div style={{ fontSize: '2.2rem', fontWeight: 900, color: 'var(--primary)' }}>฿{total.toLocaleString()}</div>
                             )}
                         </div>
 
-                        {/* Free booking via refund code */}
-                        {isRefundCode && total <= 0 ? (
-                            <div style={{ background: 'rgba(16,185,129,0.06)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-6)', border: '1.5px solid rgba(16,185,129,0.25)', textAlign: 'center' }}>
-                                <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>🎉</div>
-                                <div style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--success)', marginBottom: 4 }}>จองฟรีด้วยโค้ดคืนเงิน</div>
-                                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>เพียงกดปุ่มด้านล่างเพื่อยืนยันการจอง</div>
+                        {/* Free booking card — triggers when total = 0 (any discount type) */}
+                        {total <= 0 ? (
+                            <div style={{
+                                background: 'linear-gradient(135deg, rgba(16,185,129,0.07) 0%, rgba(5,150,105,0.04) 100%)',
+                                borderRadius: 'var(--radius-xl)',
+                                padding: 'var(--space-6)',
+                                border: '1.5px solid rgba(16,185,129,0.25)',
+                                textAlign: 'center',
+                            }}>
+                                <div style={{
+                                    width: 64, height: 64, borderRadius: '50%',
+                                    background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    margin: '0 auto var(--space-4)',
+                                    boxShadow: '0 8px 24px rgba(16,185,129,0.3)',
+                                }}>
+                                    <Gift size={30} color="#fff" strokeWidth={1.8} />
+                                </div>
+                                <div style={{ fontWeight: 800, fontSize: '1.15rem', color: 'var(--text-primary)', marginBottom: 6 }}>
+                                    ยินดีด้วย! คุณได้รับส่วนลด 100%
+                                </div>
+                                <div style={{ fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                                    คุณไม่ต้องชำระเงินสำหรับรายการจองนี้<br />
+                                    เพียงกดยืนยันเพื่อเสร็จการจอง
+                                </div>
+                                <div style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                                    marginTop: 'var(--space-4)',
+                                    padding: '6px 14px', borderRadius: 20,
+                                    background: 'rgba(16,185,129,0.1)',
+                                    fontSize: '0.78rem', fontWeight: 700, color: 'var(--success)',
+                                }}>
+                                    <Tag size={13} /> โค้ด: {discountCode.toUpperCase()}
+                                </div>
                             </div>
                         ) : paymentError ? (
                             <div className="alert alert-danger" style={{ marginBottom: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', textAlign: 'center' }}>
@@ -1826,15 +1854,15 @@ export default function BookPage() {
                             ถัดไป <ChevronRight size={18} />
                         </button>
                     ) : (
-                        // Free booking path (refund code, total = 0)
-                        isRefundCode && total <= 0 && step === 4 ? (
+                        // Free booking path (any discount making total = 0)
+                        total <= 0 && step === 4 ? (
                             <button
                                 className="btn btn-primary"
-                                style={{ flex: 2, gap: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)' }}
+                                style={{ flex: 2, gap: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', boxShadow: '0 4px 14px rgba(16,185,129,0.35)' }}
                                 disabled={submitting}
                                 onClick={handleFreeBooking}
                             >
-                                {submitting ? <span className="spinner" /> : <><CheckCircle size={18} /> ยืนยันจองฟรี 🎉</>}
+                                {submitting ? <span className="spinner" /> : <><CheckCircle size={18} /> ยืนยันการจองฟรี</>}
                             </button>
                         ) : (
                             // Hide main footer button when Stripe form is active (CheckoutForm has its own button)
