@@ -37,21 +37,25 @@ const InfoSection = ({ job, addons }: { job: any, addons: any[] }) => {
         })
     }
 
-    const travelSurcharge = job.travel_surcharge || 0
-    const diffSpotFee = job.different_spot_fee || 0
+    const travelSurcharge = Math.round(job.travel_surcharge || 0)
+    const diffSpotFee = Math.round(job.different_spot_fee || 0)
     const additional = job.additional_price || 0
-    const discount = job.discount_amount || 0
+    const discount = Math.round(job.discount_amount || 0)
 
     // ── Source of truth: gross total stored in DB (before discount) ──
     const grossTotal = job.total_price && job.total_price > 0
-        ? job.total_price
+        ? Math.round(job.total_price)
         : (job.base_price || 0) + rowAddonTotal + travelSurcharge + diffSpotFee
+    const isRebooking = discount > 0 && (discount >= grossTotal || (job.discount_code && /rebook|refund/i.test(job.discount_code)))
+    
     // ── Net = what the customer owes for booking (excl. additional) ──
     const netTotal = Math.max(0, grossTotal - discount)
+    // ── Display Total (Staff sees full value if rebooking) ──
+    const displayNetTotal = isRebooking ? grossTotal : netTotal
     // ── Full bill including on-site additional ──
-    const totalBill = netTotal + additional
+    const totalBill = displayNetTotal + additional
     // ── What was already paid online via Stripe / free booking ──
-    const paidOnline = Math.max(0, netTotal) // Stripe charge = netTotal (before additional)
+    const paidOnline = isRebooking ? grossTotal : Math.max(0, netTotal) // Stripe charge = netTotal (before additional)
     // ── Additional balance ──
     const additionalBalance = job.is_additional_paid ? 0 : additional
     // ── Total balance still owed (incl. additional if not paid) ──
@@ -77,6 +81,7 @@ const InfoSection = ({ job, addons }: { job: any, addons: any[] }) => {
                     <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-primary)' }}>{job.services?.name}</div>
                     <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 4 }}>ไซส์รถ (CC): <strong>{VEHICLE_SIZE_LABEL[job.customers?.vehicle_size] || job.customers?.vehicle_size || 'ไม่ระบุ'}</strong></div>
                 </div>
+                <div style={{ fontWeight: 900, color: 'var(--text-primary)', fontSize: '1.05rem' }}>฿{displayNetTotal.toLocaleString()}</div>
             </div>
 
             {/* Addons List */}
@@ -117,7 +122,11 @@ const InfoSection = ({ job, addons }: { job: any, addons: any[] }) => {
                     {diffSpotFee > 0 && <Row label="ค่ารับ-ส่งต่างสถานที่" value={diffSpotFee} color="var(--primary)" />}
                     {discount > 0 && (
                         <div style={{ display: 'flex', flexDirection: 'column', margin: '4px 0', padding: '8px', background: 'rgba(16,185,129,0.06)', borderRadius: 8, border: '1px solid rgba(16,185,129,0.15)' }}>
-                            <Row label={`ส่วนลด${job.discount_code ? ` (${job.discount_code})` : ''}`} value={`-฿${discount.toLocaleString()}`} color="var(--success)" />
+                            <Row 
+                                label={isRebooking ? `จองใหม่ทดแทน (Rebooking)` : `ส่วนลด${job.discount_code ? ` (${job.discount_code})` : ''}`} 
+                                value={isRebooking ? 'ฟรี' : `-฿${discount.toLocaleString()}`} 
+                                color="var(--success)" 
+                            />
                         </div>
                     )}
                     {additional > 0 && (

@@ -85,7 +85,7 @@ export function findMatchingStaffForJob({
             // Check branch-level distance limit from anchor
             if (maxDist > (branch.max_out_of_zone_km || 2)) return
 
-            let fee = dPickup * 2 * (branch.out_of_zone_fee || 10)
+            let fee = Math.ceil(dPickup * 2 * (branch.out_of_zone_fee || 10))
             
             matchingStaff.push({
                 staff_id: sId,

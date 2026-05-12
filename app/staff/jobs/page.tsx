@@ -157,20 +157,23 @@ export default function StaffJobsPage() {
                                 <div className={styles.jobPrice} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
                                     {(() => {
                                         // ── Gross total stored in DB (pre-discount) ──
-                                        const grossTotal = job.total_price || 0
+                                        const grossTotal = Math.round(job.total_price || 0)
                                         // ── Net = what customer actually owes for this booking ──
-                                        const discount = job.discount_amount || 0
+                                        const discount = Math.round(job.discount_amount || 0)
+                                        const isRebooking = discount > 0 && (discount >= grossTotal || (job.discount_code && /rebook|refund/i.test(job.discount_code)))
                                         const netTotal = Math.max(0, grossTotal - discount)
+                                        // ── Display Total (Staff sees full value if rebooking) ──
+                                        const displayNetTotal = isRebooking ? grossTotal : netTotal
                                         // ── Additional = on-site charges (pay later) ──
                                         const additional = job.additional_price || 0
                                         // ── What was already paid online (via Stripe or free booking) ──
-                                        const paidOnline = netTotal - additional
+                                        const paidOnline = isRebooking ? grossTotal : (netTotal - additional)
                                         // ── Balance = additional not yet paid ──
                                         const balance = job.is_additional_paid ? 0 : additional
 
                                         return (
                                             <>
-                                                <div style={{ fontWeight: 900, color: 'var(--text-primary)', fontSize: '1.05rem' }}>฿{netTotal.toLocaleString()}</div>
+                                                <div style={{ fontWeight: 900, color: 'var(--text-primary)', fontSize: '1.05rem' }}>฿{displayNetTotal.toLocaleString()}</div>
                                                 {balance > 0 && job.status !== 'completed' && (
                                                     <div style={{ fontSize: '0.68rem', color: 'var(--warning-dark)', fontWeight: 800, background: 'var(--warning-ghost)', padding: '2px 6px', borderRadius: 6 }}>
                                                         ค้าง ฿{balance.toLocaleString()}
