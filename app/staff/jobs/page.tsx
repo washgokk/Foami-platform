@@ -160,7 +160,7 @@ export default function StaffJobsPage() {
                                         const grossTotal = Math.round(job.total_price || 0)
                                         // ── Net = what customer actually owes for this booking ──
                                         const discount = Math.round(job.discount_amount || 0)
-                                        const isRebooking = discount > 0 && (discount >= grossTotal || (job.discount_code && /rebook|refund/i.test(job.discount_code)))
+                                        const isRebooking = discount > 0 && job.discount_code && /rebook|refund/i.test(job.discount_code)
                                         const netTotal = Math.max(0, grossTotal - discount)
                                         // ── Display Total (Staff sees full value if rebooking) ──
                                         const displayNetTotal = isRebooking ? grossTotal : netTotal

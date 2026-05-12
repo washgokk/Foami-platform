@@ -42,11 +42,11 @@ const InfoSection = ({ job, addons }: { job: any, addons: any[] }) => {
     const additional = job.additional_price || 0
     const discount = Math.round(job.discount_amount || 0)
 
-    // ── Source of truth: gross total stored in DB (before discount) ──
+    // ── Gross total stored in DB (pre-discount) ──
     const grossTotal = job.total_price && job.total_price > 0
         ? Math.round(job.total_price)
         : (job.base_price || 0) + rowAddonTotal + travelSurcharge + diffSpotFee
-    const isRebooking = discount > 0 && (discount >= grossTotal || (job.discount_code && /rebook|refund/i.test(job.discount_code)))
+    const isRebooking = discount > 0 && job.discount_code && /rebook|refund/i.test(job.discount_code)
     
     // ── Net = what the customer owes for booking (excl. additional) ──
     const netTotal = Math.max(0, grossTotal - discount)
