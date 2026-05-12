@@ -156,25 +156,21 @@ export default function StaffJobsPage() {
                                 </span>
                                 <div className={styles.jobPrice} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
                                     {(() => {
-                                        let addonTotal = 0
-                                        if (Array.isArray(job.addon_ids)) {
-                                            job.addon_ids.forEach((a: any) => {
-                                                const ad = typeof a === 'string' ? addons.find(da => da.id === a || da.name === a) : a
-                                                addonTotal += (ad?.price || ad?.selectedPrice || 0)
-                                            })
-                                        }
-                                        const travelSurcharge = job.travel_surcharge || 0
-                                        const diffSpotFee = job.different_spot_fee || 0
-                                        const additional = job.additional_price || 0
+                                        // ── Gross total stored in DB (pre-discount) ──
+                                        const grossTotal = job.total_price || 0
+                                        // ── Net = what customer actually owes for this booking ──
                                         const discount = job.discount_amount || 0
-                                        
-                                        const totalBill = (job.base_price || 0) + addonTotal + travelSurcharge + diffSpotFee + additional - discount
-                                        const paidAmount = job.status === 'completed' ? totalBill : (job.payment_status === 'paid' ? (job.total_price || 0) : 0)
-                                        const balance = Math.max(0, totalBill - paidAmount)
+                                        const netTotal = Math.max(0, grossTotal - discount)
+                                        // ── Additional = on-site charges (pay later) ──
+                                        const additional = job.additional_price || 0
+                                        // ── What was already paid online (via Stripe or free booking) ──
+                                        const paidOnline = netTotal - additional
+                                        // ── Balance = additional not yet paid ──
+                                        const balance = job.is_additional_paid ? 0 : additional
 
                                         return (
                                             <>
-                                                <div style={{ fontWeight: 900, color: 'var(--text-primary)', fontSize: '1.05rem' }}>฿{totalBill.toLocaleString()}</div>
+                                                <div style={{ fontWeight: 900, color: 'var(--text-primary)', fontSize: '1.05rem' }}>฿{netTotal.toLocaleString()}</div>
                                                 {balance > 0 && job.status !== 'completed' && (
                                                     <div style={{ fontSize: '0.68rem', color: 'var(--warning-dark)', fontWeight: 800, background: 'var(--warning-ghost)', padding: '2px 6px', borderRadius: 6 }}>
                                                         ค้าง ฿{balance.toLocaleString()}

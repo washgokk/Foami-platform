@@ -22,10 +22,10 @@ const STATUS_ACTIONS: Record<string, { label: string; next: BookingStatus; color
 }
 
 const InfoSection = ({ job, addons }: { job: any, addons: any[] }) => {
-    // 1:1 CRM LOGIC REWRITE
+    // ── Package breakdown (for display only, not used in total calc) ──
     const pkgMarkup = job.package_markup_amount || 0
     const originalBase = job.original_base_price || job.services?.price_s || 0
-    const ccAdj = job.original_base_price !== undefined 
+    const ccAdj = job.original_base_price !== undefined
         ? Math.max(0, (job.base_price || 0) - originalBase - pkgMarkup)
         : Math.max(0, (job.base_price || 0) - (job.services?.price_s || 0))
 
@@ -36,16 +36,30 @@ const InfoSection = ({ job, addons }: { job: any, addons: any[] }) => {
             rowAddonTotal += (addonObj?.price || addonObj?.selectedPrice || 0)
         })
     }
-    
+
     const travelSurcharge = job.travel_surcharge || 0
     const diffSpotFee = job.different_spot_fee || 0
     const additional = job.additional_price || 0
     const discount = job.discount_amount || 0
-    
-    const computedTotal = (job.base_price || 0) + rowAddonTotal + travelSurcharge + diffSpotFee + additional - discount
-    const paidAmount = job.status === 'completed' ? computedTotal : (job.payment_status === 'paid' ? (job.total_price || 0) : 0)
-    const balance = Math.max(0, computedTotal - paidAmount)
-    const paidLabel = job.status === 'completed' ? 'ยอดชำระทั้งหมด (Settled)' : 'ยอดชำระแล้วผ่านแอป (Paid)'
+
+    // ── Source of truth: gross total stored in DB (before discount) ──
+    const grossTotal = job.total_price && job.total_price > 0
+        ? job.total_price
+        : (job.base_price || 0) + rowAddonTotal + travelSurcharge + diffSpotFee
+    // ── Net = what the customer owes for booking (excl. additional) ──
+    const netTotal = Math.max(0, grossTotal - discount)
+    // ── Full bill including on-site additional ──
+    const totalBill = netTotal + additional
+    // ── What was already paid online via Stripe / free booking ──
+    const paidOnline = Math.max(0, netTotal) // Stripe charge = netTotal (before additional)
+    // ── Additional balance ──
+    const additionalBalance = job.is_additional_paid ? 0 : additional
+    // ── Total balance still owed (incl. additional if not paid) ──
+    const balance = additionalBalance
+
+    const paidLabel = job.is_additional_paid || job.status === 'completed'
+        ? 'ยอดชำระทั้งหมด (Settled)'
+        : 'ยอดชำระแล้วผ่านแอป (Paid)'
 
     const Row = ({ label, value, color }: { label: string; value: number | string; color?: string }) => (
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.88rem' }}>
@@ -87,7 +101,7 @@ const InfoSection = ({ job, addons }: { job: any, addons: any[] }) => {
                 </div>
             )}
 
-            {/* Financial Summary - CRM Aligned */}
+            {/* Financial Summary */}
             <div style={{ marginTop: 24, padding: '20px 16px', background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
                     <BadgeDollarSign size={20} color="var(--brand-dominant)" />
@@ -101,6 +115,11 @@ const InfoSection = ({ job, addons }: { job: any, addons: any[] }) => {
                     {rowAddonTotal > 0 && <Row label="บริการเสริมรวม" value={rowAddonTotal} color="var(--brand-secondary)" />}
                     {travelSurcharge > 0 && <Row label="ค่าเดินทางไปจุดรับ" value={travelSurcharge} color="var(--primary)" />}
                     {diffSpotFee > 0 && <Row label="ค่ารับ-ส่งต่างสถานที่" value={diffSpotFee} color="var(--primary)" />}
+                    {discount > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', margin: '4px 0', padding: '8px', background: 'rgba(16,185,129,0.06)', borderRadius: 8, border: '1px solid rgba(16,185,129,0.15)' }}>
+                            <Row label={`ส่วนลด${job.discount_code ? ` (${job.discount_code})` : ''}`} value={`-฿${discount.toLocaleString()}`} color="var(--success)" />
+                        </div>
+                    )}
                     {additional > 0 && (
                         <div style={{ display: 'flex', flexDirection: 'column', margin: '4px 0', padding: '8px', background: 'var(--warning-ghost)', borderRadius: 8 }}>
                             <Row label="ยอดเพิ่มเติมหน้างาน" value={additional} color="var(--warning-dark)" />
@@ -109,32 +128,31 @@ const InfoSection = ({ job, addons }: { job: any, addons: any[] }) => {
                             )}
                         </div>
                     )}
-                    {discount > 0 && <Row label="ส่วนลด" value={`-฿${discount.toLocaleString()}`} color="var(--danger)" />}
 
-                    <div style={{ 
-                        marginTop: 12, 
-                        padding: '12px 0 0', 
-                        borderTop: '2px solid var(--border)', 
-                        display: 'flex', 
+                    <div style={{
+                        marginTop: 12,
+                        padding: '12px 0 0',
+                        borderTop: '2px solid var(--border)',
+                        display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center'
                     }}>
                         <span style={{ fontWeight: 900, fontSize: '1.05rem', color: 'var(--text-primary)' }}>ยอดรวมทั้งสิ้น (Total Bill)</span>
-                        <span style={{ fontWeight: 900, fontSize: '1.25rem', color: 'var(--brand-dominant)' }}>฿{computedTotal.toLocaleString()}</span>
+                        <span style={{ fontWeight: 900, fontSize: '1.25rem', color: 'var(--brand-dominant)' }}>฿{totalBill.toLocaleString()}</span>
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: '0.85rem', color: 'var(--success)' }}>
                         <span>{paidLabel}</span>
-                        <span>฿{paidAmount.toLocaleString()}</span>
+                        <span>฿{paidOnline.toLocaleString()}</span>
                     </div>
 
                     {balance > 0 && job.status !== 'completed' && (
-                        <div style={{ 
-                            marginTop: 16, 
-                            padding: '16px', 
-                            borderRadius: '14px', 
-                            background: '#FFD700', // Solid Gold/Yellow
-                            color: '#2D2D2D',      // High contrast dark text
+                        <div style={{
+                            marginTop: 16,
+                            padding: '16px',
+                            borderRadius: '14px',
+                            background: '#FFD700',
+                            color: '#2D2D2D',
                             display: 'flex',
                             justifyContent: 'space-between',
                             alignItems: 'center',
@@ -150,12 +168,12 @@ const InfoSection = ({ job, addons }: { job: any, addons: any[] }) => {
                     )}
 
                     {job.status === 'completed' && (
-                        <div style={{ 
-                            marginTop: 16, 
-                            padding: '14px', 
-                            borderRadius: '12px', 
-                            background: 'var(--success-ghost)', 
-                            color: 'var(--success-dark)', 
+                        <div style={{
+                            marginTop: 16,
+                            padding: '14px',
+                            borderRadius: '12px',
+                            background: 'var(--success-ghost)',
+                            color: 'var(--success-dark)',
                             textAlign: 'center',
                             fontWeight: 800,
                             border: '1.5px solid var(--success-light)',
