@@ -174,9 +174,20 @@ export default function CRMPage() {
         const cBookings = bookings.filter((b: any) => b.customer_id === c.id && ['completed', 'paid', 'delivering', 'washing'].includes(b.status))
         const totalSpent = cBookings.reduce((sum: number, b: any) => {
             const isRebooking = b.discount_code && /rebook|refund/i.test(b.discount_code)
-            const gross = b.total_price && b.total_price > 0 ? Number(b.total_price) : 0
+            // Rebuild gross from components if total_price is 0 or missing (legacy records)
+            let addonSum = 0
+            if (Array.isArray(b.addon_ids)) {
+                b.addon_ids.forEach((a: any) => {
+                    addonSum += (Number(a?.price) || Number(a?.selectedPrice) || 0)
+                })
+            }
+            const fallbackGross = (Number(b.base_price) || 0) + addonSum +
+                (Number(b.travel_surcharge) || 0) + (Number(b.different_spot_fee) || 0)
+            const gross = (b.total_price && b.total_price > 0) ? Number(b.total_price) : fallbackGross
             const additional = Number(b.additional_price) || 0
             const discount = Number(b.discount_amount) || 0
+            // Rebooking: full price is revenue (company rendered service, customer used entitlement)
+            // Normal discount: net = gross - discount
             return sum + (isRebooking ? (gross + additional) : Math.max(0, gross - discount + additional))
         }, 0)
         const totalVisits = cBookings.length
