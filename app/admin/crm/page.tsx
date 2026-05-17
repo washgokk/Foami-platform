@@ -172,7 +172,13 @@ export default function CRMPage() {
     // Process Analytics
     const customerStats = customers.map(c => {
         const cBookings = bookings.filter((b: any) => b.customer_id === c.id && ['completed', 'paid', 'delivering', 'washing'].includes(b.status))
-        const totalSpent = cBookings.reduce((sum: number, b: any) => sum + (b.total_price || 0), 0)
+        const totalSpent = cBookings.reduce((sum: number, b: any) => {
+            const isRebooking = b.discount_code && /rebook|refund/i.test(b.discount_code)
+            const gross = b.total_price && b.total_price > 0 ? Number(b.total_price) : 0
+            const additional = Number(b.additional_price) || 0
+            const discount = Number(b.discount_amount) || 0
+            return sum + (isRebooking ? (gross + additional) : Math.max(0, gross - discount + additional))
+        }, 0)
         const totalVisits = cBookings.length
 
         const allAddons = new Set<string>()
@@ -305,7 +311,12 @@ export default function CRMPage() {
                 }).join('; ')
             }
 
-            const computedTotal = (b.base_price || 0) + rowAddonTotal + (b.travel_surcharge || 0) + (b.different_spot_fee || 0) + (b.additional_price || 0) - (b.discount_amount || 0);
+            const isRebookingCode = b.discount_code && /rebook|refund/i.test(b.discount_code)
+            const grossFromDB = b.total_price && b.total_price > 0 ? b.total_price : ((b.base_price || 0) + rowAddonTotal + (b.travel_surcharge || 0) + (b.different_spot_fee || 0))
+            const discountVal = b.discount_amount || 0
+            const computedTotal = isRebookingCode
+                ? (grossFromDB + (b.additional_price || 0))   // Rebooking: gross counts as revenue
+                : Math.max(0, grossFromDB - discountVal + (b.additional_price || 0)) // Normal discount: net
             const labor = b.labor_cost || 0;
             const rental = b.rental_cost || 0;
             const fuel = b.fuel_cost || 0;
@@ -833,9 +844,14 @@ export default function CRMPage() {
 
                                                 {(() => {
                                                     // Use total_price from DB (gross pre-discount) when available
-                                                    const computedTotal = b.total_price && b.total_price > 0
+                                                    const isRebookingTx = b.discount_code && /rebook|refund/i.test(b.discount_code)
+                                                    const grossTx = b.total_price && b.total_price > 0
                                                         ? b.total_price
-                                                        : (b.base_price || 0) + rowAddonTotal + (b.travel_surcharge || 0) + (b.different_spot_fee || 0) + (b.additional_price || 0);
+                                                        : (b.base_price || 0) + rowAddonTotal + (b.travel_surcharge || 0) + (b.different_spot_fee || 0)
+                                                    const discountTx = b.discount_amount || 0
+                                                    const computedTotal = isRebookingTx
+                                                        ? (grossTx + (b.additional_price || 0))
+                                                        : Math.max(0, grossTx - discountTx + (b.additional_price || 0))
 
                                                     // Costs (using snapshots or 0)
                                                     const labor = b.labor_cost || 0;

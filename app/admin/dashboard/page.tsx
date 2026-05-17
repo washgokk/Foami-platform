@@ -46,22 +46,25 @@ export default function AdminDashboardPage() {
     const [topService, setTopService] = useState({ name: '-', count: 0 })
     const [topBranch, setTopBranch] = useState({ name: '-', count: 0, revenue: 0 })
     
-    // Revenue logic aligned with CRM (/admin/crm)
-    const calculateBookingFullPrice = (b: any) => {
-        let rowAddonTotal = 0
+    // Revenue logic: use total_price (gross pre-discount) from DB as source of truth.
+    // Rebooking codes = company earned full price (customer redeemed a free service).
+    // Normal discounts = net revenue = gross - discount.
+    const calculateBookingNetRevenue = (b: any) => {
+        const isRebooking = b.discount_code && /rebook|refund/i.test(b.discount_code)
+        // Gross = total_price stored in DB (pre-discount), fallback to component sum
+        let fallbackGross = (Number(b.base_price) || 0)
         if (Array.isArray(b.addon_ids)) {
             b.addon_ids.forEach((a: any) => {
-                rowAddonTotal += (Number(a.price) || Number(a.selectedPrice) || Number(a.variableState?.customAmount) || 0)
+                fallbackGross += (Number(a.price) || Number(a.selectedPrice) || Number(a.variableState?.customAmount) || 0)
             })
         }
-
-        const computedTotal = (Number(b.base_price) || 0) + 
-                             rowAddonTotal + 
-                             (Number(b.travel_surcharge) || 0) + 
-                             (Number(b.different_spot_fee) || 0) + 
-                             (Number(b.additional_price) || 0) - 
-                             (Number(b.discount_amount) || 0);
-        return computedTotal;
+        fallbackGross += (Number(b.travel_surcharge) || 0) + (Number(b.different_spot_fee) || 0)
+        const grossTotal = b.total_price && b.total_price > 0 ? Number(b.total_price) : fallbackGross
+        const additional = Number(b.additional_price) || 0
+        const discount = Number(b.discount_amount) || 0
+        // Rebooking: full price counts as revenue (service was rendered, customer used a free-service entitlement)
+        // Normal discount: net = gross - discount
+        return isRebooking ? (grossTotal + additional) : Math.max(0, grossTotal - discount + additional)
     };
 
     useEffect(() => {
@@ -145,7 +148,7 @@ export default function AdminDashboardPage() {
                     if (bName !== '-') {
                         if (!branchStats[bName]) branchStats[bName] = { count: 0, revenue: 0 }
                         branchStats[bName].count++
-                        branchStats[bName].revenue += calculateBookingFullPrice(b)
+                        branchStats[bName].revenue += calculateBookingNetRevenue(b)
                     }
                 })
 
@@ -169,8 +172,8 @@ export default function AdminDashboardPage() {
                     today_bookings: bookings.filter((b: any) => b.scheduled_date === todayStr).length,
                     pending_bookings: filteredBookings.filter((b: any) => !['completed', 'cancelled'].includes(b.status)).length,
                     completed_bookings: filteredBookings.filter((b: any) => b.status === 'completed').length,
-                    total_revenue: filteredBookings.filter((b: any) => b.status === 'completed').reduce((s: number, b: any) => s + calculateBookingFullPrice(b), 0),
-                    today_revenue: bookings.filter((b: any) => b.scheduled_date === todayStr && b.status === 'completed').reduce((s: number, b: any) => s + calculateBookingFullPrice(b), 0),
+                    total_revenue: filteredBookings.filter((b: any) => b.status === 'completed').reduce((s: number, b: any) => s + calculateBookingNetRevenue(b), 0),
+                    today_revenue: bookings.filter((b: any) => b.scheduled_date === todayStr && b.status === 'completed').reduce((s: number, b: any) => s + calculateBookingNetRevenue(b), 0),
                 })
                 setRecentBookings(bookings.slice(0, 10))
             } catch (err) {
@@ -291,7 +294,7 @@ export default function AdminDashboardPage() {
                                     </td>
                                     <td>{b.scheduled_date}</td>
                                     <td>{b.scheduled_time}</td>
-                                    <td>฿{(calculateBookingFullPrice(b)).toLocaleString()}</td>
+                                    <td>฿{(calculateBookingNetRevenue(b)).toLocaleString()}</td>
                                     <td>
                                         <span className="badge" style={{ background: `${STATUS_COLORS[b.status]}15`, color: STATUS_COLORS[b.status] }}>
                                             {STATUS_TH[b.status] || b.status}
