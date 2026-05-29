@@ -73,18 +73,40 @@ export function findMatchingStaffForJob({
         else canServe = true // Local to their base zone
         
         if (canServe) {
-            // Calculate distances from baseZone polygon to pickup/delivery
+            // Calculate actual distances from baseZone polygon to pickup/delivery (used for fee)
             const isPickupInBase = isPointInPolygon(pickupLat, pickupLng, baseZone.polygon_coords)
             const dPickup = isPickupInBase ? 0 : minDistanceToPolygon(pickupLat, pickupLng, baseZone.polygon_coords)
-            
+
             const isDeliveryInBase = showDelivery ? isPointInPolygon(deliveryLat || 0, deliveryLng || 0, baseZone.polygon_coords) : true
             const dDelivery = (showDelivery && !isDeliveryInBase) ? minDistanceToPolygon(deliveryLat || 0, deliveryLng || 0, baseZone.polygon_coords) : 0
-            
-            const maxDist = Math.max(dPickup, dDelivery)
 
-            // Check branch-level distance limit from anchor
+            // For limit check: cross_zone staff explicitly opted into that zone, so bypass
+            // the base-zone distance cap — but still use actual distance for fee calculation.
+            let dPickupForLimit = dPickup
+            let dDeliveryForLimit = dDelivery
+
+            if (isC && localPickupMatched) {
+                const hasCrossForPickupZone = assignments.some(a =>
+                    a.zone_id === localPickupMatched.id &&
+                    (a.work_type === 'cross_zone' || a.work_type === 'out_of_zone')
+                )
+                if (hasCrossForPickupZone) dPickupForLimit = 0
+            }
+
+            if (isC && showDelivery && localDeliveryMatched) {
+                const hasCrossForDeliveryZone = assignments.some(a =>
+                    a.zone_id === localDeliveryMatched.id &&
+                    (a.work_type === 'cross_zone' || a.work_type === 'out_of_zone')
+                )
+                if (hasCrossForDeliveryZone) dDeliveryForLimit = 0
+            }
+
+            const maxDist = Math.max(dPickupForLimit, dDeliveryForLimit)
+
+            // Limit check: only filters true out-of-zone (customer outside all polygons)
             if (maxDist > (branch.max_out_of_zone_km || 2)) return
 
+            // Fee: always based on actual distance from base zone (cross_zone still earns travel surcharge)
             let fee = Math.ceil(dPickup * 2 * (branch.out_of_zone_fee || 10))
             
             matchingStaff.push({
