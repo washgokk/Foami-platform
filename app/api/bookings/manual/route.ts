@@ -47,6 +47,22 @@ export async function POST(req: NextRequest) {
             )
         }
 
+        // Fetch branch costs configuration
+        const { data: branchData, error: branchError } = await supabase
+            .from('branches')
+            .select('labor_cost_per_job, max_capital_per_job, vehicle_rental_per_job, fuel_cost_per_job')
+            .eq('id', branch_id)
+            .single()
+
+        if (branchError) {
+            console.error('[Manual Booking] Fetch branch error:', branchError)
+        }
+
+        const labor_cost = branchData?.labor_cost_per_job || 0
+        const capital_cost = branchData?.max_capital_per_job || 0
+        const rental_cost = branchData?.vehicle_rental_per_job || 0
+        const fuel_cost = branchData?.fuel_cost_per_job || 0
+
         // Build vehicle_data for storage
         const vehicle_data = {
             vehicle_brand: vehicle_brand || '',
@@ -144,10 +160,10 @@ export async function POST(req: NextRequest) {
                 customer_note: manualNote,
                 status: finalStatus,
                 auto_assigned: false,
-                labor_cost: 0,
-                capital_cost: 0,
-                rental_cost: 0,
-                fuel_cost: 0,
+                labor_cost: labor_cost,
+                capital_cost: capital_cost,
+                rental_cost: rental_cost,
+                fuel_cost: fuel_cost,
             })
             .select()
             .single()
