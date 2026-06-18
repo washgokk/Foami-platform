@@ -2,8 +2,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '@/lib/supabase'
-import { BOOKING_STATUS_LABEL, BOOKING_STATUS_CSS, BookingStatus } from '@/lib/types'
-import { Search, ClipboardList, MessageCircle, Star, Image as ImageIcon, User, MapPin, Calendar, Clock, Phone, Briefcase, ChevronRight, X, LayoutGrid, List } from 'lucide-react'
+import { trackAuditLog } from '@/lib/audit'
+import { BOOKING_STATUS_LABEL, BOOKING_STATUS_CSS, BookingStatus, TIME_SLOTS, VEHICLE_SIZE_LABEL } from '@/lib/types'
+import { generateScalableId } from '@/lib/id-utils'
+import { Search, ClipboardList, MessageCircle, Star, Image as ImageIcon, User, MapPin, Calendar, Clock, Phone, Briefcase, ChevronRight, X, LayoutGrid, List, Plus, Bike, CreditCard, FileText, Tag, Hash } from 'lucide-react'
 import ImageZoom from '@/components/Global/ImageZoom'
 import BookingChat from '@/components/Chat/BookingChat'
 
@@ -18,6 +20,7 @@ export default function AdminBookingsPage() {
     const [showChat, setShowChat] = useState(false)
     const [jobPhotos, setJobPhotos] = useState<{ before: string[], after: string[] }>({ before: [], after: [] })
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+    const [showManualModal, setShowManualModal] = useState(false)
 
     useEffect(() => {
         if (selected?.id) {
@@ -121,6 +124,13 @@ export default function AdminBookingsPage() {
                     </h1>
                     <p className="page-subtitle">{filtered.length} รายการที่พบ</p>
                 </div>
+                <button
+                    className="btn btn-primary"
+                    style={{ borderRadius: 16, gap: 8, fontSize: '0.9rem' }}
+                    onClick={() => setShowManualModal(true)}
+                >
+                    <Plus size={18} /> เพิ่มการจองใหม่
+                </button>
             </div>
 
             {/* Search + Filter Bar */}
@@ -270,7 +280,17 @@ export default function AdminBookingsPage() {
                                                     .eq('staff_id', booking.staff_id).eq('zone_id', booking.zone_id)
                                                     .eq('date', booking.scheduled_date).eq('time_slot', booking.scheduled_time)
                                             }
-                                            await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', b.id)
+                                            const { error: updateErr } = await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', b.id)
+                                            if (!updateErr) {
+                                                await trackAuditLog({
+                                                    action_type: 'UPDATE',
+                                                    entity_type: 'booking',
+                                                    entity_id: b.id,
+                                                    old_data: booking,
+                                                    new_data: { ...(booking || {}), status: 'cancelled' },
+                                                    description: `ยกเลิกการจอง ID: ${b.id} ของลูกค้า: ${b.customers?.full_name || 'ไม่ระบุชื่อ'}`
+                                                })
+                                            }
                                             load()
                                         }}>ยกเลิก</button>
                                     </div>
@@ -627,12 +647,590 @@ export default function AdminBookingsPage() {
                 />
             , document.body)}
 
+            {/* Manual Booking Modal */}
+            {showManualModal && createPortal(
+                <ManualBookingModal
+                    onClose={() => setShowManualModal(false)}
+                    onCreated={() => { setShowManualModal(false); load() }}
+                />
+            , document.body)}
+
             <style>{`
                 @keyframes modalPopIn {
                     from { transform: scale(0.93) translateY(12px); opacity: 0; }
                     to { transform: scale(1) translateY(0); opacity: 1; }
                 }
             `}</style>
+        </div>
+    )
+}
+
+function ManualBookingModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+    // ── Data from DB ──
+    const [branches, setBranches] = useState<any[]>([])
+    const [zones, setZones] = useState<any[]>([])
+    const [staffList, setStaffList] = useState<any[]>([])
+    const [services, setServices] = useState<any[]>([])
+    const [serviceAddons, setServiceAddons] = useState<any[]>([])
+    const [schedules, setSchedules] = useState<any[]>([])
+
+    // ── Form State ──
+    const [customerName, setCustomerName] = useState('')
+    const [customerPhone, setCustomerPhone] = useState('')
+    const [vehicleBrand, setVehicleBrand] = useState('')
+    const [vehicleModel, setVehicleModel] = useState('')
+    const [vehicleColor, setVehicleColor] = useState('')
+    const [licensePlate, setLicensePlate] = useState('')
+    const [vehicleSize, setVehicleSize] = useState('S')
+
+    const [selectedServiceId, setSelectedServiceId] = useState('')
+    const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([])
+
+    const [pickupAddress, setPickupAddress] = useState('')
+    const [deliveryAddress, setDeliveryAddress] = useState('')
+
+    const [selectedBranchId, setSelectedBranchId] = useState('')
+    const [selectedZoneId, setSelectedZoneId] = useState('')
+    const [selectedStaffId, setSelectedStaffId] = useState('')
+    const [selectedDate, setSelectedDate] = useState('')
+    const [selectedTime, setSelectedTime] = useState('')
+
+    const [basePrice, setBasePrice] = useState(0)
+    const [extraFee, setExtraFee] = useState(0)
+    const [totalPrice, setTotalPrice] = useState(0)
+
+    const [paymentMethod, setPaymentMethod] = useState('transfer')
+    const [paymentStatus, setPaymentStatus] = useState('pending')
+
+    const [note, setNote] = useState('')
+    const [submitting, setSubmitting] = useState(false)
+    const [error, setError] = useState('')
+
+    const todayStr = (() => {
+        const now = new Date()
+        const thTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }))
+        return thTime.getFullYear() + '-' + String(thTime.getMonth() + 1).padStart(2, '0') + '-' + String(thTime.getDate()).padStart(2, '0')
+    })()
+    const isPastDate = selectedDate && selectedDate < todayStr
+
+    // ── Load initial data ──
+    useEffect(() => {
+        Promise.all([
+            supabase.from('branches').select('*').eq('is_active', true),
+            supabase.from('zones').select('*').eq('is_active', true),
+            supabase.from('staff').select('*').eq('is_active', true),
+            supabase.from('services').select('*').eq('is_active', true).order('price_s'),
+            supabase.from('service_addons').select('*').eq('is_active', true),
+        ]).then(([brRes, znRes, stRes, svcRes, adnRes]) => {
+            if (brRes.data) { setBranches(brRes.data); if (brRes.data.length > 0) setSelectedBranchId(brRes.data[0].id) }
+            if (znRes.data) setZones(znRes.data)
+            if (stRes.data) setStaffList(stRes.data)
+            if (svcRes.data) setServices(svcRes.data)
+            if (adnRes.data) setServiceAddons(adnRes.data)
+        })
+        setSelectedDate(todayStr)
+    }, [todayStr])
+
+    // ── Load schedules when branch/zone/date change ──
+    useEffect(() => {
+        if (!selectedBranchId || !selectedDate) return
+        const activeZones = selectedZoneId
+            ? [selectedZoneId]
+            : zones.filter(z => z.branch_id === selectedBranchId).map(z => z.id)
+
+        if (activeZones.length === 0) { setSchedules([]); return }
+
+        supabase
+            .from('staff_schedules')
+            .select('id, staff_id, zone_id, date, time_slot, is_booked, work_type')
+            .in('zone_id', activeZones)
+            .eq('date', selectedDate)
+            .then(({ data }) => setSchedules(data || []))
+    }, [selectedBranchId, selectedZoneId, selectedDate, zones])
+
+    // ── Auto-fill price when service changes ──
+    useEffect(() => {
+        if (!selectedServiceId) { setBasePrice(0); return }
+        const svc = services.find(s => s.id === selectedServiceId)
+        if (!svc) return
+        const sizeKey = `price_${vehicleSize.toLowerCase()}`
+        const price = Number(svc[sizeKey] || svc.price_s || 0)
+        setBasePrice(price)
+    }, [selectedServiceId, vehicleSize, services])
+
+    // ── Calculate total ──
+    useEffect(() => {
+        setTotalPrice(basePrice + extraFee)
+    }, [basePrice, extraFee])
+
+    // ── Derived data ──
+    const branchZones = zones.filter(z => z.branch_id === selectedBranchId)
+    const branchStaff = staffList.filter(s => s.branch_id === selectedBranchId)
+
+    // Available time slots (not yet booked for any staff in this zone)
+    const availableSlots = TIME_SLOTS.filter(slot => {
+        if (!selectedStaffId) return true
+        const staffSlots = schedules.filter(s => s.staff_id === selectedStaffId && (s.time_slot === slot || s.time_slot?.startsWith(slot)))
+        // Staff has a schedule entry for this slot AND it's not booked
+        return staffSlots.some(s => !s.is_booked)
+    })
+
+    // Available staff for selected time slot
+    const availableStaff = selectedTime && !isPastDate
+        ? branchStaff.filter(st => {
+            const staffSlots = schedules.filter(s => s.staff_id === st.id && (s.time_slot === selectedTime || s.time_slot?.startsWith(selectedTime)))
+            return staffSlots.some(s => !s.is_booked)
+        })
+        : branchStaff
+
+    // ── Submit ──
+    const handleSubmit = async () => {
+        if (!customerName.trim()) { setError('กรุณากรอกชื่อลูกค้า'); return }
+        if (!selectedServiceId) { setError('กรุณาเลือกแพ็กเกจ'); return }
+        if (!selectedBranchId) { setError('กรุณาเลือกสาขา'); return }
+        if (!selectedZoneId) { setError('กรุณาเลือกโซน'); return }
+        if (!selectedStaffId) { setError('กรุณาเลือกพนักงาน'); return }
+        if (!selectedDate) { setError('กรุณาเลือกวันที่'); return }
+        if (!selectedTime) { setError('กรุณาเลือกเวลา'); return }
+
+        setSubmitting(true)
+        setError('')
+
+        try {
+            const bookingId = generateScalableId('BK')
+            const adminId = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : 'unknown'
+            const res = await fetch('/api/bookings/manual', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: bookingId,
+                    admin_id: adminId,
+                    customer_name: customerName,
+                    customer_phone: customerPhone,
+                    vehicle_brand: vehicleBrand,
+                    vehicle_model: vehicleModel,
+                    vehicle_color: vehicleColor,
+                    license_plate: licensePlate,
+                    vehicle_size: vehicleSize,
+                    service_id: selectedServiceId,
+                    addon_ids: selectedAddonIds,
+                    pickup_address: pickupAddress,
+                    delivery_address: deliveryAddress,
+                    branch_id: selectedBranchId,
+                    zone_id: selectedZoneId,
+                    staff_id: selectedStaffId,
+                    scheduled_date: selectedDate,
+                    scheduled_time: selectedTime,
+                    base_price: basePrice,
+                    extra_fee: extraFee,
+                    total_price: totalPrice,
+                    payment_method: paymentMethod,
+                    payment_status: paymentStatus,
+                    customer_note: note,
+                }),
+            })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด')
+            onCreated()
+        } catch (e: any) {
+            setError(e.message || 'เกิดข้อผิดพลาด')
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
+    const sectionStyle: React.CSSProperties = {
+        background: 'var(--surface)', borderRadius: 16,
+        border: '1.5px solid var(--border)', overflow: 'hidden',
+    }
+    const sectionHeaderStyle: React.CSSProperties = {
+        padding: '13px 18px', borderBottom: '1px solid var(--border)',
+        display: 'flex', alignItems: 'center', gap: 8,
+        background: 'var(--surface-2)',
+    }
+    const sectionBodyStyle: React.CSSProperties = { padding: '16px 18px' }
+    const fieldRow: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }
+    const labelStyle: React.CSSProperties = { fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }
+    const inputStyle: React.CSSProperties = {
+        width: '100%', padding: '10px 14px', border: '2px solid var(--border)',
+        borderRadius: 12, fontSize: '0.9rem', color: 'var(--text-primary)',
+        background: 'var(--surface)', outline: 'none', transition: 'border-color 0.2s',
+        fontFamily: 'var(--font-main)',
+    }
+
+    return (
+        <div
+            style={{
+                position: 'fixed', inset: 0, zIndex: 9999,
+                background: 'rgba(15, 20, 50, 0.55)',
+                backdropFilter: 'blur(6px)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: '24px 16px',
+            }}
+            onClick={onClose}
+        >
+            <div
+                style={{
+                    width: '100%', maxWidth: 860,
+                    maxHeight: '92vh',
+                    background: 'var(--bg)', display: 'flex', flexDirection: 'column',
+                    borderRadius: 24,
+                    boxShadow: '0 32px 80px rgba(15,20,50,0.28)',
+                    border: '1px solid var(--border)',
+                    animation: 'modalPopIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                }}
+                onClick={e => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div style={{
+                    padding: '0 28px', height: 72, display: 'flex', alignItems: 'center',
+                    justifyContent: 'space-between', flexShrink: 0,
+                    borderBottom: '1.5px solid var(--border)',
+                    background: 'var(--surface)', borderRadius: '24px 24px 0 0',
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                        <div style={{
+                            width: 42, height: 42, borderRadius: 13,
+                            background: 'linear-gradient(135deg, var(--brand-dominant), #7C5CFA)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white',
+                        }}>
+                            <Plus size={20} />
+                        </div>
+                        <div>
+                            <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>เพิ่มการจองใหม่ (Manual)</div>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 1 }}>
+                                สำหรับลูกค้าที่จองผ่าน LINE หรือช่องทางอื่น
+                            </div>
+                        </div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        style={{
+                            width: 38, height: 38, borderRadius: 12, border: 'none',
+                            background: 'var(--surface-2)', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: 'var(--text-muted)', transition: 'all 0.15s',
+                        }}
+                    >
+                        <X size={17} />
+                    </button>
+                </div>
+
+                {/* Body — scrollable */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+
+                        {/* ── LEFT COLUMN ── */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+                            {/* Customer Info */}
+                            <div style={sectionStyle}>
+                                <div style={sectionHeaderStyle}>
+                                    <User size={15} color="var(--brand-dominant)" />
+                                    <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>ข้อมูลลูกค้า</span>
+                                </div>
+                                <div style={sectionBodyStyle}>
+                                    <div style={fieldRow}>
+                                        <div>
+                                            <label style={labelStyle}>ชื่อลูกค้า *</label>
+                                            <input style={inputStyle} placeholder="ชื่อ-นามสกุล" value={customerName} onChange={e => setCustomerName(e.target.value)} />
+                                        </div>
+                                        <div>
+                                            <label style={labelStyle}>เบอร์โทร</label>
+                                            <input style={inputStyle} placeholder="08x-xxx-xxxx" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
+                                        </div>
+                                    </div>
+                                    <div style={fieldRow}>
+                                        <div>
+                                            <label style={labelStyle}>ยี่ห้อรถ</label>
+                                            <input style={inputStyle} placeholder="เช่น Honda, Yamaha" value={vehicleBrand} onChange={e => setVehicleBrand(e.target.value)} />
+                                        </div>
+                                        <div>
+                                            <label style={labelStyle}>รุ่นรถ</label>
+                                            <input style={inputStyle} placeholder="เช่น Click, Wave" value={vehicleModel} onChange={e => setVehicleModel(e.target.value)} />
+                                        </div>
+                                    </div>
+                                    <div style={fieldRow}>
+                                        <div>
+                                            <label style={labelStyle}>สีรถ</label>
+                                            <input style={inputStyle} placeholder="เช่น แดง, ดำ" value={vehicleColor} onChange={e => setVehicleColor(e.target.value)} />
+                                        </div>
+                                        <div>
+                                            <label style={labelStyle}>ทะเบียน</label>
+                                            <input style={inputStyle} placeholder="เช่น กข 1234" value={licensePlate} onChange={e => setLicensePlate(e.target.value)} />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label style={labelStyle}>ขนาดรถ (CC)</label>
+                                        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                                            {(['S', 'M', 'L'] as const).map(sz => (
+                                                <button
+                                                    key={sz}
+                                                    onClick={() => setVehicleSize(sz)}
+                                                    style={{
+                                                        flex: 1, padding: '10px 8px', borderRadius: 12,
+                                                        border: vehicleSize === sz ? '2px solid var(--brand-dominant)' : '2px solid var(--border)',
+                                                        background: vehicleSize === sz ? 'var(--primary-ghost)' : 'var(--surface)',
+                                                        color: vehicleSize === sz ? 'var(--brand-dominant)' : 'var(--text-secondary)',
+                                                        fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer',
+                                                        transition: 'all 0.15s', fontFamily: 'var(--font-main)',
+                                                    }}
+                                                >
+                                                    <div>{sz}</div>
+                                                    <div style={{ fontSize: '0.7rem', fontWeight: 400, marginTop: 2 }}>{VEHICLE_SIZE_LABEL[sz]}</div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Service Selection */}
+                            <div style={sectionStyle}>
+                                <div style={sectionHeaderStyle}>
+                                    <Briefcase size={15} color="var(--brand-dominant)" />
+                                    <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>แพ็กเกจและบริการ</span>
+                                </div>
+                                <div style={sectionBodyStyle}>
+                                    <div>
+                                        <label style={labelStyle}>เลือกแพ็กเกจ *</label>
+                                        <select
+                                            style={{ ...inputStyle, cursor: 'pointer' }}
+                                            value={selectedServiceId}
+                                            onChange={e => setSelectedServiceId(e.target.value)}
+                                        >
+                                            <option value="">-- เลือกแพ็กเกจ --</option>
+                                            {services.map(s => (
+                                                <option key={s.id} value={s.id}>
+                                                    {s.name} — ฿{s[`price_${vehicleSize.toLowerCase()}`] || s.price_s}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    {serviceAddons.length > 0 && (
+                                        <div style={{ marginTop: 14 }}>
+                                            <label style={labelStyle}>บริการเสริม</label>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+                                                {serviceAddons.map(addon => (
+                                                    <label
+                                                        key={addon.id}
+                                                        style={{
+                                                            display: 'flex', alignItems: 'center', gap: 10,
+                                                            padding: '10px 14px', borderRadius: 12,
+                                                            border: selectedAddonIds.includes(addon.id) ? '2px solid var(--brand-dominant)' : '2px solid var(--border)',
+                                                            background: selectedAddonIds.includes(addon.id) ? 'var(--primary-ghost)' : 'var(--surface)',
+                                                            cursor: 'pointer', transition: 'all 0.15s',
+                                                        }}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedAddonIds.includes(addon.id)}
+                                                            onChange={e => {
+                                                                if (e.target.checked) setSelectedAddonIds(p => [...p, addon.id])
+                                                                else setSelectedAddonIds(p => p.filter(id => id !== addon.id))
+                                                            }}
+                                                            style={{ width: 18, height: 18, accentColor: 'var(--brand-dominant)' }}
+                                                        />
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{addon.name}</div>
+                                                            {addon.price > 0 && <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>฿{addon.price}</div>}
+                                                        </div>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Location */}
+                            <div style={sectionStyle}>
+                                <div style={sectionHeaderStyle}>
+                                    <MapPin size={15} color="var(--brand-dominant)" />
+                                    <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>ที่อยู่</span>
+                                </div>
+                                <div style={sectionBodyStyle}>
+                                    <div style={{ marginBottom: 12 }}>
+                                        <label style={labelStyle}>ที่อยู่รับรถ</label>
+                                        <input style={inputStyle} placeholder="เช่น หอพักหลังมอ ตรงข้ามเซเว่น" value={pickupAddress} onChange={e => setPickupAddress(e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <label style={labelStyle}>ที่อยู่ส่งรถ (ถ้าต่างจากจุดรับ)</label>
+                                        <input style={inputStyle} placeholder="เว้นว่างถ้าส่งจุดเดิม" value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── RIGHT COLUMN ── */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+                            {/* Schedule */}
+                            <div style={sectionStyle}>
+                                <div style={sectionHeaderStyle}>
+                                    <Calendar size={15} color="var(--brand-dominant)" />
+                                    <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>กำหนดการและพนักงาน</span>
+                                </div>
+                                <div style={sectionBodyStyle}>
+                                    <div style={fieldRow}>
+                                        <div>
+                                            <label style={labelStyle}>สาขา *</label>
+                                            <select style={{ ...inputStyle, cursor: 'pointer' }} value={selectedBranchId} onChange={e => { setSelectedBranchId(e.target.value); setSelectedZoneId(''); setSelectedStaffId('') }}>
+                                                {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label style={labelStyle}>โซน *</label>
+                                            <select style={{ ...inputStyle, cursor: 'pointer' }} value={selectedZoneId} onChange={e => { setSelectedZoneId(e.target.value); setSelectedStaffId('') }}>
+                                                <option value="">-- เลือกโซน --</option>
+                                                {branchZones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div style={fieldRow}>
+                                        <div>
+                                            <label style={labelStyle}>วันที่ *</label>
+                                            <input type="date" style={inputStyle} value={selectedDate} onChange={e => { setSelectedDate(e.target.value); setSelectedTime(''); setSelectedStaffId('') }} />
+                                        </div>
+                                        <div>
+                                            <label style={labelStyle}>เวลา *</label>
+                                            <select style={{ ...inputStyle, cursor: 'pointer' }} value={selectedTime} onChange={e => { setSelectedTime(e.target.value); setSelectedStaffId('') }}>
+                                                <option value="">-- เลือกเวลา --</option>
+                                                {TIME_SLOTS.map(slot => {
+                                                    const hasSchedule = schedules.some(s => (s.time_slot === slot || s.time_slot?.startsWith(slot)) && !s.is_booked)
+                                                    return (
+                                                        <option key={slot} value={slot} disabled={isPastDate ? false : (!hasSchedule && selectedZoneId !== '')}>
+                                                            {slot} {isPastDate ? '' : (hasSchedule ? '✓' : selectedZoneId ? '(ไม่มีพนักงาน)' : '')}
+                                                        </option>
+                                                    )
+                                                })}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label style={labelStyle}>พนักงาน *</label>
+                                        <select style={{ ...inputStyle, cursor: 'pointer' }} value={selectedStaffId} onChange={e => setSelectedStaffId(e.target.value)}>
+                                            <option value="">-- เลือกพนักงาน --</option>
+                                            {availableStaff.map(st => {
+                                                const isAvail = selectedTime
+                                                    ? schedules.some(s => s.staff_id === st.id && (s.time_slot === selectedTime || s.time_slot?.startsWith(selectedTime)) && !s.is_booked)
+                                                    : true
+                                                return (
+                                                    <option key={st.id} value={st.id} disabled={isPastDate ? false : (selectedTime ? !isAvail : false)}>
+                                                        {st.full_name} {isPastDate ? '' : (selectedTime && isAvail ? '✓ ว่าง' : selectedTime && !isAvail ? '(ไม่ว่าง)' : '')}
+                                                    </option>
+                                                )
+                                            })}
+                                        </select>
+                                        {!isPastDate && selectedTime && availableStaff.filter(st => schedules.some(s => s.staff_id === st.id && (s.time_slot === selectedTime || s.time_slot?.startsWith(selectedTime)) && !s.is_booked)).length === 0 && selectedZoneId && (
+                                            <div style={{ fontSize: '0.78rem', color: 'var(--danger)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                ⓘ ไม่มีพนักงานว่างในเวลานี้
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Pricing */}
+                            <div style={sectionStyle}>
+                                <div style={sectionHeaderStyle}>
+                                    <Tag size={15} color="var(--brand-dominant)" />
+                                    <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>ราคา</span>
+                                </div>
+                                <div style={sectionBodyStyle}>
+                                    <div style={fieldRow}>
+                                        <div>
+                                            <label style={labelStyle}>ราคาแพ็กเกจ (฿)</label>
+                                            <input type="number" style={inputStyle} value={basePrice} onChange={e => setBasePrice(Number(e.target.value) || 0)} />
+                                        </div>
+                                        <div>
+                                            <label style={labelStyle}>ค่าเดินทาง/เพิ่มเติม (฿)</label>
+                                            <input type="number" style={inputStyle} value={extraFee} onChange={e => setExtraFee(Number(e.target.value) || 0)} />
+                                        </div>
+                                    </div>
+                                    <div style={{
+                                        background: 'linear-gradient(135deg, var(--primary-ghost), #EEF1FB)',
+                                        borderRadius: 14, padding: '14px 18px',
+                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                        border: '1.5px solid var(--border)',
+                                    }}>
+                                        <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>ยอดรวม</span>
+                                        <span style={{ fontWeight: 800, fontSize: '1.3rem', color: 'var(--brand-dominant)' }}>฿{totalPrice.toLocaleString()}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Payment */}
+                            <div style={sectionStyle}>
+                                <div style={sectionHeaderStyle}>
+                                    <CreditCard size={15} color="var(--brand-dominant)" />
+                                    <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>การชำระเงิน</span>
+                                </div>
+                                <div style={sectionBodyStyle}>
+                                    <div style={fieldRow}>
+                                        <div>
+                                            <label style={labelStyle}>วิธีชำระ</label>
+                                            <select style={{ ...inputStyle, cursor: 'pointer' }} value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
+                                                <option value="transfer">โอนเงิน</option>
+                                                <option value="cash">เงินสด</option>
+                                                <option value="stripe">Stripe</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label style={labelStyle}>สถานะการชำระ</label>
+                                            <select style={{ ...inputStyle, cursor: 'pointer' }} value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)}>
+                                                <option value="pending">รอชำระ</option>
+                                                <option value="paid">ชำระแล้ว</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Note */}
+                            <div style={sectionStyle}>
+                                <div style={sectionHeaderStyle}>
+                                    <FileText size={15} color="var(--brand-dominant)" />
+                                    <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>หมายเหตุ</span>
+                                </div>
+                                <div style={sectionBodyStyle}>
+                                    <textarea
+                                        style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }}
+                                        placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)"
+                                        value={note}
+                                        onChange={e => setNote(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div style={{
+                    padding: '16px 28px', borderTop: '1.5px solid var(--border)',
+                    background: 'var(--surface)', borderRadius: '0 0 24px 24px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
+                }}>
+                    {error && (
+                        <div style={{ fontSize: '0.85rem', color: 'var(--danger)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            ⓘ {error}
+                        </div>
+                    )}
+                    {!error && <div />}
+                    <div style={{ display: 'flex', gap: 10 }}>
+                        <button className="btn btn-ghost" style={{ borderRadius: 14 }} onClick={onClose}>ยกเลิก</button>
+                        <button
+                            className="btn btn-primary"
+                            style={{ borderRadius: 14, gap: 8, minWidth: 160 }}
+                            onClick={handleSubmit}
+                            disabled={submitting}
+                        >
+                            {submitting ? <><span className="spinner" style={{ width: 16, height: 16 }} /> กำลังสร้าง...</> : <><Plus size={16} /> สร้างการจอง</>}
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     )
 }
