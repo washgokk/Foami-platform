@@ -722,6 +722,10 @@ function ManualBookingModal({ onClose, onCreated, initialBooking = null }: { onC
     const [basePrice, setBasePrice] = useState(initialBooking?.base_price || 0)
     const [extraFee, setExtraFee] = useState(initialBooking?.extra_fee || 0)
     const [totalPrice, setTotalPrice] = useState(initialBooking?.total_price || 0)
+    const [discountCode, setDiscountCode] = useState(initialBooking?.discount_code || '')
+    const [discountAmount, setDiscountAmount] = useState(initialBooking?.discount_amount || 0)
+    const [discountError, setDiscountError] = useState('')
+    const [isCheckingDiscount, setIsCheckingDiscount] = useState(false)
     const [paymentMethod, setPaymentMethod] = useState(initialBooking?.payment_method || 'transfer')
     const [paymentStatus, setPaymentStatus] = useState(initialBooking?.payment_status || 'pending')
 
@@ -765,7 +769,7 @@ function ManualBookingModal({ onClose, onCreated, initialBooking = null }: { onC
             supabase.from('zones').select('*').eq('is_active', true),
             supabase.from('staff').select('*').eq('is_active', true),
             supabase.from('services').select('*').eq('is_active', true).order('price_s'),
-            supabase.from('service_addons').select('*').eq('is_active', true),
+supabase.from('service_addons').select('*').eq('is_active', true),
         ]).then(([brRes, znRes, stRes, svcRes, adnRes]) => {
             if (brRes.data) { setBranches(brRes.data); if (!isEdit && brRes.data.length > 0) setSelectedBranchId(brRes.data[0].id) }
             if (znRes.data) setZones(znRes.data)
@@ -829,8 +833,8 @@ function ManualBookingModal({ onClose, onCreated, initialBooking = null }: { onC
 
     // ── Calculate total ──
     useEffect(() => {
-        setTotalPrice(basePrice + extraFee)
-    }, [basePrice, extraFee])
+        setTotalPrice(Math.max(0, basePrice + extraFee - discountAmount))
+    }, [basePrice, extraFee, discountAmount])
 
     // ── Derived data ──
     const branchZones = zones.filter(z => z.branch_id === selectedBranchId)
@@ -852,6 +856,42 @@ function ManualBookingModal({ onClose, onCreated, initialBooking = null }: { onC
         })
         : branchStaff
 
+    const handleCheckDiscount = async () => {
+        if (!discountCode.trim()) return;
+        setIsCheckingDiscount(true);
+        setDiscountError('');
+        try {
+            const res = await fetch('/api/discount/validate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    code: discountCode,
+                    customerId: customerId,
+                    basePrice: basePrice + extraFee,
+                    branchId: selectedBranchId,
+                    zoneId: selectedZoneId,
+                    bookingId: isEdit ? initialBooking.id : undefined
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'ตรวจสอบไม่ผ่าน');
+            
+            const amt = data.discount_amount || 0;
+            setDiscountAmount(amt);
+            
+            // Auto calculate new total price
+            const gross = basePrice + extraFee;
+            setTotalPrice(Math.max(0, gross - amt));
+            
+        } catch (err: any) {
+            setDiscountError(err.message);
+            setDiscountAmount(0);
+            setTotalPrice(basePrice + extraFee); // Reset to gross
+        } finally {
+            setIsCheckingDiscount(false);
+        }
+    }
+
     // ── Submit ──
     const [submitting, setSubmitting] = useState(false)
     const [error, setError] = useState('')
@@ -872,38 +912,42 @@ function ManualBookingModal({ onClose, onCreated, initialBooking = null }: { onC
             const bookingId = isEdit ? initialBooking.id : generateScalableId('BK')
             const adminId = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : 'unknown'
             
+            const payload = {
+                id: isEdit ? initialBooking.id : `MANUAL-${Date.now()}`,
+                admin_id: adminId,
+                customer_id: customerId,
+                customer_name: customerName,
+                customer_phone: customerPhone,
+                vehicle_brand: vehicleBrand,
+                vehicle_model: vehicleModel,
+                vehicle_color: vehicleColor,
+                license_plate: licensePlate,
+                vehicle_size: vehicleSize,
+                pickup_address: pickupAddress,
+                delivery_address: deliveryAddress,
+                branch_id: selectedBranchId,
+                zone_id: selectedZoneId,
+                staff_id: selectedStaffId,
+                scheduled_date: selectedDate,
+                scheduled_time: selectedTime,
+                service_id: selectedServiceId,
+                addon_ids: selectedAddonIds,
+                base_price: basePrice,
+                extra_fee: extraFee,
+                total_price: totalPrice,
+                discount_code: discountCode,
+                discount_amount: discountAmount,
+                payment_method: paymentMethod,
+                payment_status: paymentStatus,
+                customer_note: note,
+            }
+            
             const endpoint = isEdit ? '/api/bookings/manual/edit' : '/api/bookings/manual'
             
             const res = await fetch(endpoint, {
                 method: isEdit ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    id: bookingId,
-                    admin_id: adminId,
-                    customer_name: customerName,
-                    customer_phone: customerPhone,
-                    vehicle_brand: vehicleBrand,
-                    vehicle_model: vehicleModel,
-                    vehicle_color: vehicleColor,
-                    license_plate: licensePlate,
-                    vehicle_size: vehicleSize,
-                    service_id: selectedServiceId,
-                    addon_ids: selectedAddonIds,
-                    pickup_address: pickupAddress,
-                    delivery_address: deliveryAddress,
-                    branch_id: selectedBranchId,
-                    zone_id: selectedZoneId,
-                    staff_id: selectedStaffId,
-                    scheduled_date: selectedDate,
-                    scheduled_time: selectedTime,
-                    base_price: basePrice,
-                    extra_fee: extraFee,
-                    total_price: totalPrice,
-                    payment_method: paymentMethod,
-                    payment_status: paymentStatus,
-                    customer_note: note,
-                    customer_id: customerId,
-                }),
+                body: JSON.stringify(payload),
             })
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด')
@@ -1274,12 +1318,62 @@ function ManualBookingModal({ onClose, onCreated, initialBooking = null }: { onC
                                     </div>
                                     <div style={{
                                         background: 'linear-gradient(135deg, var(--primary-ghost), #EEF1FB)',
-                                        borderRadius: 14, padding: '14px 18px',
-                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                        borderRadius: 14, padding: '16px', display: 'flex', flexDirection: 'column', gap: 12,
                                         border: '1.5px solid var(--border)',
                                     }}>
-                                        <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>ยอดรวม</span>
-                                        <span style={{ fontWeight: 800, fontSize: '1.3rem', color: 'var(--brand-dominant)' }}>฿{totalPrice.toLocaleString()}</span>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>ส่วนลด</span>
+                                                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                    <div style={{ display: 'flex', gap: 4 }}>
+                                                        <input 
+                                                            type="text" 
+                                                            style={{ ...inputStyle, width: 100, textAlign: 'center', fontFamily: 'monospace', fontSize: '0.8rem', padding: '4px 8px', height: 'auto', textTransform: 'uppercase' }} 
+                                                            placeholder="CODE"
+                                                            value={discountCode} 
+                                                            onChange={e => setDiscountCode(e.target.value.toUpperCase())} 
+                                                        />
+                                                        <button 
+                                                            onClick={handleCheckDiscount}
+                                                            disabled={!discountCode.trim() || isCheckingDiscount}
+                                                            style={{ 
+                                                                background: discountCode.trim() ? 'var(--brand-dominant)' : '#e2e8f0', 
+                                                                color: 'white', 
+                                                                border: 'none', 
+                                                                borderRadius: 8, 
+                                                                padding: '0 10px', 
+                                                                fontSize: '0.75rem', 
+                                                                fontWeight: 700,
+                                                                cursor: discountCode.trim() && !isCheckingDiscount ? 'pointer' : 'not-allowed',
+                                                                transition: 'all 0.2s'
+                                                            }}
+                                                        >
+                                                            {isCheckingDiscount ? '...' : 'ใช้โค้ด'}
+                                                        </button>
+                                                    </div>
+                                                    <div style={{ position: 'relative', width: 90 }}>
+                                                        <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 600 }}>฿</span>
+                                                        <input type="number" style={{ ...inputStyle, paddingLeft: 22, textAlign: 'right', color: 'var(--danger)', fontWeight: 700 }} value={discountAmount} onChange={e => { setDiscountAmount(Number(e.target.value)); setTotalPrice(Math.max(0, basePrice + extraFee - Number(e.target.value))); }} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {discountError && (
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--danger)', textAlign: 'right' }}>
+                                                    {discountError}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div style={{
+                                            borderTop: '2px dashed var(--border)', paddingTop: 12,
+                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                                        }}>
+                                            <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>ยอดรวม (สุทธิ)</span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <span style={{ position: 'relative', fontSize: '1.3rem', fontWeight: 800, color: 'var(--brand-dominant)' }}>฿</span>
+                                                <input type="number" style={{ ...inputStyle, width: 120, fontSize: '1.3rem', fontWeight: 800, color: 'var(--brand-dominant)', padding: '0 8px', textAlign: 'right', background: 'transparent', border: 'none', borderBottom: '2px solid var(--brand-dominant)', borderRadius: 0 }} value={totalPrice} onChange={e => setTotalPrice(Number(e.target.value))} />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

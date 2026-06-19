@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
-    const { code, customerId, basePrice = 0, branchId, zoneId } = await req.json()
+    const { code, customerId, basePrice = 0, branchId, zoneId, bookingId } = await req.json()
     const supabase = createServiceClient()
 
     // 1. Fetch discount code
@@ -54,12 +54,18 @@ export async function POST(req: NextRequest) {
     if (customerId) {
         // 4.a Check uses per customer
         if (discount.max_uses_per_customer) {
-            const { count } = await supabase
+            let query = supabase
                 .from('bookings')
                 .select('*', { count: 'exact', head: true })
                 .eq('discount_code', discount.code)
                 .eq('customer_id', customerId)
                 .neq('status', 'cancelled')
+
+            if (bookingId) {
+                query = query.neq('id', bookingId)
+            }
+
+            const { count } = await query
 
             if (count !== null && count >= discount.max_uses_per_customer) {
                 return NextResponse.json({ error: 'คุณใช้สิทธิ์ของโค้ดนี้ครบแล้ว' }, { status: 400 })

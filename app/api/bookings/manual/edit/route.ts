@@ -33,6 +33,8 @@ export async function PUT(req: NextRequest) {
             payment_status,
             customer_note,
             customer_id,
+            discount_code,
+            discount_amount,
         } = body
 
         if (!bookingId || !service_id || !scheduled_date || !scheduled_time || !staff_id || !zone_id || !branch_id) {
@@ -150,6 +152,8 @@ export async function PUT(req: NextRequest) {
             payment_method,
             payment_status,
             customer_note: manualNote,
+            discount_code: discount_code || null,
+            discount_amount: discount_amount ? Number(discount_amount) : 0,
             updated_at: new Date().toISOString()
         }
 
@@ -159,11 +163,34 @@ export async function PUT(req: NextRequest) {
             .eq('id', bookingId)
 
         if (bookingError) {
-            console.error('[Manual Edit] Booking update error:', bookingError)
-            return NextResponse.json({ error: 'ไม่สามารถอัปเดตการจองได้' }, { status: 500 })
+            console.error('[Edit Booking] Update error:', bookingError)
+            return NextResponse.json({ error: bookingError.message }, { status: 400 })
         }
 
-        // 4. Record Audit Log
+        // Adjust discount code usage if changed
+        const newCode = discount_code ? discount_code.toUpperCase() : null
+        const oldCode = oldBooking.discount_code ? oldBooking.discount_code.toUpperCase() : null
+
+        const codesToSync = new Set<string>()
+        if (newCode) codesToSync.add(newCode)
+        if (oldCode) codesToSync.add(oldCode)
+
+        for (const code of codesToSync) {
+            const { count } = await supabase
+                .from('bookings')
+                .select('*', { count: 'exact', head: true })
+                .eq('discount_code', code)
+                .neq('status', 'cancelled')
+                
+            if (count !== null) {
+                await supabase
+                    .from('discount_codes')
+                    .update({ used_count: count })
+                    .eq('code', code)
+            }
+        }
+
+        // Write audit log
         if (admin_id) {
             try {
                 // Fetch admin info

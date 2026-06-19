@@ -39,6 +39,8 @@ export async function POST(req: NextRequest) {
             payment_status,
             customer_note,
             customer_id,
+            discount_code,
+            discount_amount,
         } = body
 
         if (!bookingId || !service_id || !scheduled_date || !scheduled_time || !staff_id || !zone_id || !branch_id) {
@@ -166,8 +168,8 @@ export async function POST(req: NextRequest) {
                 base_price: base_price || 0,
                 total_price: total_price || 0,
                 additional_price: 0,
-                discount_code: null,
-                discount_amount: 0,
+                discount_code: discount_code || null,
+                discount_amount: discount_amount ? Number(discount_amount) : 0,
                 payment_method: payment_method || 'transfer',
                 payment_status: payment_status || 'pending',
                 vehicle_data,
@@ -185,6 +187,22 @@ export async function POST(req: NextRequest) {
         if (insertError) {
             console.error('[Manual Booking] Insert error:', insertError)
             return NextResponse.json({ error: insertError.message }, { status: 400 })
+        }
+
+        // Sync discount code usage using absolute count for safety
+        if (discount_code && discount_amount > 0) {
+            const { count } = await supabase
+                .from('bookings')
+                .select('*', { count: 'exact', head: true })
+                .eq('discount_code', discount_code.toUpperCase())
+                .neq('status', 'cancelled')
+                
+            if (count !== null) {
+                await supabase
+                    .from('discount_codes')
+                    .update({ used_count: count })
+                    .eq('code', discount_code.toUpperCase())
+            }
         }
 
         // Write audit log

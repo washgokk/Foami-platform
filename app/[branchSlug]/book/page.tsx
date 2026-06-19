@@ -797,8 +797,8 @@ export default function BookPage() {
             delivery_lat: finalDeliveryLat, delivery_lng: finalDeliveryLng, delivery_address: finalDeliveryAddr,
             scheduled_date: selectedDate, scheduled_time: selectedSlot,
             zone_id: zoneId, extra_fee: extraFee,
-            base_price: selectedPkg?.price || 0, // ONLY Package Price
-            total_price: grossTotal, // ← Gross total (before discount) — discount tracked separately
+            base_price: pkgBasePrice,
+            total_price: total, // ← Net total (after discount) — to match system expectations
             discount_code: discountCode,
             discount_amount: discountAmount,
             payment_method: total <= 0 ? 'discount_code' : payMethod, // Mark free bookings correctly

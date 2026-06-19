@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
                 different_spot_fee: different_spot_fee || 0,
                 staff_extra_payout: staff_extra_payout || 0,
                 base_price,
-                total_price: gross_total,       // Store GROSS (before discount) for accurate records
+                total_price: Math.max(0, gross_total - (discount_amount || 0)),       // Store NET (after discount) to prevent double deduction in CRM/Staff
                 additional_price: 0,
                 is_additional_paid: false,
                 discount_code: discount_code || null,

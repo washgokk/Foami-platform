@@ -156,18 +156,36 @@ export default function StaffJobsPage() {
                                 </span>
                                 <div className={styles.jobPrice} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
                                     {(() => {
-                                        // ── Gross total stored in DB (pre-discount) ──
-                                        const grossTotal = Math.round(job.total_price || 0)
-                                        // ── Net = what customer actually owes for this booking ──
+                                        // ── Calculate Addons ──
+                                        let rowAddonTotal = 0
+                                        if (Array.isArray(job.addon_ids)) {
+                                            job.addon_ids.forEach((a: any) => {
+                                                const addonObj = typeof a === 'string' ? addons.find(da => da.id === a || da.name === a) : a
+                                                rowAddonTotal += (addonObj?.price || 0)
+                                            })
+                                        }
+
+                                        const theoreticalGross = (job.base_price || 0) + rowAddonTotal + (job.travel_surcharge || 0) + (job.different_spot_fee || 0)
                                         const discount = Math.round(job.discount_amount || 0)
                                         const isRebooking = discount > 0 && job.discount_code && /rebook|refund/i.test(job.discount_code)
-                                        const netTotal = Math.max(0, grossTotal - discount)
+
+                                        let netTotal = 0
+                                        if (job.total_price != null && job.total_price > 0) {
+                                            if (discount > 0 && Math.abs(job.total_price - theoreticalGross) <= 1) {
+                                                netTotal = Math.max(0, job.total_price - discount)
+                                            } else {
+                                                netTotal = job.total_price
+                                            }
+                                        } else {
+                                            netTotal = Math.max(0, theoreticalGross - discount)
+                                        }
+
                                         // ── Display Total (Staff sees full value if rebooking) ──
-                                        const displayNetTotal = isRebooking ? grossTotal : netTotal
+                                        const displayNetTotal = isRebooking ? theoreticalGross : netTotal
                                         // ── Additional = on-site charges (pay later) ──
                                         const additional = job.additional_price || 0
                                         // ── What was already paid online (via Stripe or free booking) ──
-                                        const paidOnline = isRebooking ? grossTotal : (netTotal - additional)
+                                        const paidOnline = isRebooking ? theoreticalGross : (netTotal - additional)
                                         // ── Balance = additional not yet paid ──
                                         const balance = job.is_additional_paid ? 0 : additional
 

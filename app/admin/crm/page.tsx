@@ -323,11 +323,23 @@ export default function CRMPage() {
             }
 
             const isRebookingCode = b.discount_code && /rebook|refund/i.test(b.discount_code)
-            const grossFromDB = b.total_price && b.total_price > 0 ? b.total_price : ((b.base_price || 0) + rowAddonTotal + (b.travel_surcharge || 0) + (b.different_spot_fee || 0))
+            const theoreticalGross = (b.base_price || 0) + rowAddonTotal + (b.travel_surcharge || 0) + (b.different_spot_fee || 0)
             const discountVal = b.discount_amount || 0
+            
+            let baseNet = 0
+            if (b.total_price != null && b.total_price > 0) {
+                if (discountVal > 0 && Math.abs(b.total_price - theoreticalGross) <= 1) {
+                    baseNet = Math.max(0, b.total_price - discountVal)
+                } else {
+                    baseNet = b.total_price
+                }
+            } else {
+                baseNet = Math.max(0, theoreticalGross - discountVal)
+            }
+
             const computedTotal = isRebookingCode
-                ? (grossFromDB + (b.additional_price || 0))   // Rebooking: gross counts as revenue
-                : Math.max(0, grossFromDB - discountVal + (b.additional_price || 0)) // Normal discount: net
+                ? (theoreticalGross + (b.additional_price || 0))   // Rebooking: gross counts as revenue
+                : (baseNet + (b.additional_price || 0)) // Normal discount: net
             const labor = b.labor_cost || 0;
             const rental = b.rental_cost || 0;
             const fuel = b.fuel_cost || 0;
@@ -854,15 +866,25 @@ export default function CRMPage() {
                                                 </td>
 
                                                 {(() => {
-                                                    // Use total_price from DB (gross pre-discount) when available
+                                                    // Determine Net Total robustly (handle if total_price in DB is Gross or Net)
                                                     const isRebookingTx = b.discount_code && /rebook|refund/i.test(b.discount_code)
-                                                    const grossTx = b.total_price && b.total_price > 0
-                                                        ? b.total_price
-                                                        : (b.base_price || 0) + rowAddonTotal + (b.travel_surcharge || 0) + (b.different_spot_fee || 0)
+                                                    const theoreticalGross = (b.base_price || 0) + rowAddonTotal + (b.travel_surcharge || 0) + (b.different_spot_fee || 0)
                                                     const discountTx = b.discount_amount || 0
+
+                                                    let baseNet = 0
+                                                    if (b.total_price != null && b.total_price > 0) {
+                                                        if (discountTx > 0 && Math.abs(b.total_price - theoreticalGross) <= 1) {
+                                                            baseNet = Math.max(0, b.total_price - discountTx)
+                                                        } else {
+                                                            baseNet = b.total_price
+                                                        }
+                                                    } else {
+                                                        baseNet = Math.max(0, theoreticalGross - discountTx)
+                                                    }
+
                                                     const computedTotal = isRebookingTx
-                                                        ? (grossTx + (b.additional_price || 0))
-                                                        : Math.max(0, grossTx - discountTx + (b.additional_price || 0))
+                                                        ? (theoreticalGross + (b.additional_price || 0))
+                                                        : (baseNet + (b.additional_price || 0))
 
                                                     // Costs (using snapshots or 0)
                                                     const labor = b.labor_cost || 0;

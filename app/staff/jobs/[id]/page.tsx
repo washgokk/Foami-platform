@@ -42,20 +42,27 @@ const InfoSection = ({ job, addons }: { job: any, addons: any[] }) => {
     const additional = job.additional_price || 0
     const discount = Math.round(job.discount_amount || 0)
 
-    // ── Gross total stored in DB (pre-discount) ──
-    const grossTotal = job.total_price && job.total_price > 0
-        ? Math.round(job.total_price)
-        : (job.base_price || 0) + rowAddonTotal + travelSurcharge + diffSpotFee
+    const theoreticalGross = (job.base_price || 0) + rowAddonTotal + travelSurcharge + diffSpotFee
     const isRebooking = discount > 0 && job.discount_code && /rebook|refund/i.test(job.discount_code)
     
     // ── Net = what the customer owes for booking (excl. additional) ──
-    const netTotal = Math.max(0, grossTotal - discount)
+    let netTotal = 0
+    if (job.total_price != null && job.total_price > 0) {
+        if (discount > 0 && Math.abs(job.total_price - theoreticalGross) <= 1) {
+            netTotal = Math.max(0, job.total_price - discount)
+        } else {
+            netTotal = job.total_price
+        }
+    } else {
+        netTotal = Math.max(0, theoreticalGross - discount)
+    }
+
     // ── Display Total (Staff sees full value if rebooking) ──
-    const displayNetTotal = isRebooking ? grossTotal : netTotal
+    const displayNetTotal = isRebooking ? theoreticalGross : netTotal
     // ── Full bill including on-site additional ──
     const totalBill = displayNetTotal + additional
     // ── What was already paid online via Stripe / free booking ──
-    const paidOnline = isRebooking ? grossTotal : Math.max(0, netTotal) // Stripe charge = netTotal (before additional)
+    const paidOnline = isRebooking ? theoreticalGross : Math.max(0, netTotal) // Stripe charge = netTotal (before additional)
     // ── Additional balance ──
     const additionalBalance = job.is_additional_paid ? 0 : additional
     // ── Total balance still owed (incl. additional if not paid) ──
@@ -69,7 +76,7 @@ const InfoSection = ({ job, addons }: { job: any, addons: any[] }) => {
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '0.88rem' }}>
             <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
             <span style={{ fontWeight: 700, color: color || 'var(--text-primary)' }}>
-                {typeof value === 'number' ? `฿${value.toLocaleString()}` : value}
+                {typeof value === 'number' ? (value < 0 ? `-฿${Math.abs(value).toLocaleString()}` : `฿${value.toLocaleString()}`) : value}
             </span>
         </div>
     )
