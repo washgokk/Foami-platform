@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
-    const { code, customerId, basePrice = 0 } = await req.json()
+    const { code, customerId, basePrice = 0, branchId, zoneId } = await req.json()
     const supabase = createServiceClient()
 
     // 1. Fetch discount code
@@ -23,6 +23,31 @@ export async function POST(req: NextRequest) {
     // 3. Check Total Uses
     if (discount.max_uses && (discount.used_count || 0) >= discount.max_uses) {
         return NextResponse.json({ error: 'โค้ดถูกใช้ครบสิทธิ์ทั้งหมดแล้ว' }, { status: 400 })
+    }
+
+    // 3.5 Check new conditions (valid_from, valid_until, days, branch, zone)
+    if (discount.valid_from && new Date() < new Date(discount.valid_from)) {
+        return NextResponse.json({ error: `เริ่มใช้ได้ตั้งแต่วันที่ ${new Date(discount.valid_from).toLocaleDateString('th-TH')}` }, { status: 400 })
+    }
+    if (discount.usage_type === 'date_range' && discount.valid_until && new Date() > new Date(discount.valid_until + 'T23:59:59')) {
+        return NextResponse.json({ error: `โค้ดนี้สิ้นสุดแคมเปญไปแล้วเมื่อวันที่ ${new Date(discount.valid_until).toLocaleDateString('th-TH')}` }, { status: 400 })
+    }
+    if (discount.usage_type === 'specific_days' && discount.valid_days && discount.valid_days.length > 0) {
+        const daysMap = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์']
+        const currentDayStr = daysMap[new Date().getDay()]
+        if (!discount.valid_days.includes(currentDayStr)) {
+            return NextResponse.json({ error: `ใช้ได้เฉพาะวัน ${discount.valid_days.join(', ')} เท่านั้น` }, { status: 400 })
+        }
+    }
+    if (discount.allowed_branch_ids && discount.allowed_branch_ids.length > 0) {
+        if (!branchId || !discount.allowed_branch_ids.includes(branchId)) {
+            return NextResponse.json({ error: 'ไม่สามารถใช้กับสาขาที่เลือกได้' }, { status: 400 })
+        }
+    }
+    if (discount.allowed_zone_ids && discount.allowed_zone_ids.length > 0) {
+        if (!zoneId || !discount.allowed_zone_ids.includes(zoneId)) {
+            return NextResponse.json({ error: 'ไม่สามารถใช้กับพื้นที่(โซน)ที่เลือกได้' }, { status: 400 })
+        }
     }
 
     // 4. Check Customer Caps & Segments (If customer ID is provided)

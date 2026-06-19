@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { trackAuditLog } from '@/lib/audit'
 import { BOOKING_STATUS_LABEL, BOOKING_STATUS_CSS, BookingStatus, TIME_SLOTS, VEHICLE_SIZE_LABEL } from '@/lib/types'
 import { generateScalableId } from '@/lib/id-utils'
-import { Search, ClipboardList, MessageCircle, Star, Image as ImageIcon, User, MapPin, Calendar, Clock, Phone, Briefcase, ChevronRight, X, LayoutGrid, List, Plus, Bike, CreditCard, FileText, Tag, Hash } from 'lucide-react'
+import { Search, ClipboardList, MessageCircle, Star, Image as ImageIcon, User, MapPin, Calendar, Clock, Phone, Briefcase, ChevronRight, X, LayoutGrid, List, Plus, Bike, CreditCard, FileText, Tag, Hash, Edit2 } from 'lucide-react'
 import ImageZoom from '@/components/Global/ImageZoom'
 import BookingChat from '@/components/Chat/BookingChat'
 
@@ -18,6 +18,7 @@ export default function AdminBookingsPage() {
     const [addons, setAddons] = useState<any[]>([])
     const [zoomConfig, setZoomConfig] = useState<{ images: { src: string; alt?: string }[]; initialIndex: number } | null>(null)
     const [showChat, setShowChat] = useState(false)
+    const [manualBookingToEdit, setManualBookingToEdit] = useState<any>(null)
     const [jobPhotos, setJobPhotos] = useState<{ before: string[], after: string[] }>({ before: [], after: [] })
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
     const [showManualModal, setShowManualModal] = useState(false)
@@ -433,19 +434,34 @@ export default function AdminBookingsPage() {
                                     </div>
                                 </div>
                             </div>
-                            <button
-                                onClick={() => { setSelected(null); setShowChat(false) }}
-                                style={{
-                                    width: 38, height: 38, borderRadius: 12, border: 'none',
-                                    background: 'var(--surface-2)', cursor: 'pointer',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    color: 'var(--text-muted)', transition: 'all 0.15s',
-                                }}
-                                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--danger-light)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--danger)' }}
-                                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-2)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)' }}
-                            >
-                                <X size={17} />
-                            </button>
+                            <div style={{ display: 'flex', gap: 10 }}>
+                                {selected.customers?.line_user_id?.startsWith('walkin_') && (
+                                    <button
+                                        onClick={() => { setManualBookingToEdit(selected); setShowManualModal(true) }}
+                                        style={{
+                                            padding: '0 16px', height: 38, borderRadius: 12, border: '1px solid var(--brand-dominant)',
+                                            background: 'var(--primary-ghost)', color: 'var(--brand-dominant)',
+                                            fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer',
+                                            display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s'
+                                        }}
+                                    >
+                                        <Edit2 size={14} /> แก้ไขการจอง
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => { setSelected(null); setShowChat(false) }}
+                                    style={{
+                                        width: 38, height: 38, borderRadius: 12, border: 'none',
+                                        background: 'var(--surface-2)', cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        color: 'var(--text-muted)', transition: 'all 0.15s',
+                                    }}
+                                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--danger-light)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--danger)' }}
+                                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-2)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)' }}
+                                >
+                                    <X size={17} />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Tab Bar */}
@@ -630,7 +646,7 @@ export default function AdminBookingsPage() {
                                         senderId="admin-system"
                                         senderType="admin"
                                         senderName="Admin"
-                                        isOpen={true}
+                                isOpen={true}
                                     />
                                 </div>
                             )}
@@ -650,8 +666,9 @@ export default function AdminBookingsPage() {
             {/* Manual Booking Modal */}
             {showManualModal && createPortal(
                 <ManualBookingModal
-                    onClose={() => setShowManualModal(false)}
-                    onCreated={() => { setShowManualModal(false); load() }}
+                    initialBooking={manualBookingToEdit}
+                    onClose={() => { setShowManualModal(false); setManualBookingToEdit(null) }}
+                    onCreated={() => { setShowManualModal(false); setManualBookingToEdit(null); load(); setSelected(null) }}
                 />
             , document.body)}
 
@@ -665,7 +682,51 @@ export default function AdminBookingsPage() {
     )
 }
 
-function ManualBookingModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+// Persisted last-used customer across modal opens (module-level so it survives re-renders)
+
+
+function ManualBookingModal({ onClose, onCreated, initialBooking = null }: { onClose: () => void; onCreated: () => void; initialBooking?: any }) {
+    // ── Pre-fill data if editing ──
+    const isEdit = !!initialBooking
+    const [customerId, setCustomerId] = useState(initialBooking?.customer_id || '')
+    const [customerName, setCustomerName] = useState(initialBooking?.customers?.full_name || '')
+    const [customerPhone, setCustomerPhone] = useState(initialBooking?.customers?.phone || '')
+    
+    // Parse vehicle data if available
+    let initVeh = { brand: '', model: '', color: '', plate: '', size: 'S' }
+    if (initialBooking?.vehicle_data) {
+        if (typeof initialBooking.vehicle_data === 'string') {
+            try { initVeh = JSON.parse(initialBooking.vehicle_data) } catch (e) {}
+        } else {
+            initVeh = initialBooking.vehicle_data
+        }
+    }
+    const [vehicleBrand, setVehicleBrand] = useState(initVeh.brand || initialBooking?.vehicle_brand || '')
+    const [vehicleModel, setVehicleModel] = useState(initVeh.model || initialBooking?.vehicle_model || '')
+    const [vehicleColor, setVehicleColor] = useState(initVeh.color || initialBooking?.vehicle_color || '')
+    const [licensePlate, setLicensePlate] = useState(initVeh.plate || initialBooking?.license_plate || '')
+    const [vehicleSize, setVehicleSize] = useState(initVeh.size || initialBooking?.vehicle_size || 'S')
+    
+    // Addresses
+    const [pickupAddress, setPickupAddress] = useState(initialBooking?.pickup_address || '')
+    const [deliveryAddress, setDeliveryAddress] = useState(initialBooking?.delivery_address || '')
+
+    const [selectedBranchId, setSelectedBranchId] = useState(initialBooking?.branch_id || '')
+    const [selectedZoneId, setSelectedZoneId] = useState(initialBooking?.zone_id || '')
+    const [selectedStaffId, setSelectedStaffId] = useState(initialBooking?.staff_id || '')
+    const [selectedDate, setSelectedDate] = useState(initialBooking?.scheduled_date || '')
+    const [selectedTime, setSelectedTime] = useState(initialBooking?.scheduled_time || '')
+    const [selectedServiceId, setSelectedServiceId] = useState(initialBooking?.service_id || '')
+    const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>(initialBooking?.addon_ids || [])
+
+    const [basePrice, setBasePrice] = useState(initialBooking?.base_price || 0)
+    const [extraFee, setExtraFee] = useState(initialBooking?.extra_fee || 0)
+    const [totalPrice, setTotalPrice] = useState(initialBooking?.total_price || 0)
+    const [paymentMethod, setPaymentMethod] = useState(initialBooking?.payment_method || 'transfer')
+    const [paymentStatus, setPaymentStatus] = useState(initialBooking?.payment_status || 'pending')
+
+    const [note, setNote] = useState(initialBooking?.customer_note || '')
+
     // ── Data from DB ──
     const [branches, setBranches] = useState<any[]>([])
     const [zones, setZones] = useState<any[]>([])
@@ -673,38 +734,22 @@ function ManualBookingModal({ onClose, onCreated }: { onClose: () => void; onCre
     const [services, setServices] = useState<any[]>([])
     const [serviceAddons, setServiceAddons] = useState<any[]>([])
     const [schedules, setSchedules] = useState<any[]>([])
+    const [recentCustomers, setRecentCustomers] = useState<any[]>([])
+    const [showRecentPicker, setShowRecentPicker] = useState(false)
 
-    // ── Form State ──
-    const [customerName, setCustomerName] = useState('')
-    const [customerPhone, setCustomerPhone] = useState('')
-    const [vehicleBrand, setVehicleBrand] = useState('')
-    const [vehicleModel, setVehicleModel] = useState('')
-    const [vehicleColor, setVehicleColor] = useState('')
-    const [licensePlate, setLicensePlate] = useState('')
-    const [vehicleSize, setVehicleSize] = useState('S')
-
-    const [selectedServiceId, setSelectedServiceId] = useState('')
-    const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([])
-
-    const [pickupAddress, setPickupAddress] = useState('')
-    const [deliveryAddress, setDeliveryAddress] = useState('')
-
-    const [selectedBranchId, setSelectedBranchId] = useState('')
-    const [selectedZoneId, setSelectedZoneId] = useState('')
-    const [selectedStaffId, setSelectedStaffId] = useState('')
-    const [selectedDate, setSelectedDate] = useState('')
-    const [selectedTime, setSelectedTime] = useState('')
-
-    const [basePrice, setBasePrice] = useState(0)
-    const [extraFee, setExtraFee] = useState(0)
-    const [totalPrice, setTotalPrice] = useState(0)
-
-    const [paymentMethod, setPaymentMethod] = useState('transfer')
-    const [paymentStatus, setPaymentStatus] = useState('pending')
-
-    const [note, setNote] = useState('')
-    const [submitting, setSubmitting] = useState(false)
-    const [error, setError] = useState('')
+    // ── Fill from a previous/recent customer ──
+    const fillFromCustomer = (c: any) => {
+        setCustomerId(c.id || '')
+        setCustomerName(c.name || '')
+        setCustomerPhone(c.phone || '')
+        setVehicleBrand(c.brand || '')
+        setVehicleModel(c.model || '')
+        setVehicleColor(c.color || '')
+        setLicensePlate(c.plate || '')
+        setVehicleSize(c.size || 'S')
+        setPickupAddress(c.pickup || '')
+        setShowRecentPicker(false)
+    }
 
     const todayStr = (() => {
         const now = new Date()
@@ -722,14 +767,38 @@ function ManualBookingModal({ onClose, onCreated }: { onClose: () => void; onCre
             supabase.from('services').select('*').eq('is_active', true).order('price_s'),
             supabase.from('service_addons').select('*').eq('is_active', true),
         ]).then(([brRes, znRes, stRes, svcRes, adnRes]) => {
-            if (brRes.data) { setBranches(brRes.data); if (brRes.data.length > 0) setSelectedBranchId(brRes.data[0].id) }
+            if (brRes.data) { setBranches(brRes.data); if (!isEdit && brRes.data.length > 0) setSelectedBranchId(brRes.data[0].id) }
             if (znRes.data) setZones(znRes.data)
             if (stRes.data) setStaffList(stRes.data)
             if (svcRes.data) setServices(svcRes.data)
             if (adnRes.data) setServiceAddons(adnRes.data)
         })
-        setSelectedDate(todayStr)
-    }, [todayStr])
+        if (!isEdit) setSelectedDate(todayStr)
+
+        // Load recent walk-in customers from database
+        supabase
+            .from('customers')
+            .select('id, full_name, phone, vehicle_brand, vehicle_model, vehicle_color, license_plate, vehicle_size, saved_locations')
+            .like('line_user_id', 'walkin_%')
+            .order('created_at', { ascending: false })
+            .limit(15)
+            .then(({ data }) => {
+                if (data) {
+                    const mapped = data.map(c => ({
+                        id: c.id,
+                        name: c.full_name,
+                        phone: c.phone || '',
+                        brand: c.vehicle_brand || '',
+                        model: c.vehicle_model || '',
+                        color: c.vehicle_color || '',
+                        plate: c.license_plate || '',
+                        size: c.vehicle_size || 'S',
+                        pickup: c.saved_locations?.[0]?.address || ''
+                    }))
+                    setRecentCustomers(mapped)
+                }
+            })
+    }, [todayStr, isEdit])
 
     // ── Load schedules when branch/zone/date change ──
     useEffect(() => {
@@ -750,13 +819,13 @@ function ManualBookingModal({ onClose, onCreated }: { onClose: () => void; onCre
 
     // ── Auto-fill price when service changes ──
     useEffect(() => {
-        if (!selectedServiceId) { setBasePrice(0); return }
+        if (!selectedServiceId) { if (!isEdit) setBasePrice(0); return }
         const svc = services.find(s => s.id === selectedServiceId)
         if (!svc) return
         const sizeKey = `price_${vehicleSize.toLowerCase()}`
         const price = Number(svc[sizeKey] || svc.price_s || 0)
         setBasePrice(price)
-    }, [selectedServiceId, vehicleSize, services])
+    }, [selectedServiceId, vehicleSize, services, isEdit])
 
     // ── Calculate total ──
     useEffect(() => {
@@ -784,6 +853,9 @@ function ManualBookingModal({ onClose, onCreated }: { onClose: () => void; onCre
         : branchStaff
 
     // ── Submit ──
+    const [submitting, setSubmitting] = useState(false)
+    const [error, setError] = useState('')
+
     const handleSubmit = async () => {
         if (!customerName.trim()) { setError('กรุณากรอกชื่อลูกค้า'); return }
         if (!selectedServiceId) { setError('กรุณาเลือกแพ็กเกจ'); return }
@@ -797,10 +869,13 @@ function ManualBookingModal({ onClose, onCreated }: { onClose: () => void; onCre
         setError('')
 
         try {
-            const bookingId = generateScalableId('BK')
+            const bookingId = isEdit ? initialBooking.id : generateScalableId('BK')
             const adminId = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : 'unknown'
-            const res = await fetch('/api/bookings/manual', {
-                method: 'POST',
+            
+            const endpoint = isEdit ? '/api/bookings/manual/edit' : '/api/bookings/manual'
+            
+            const res = await fetch(endpoint, {
+                method: isEdit ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     id: bookingId,
@@ -827,10 +902,12 @@ function ManualBookingModal({ onClose, onCreated }: { onClose: () => void; onCre
                     payment_method: paymentMethod,
                     payment_status: paymentStatus,
                     customer_note: note,
+                    customer_id: customerId,
                 }),
             })
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด')
+
             onCreated()
         } catch (e: any) {
             setError(e.message || 'เกิดข้อผิดพลาด')
@@ -897,9 +974,9 @@ function ManualBookingModal({ onClose, onCreated }: { onClose: () => void; onCre
                             <Plus size={20} />
                         </div>
                         <div>
-                            <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>เพิ่มการจองใหม่ (Manual)</div>
+                            <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>{isEdit ? 'แก้ไขการจอง (Manual)' : 'เพิ่มการจองใหม่ (Manual)'}</div>
                             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 1 }}>
-                                สำหรับลูกค้าที่จองผ่าน LINE หรือช่องทางอื่น
+                                {isEdit ? `กำลังแก้ไขข้อมูลของการจอง ${initialBooking?.id?.slice(0, 8)}` : 'สำหรับลูกค้าที่จองผ่าน LINE หรือช่องทางอื่น'}
                             </div>
                         </div>
                     </div>
@@ -928,6 +1005,53 @@ function ManualBookingModal({ onClose, onCreated }: { onClose: () => void; onCre
                                 <div style={sectionHeaderStyle}>
                                     <User size={15} color="var(--brand-dominant)" />
                                     <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>ข้อมูลลูกค้า</span>
+                                    {recentCustomers.length > 0 && (
+                                        <div style={{ marginLeft: 'auto', position: 'relative' }}>
+                                            <button
+                                                onClick={() => setShowRecentPicker(p => !p)}
+                                                style={{
+                                                    fontSize: '0.75rem', fontWeight: 700, border: '1.5px solid var(--brand-dominant)',
+                                                    color: 'var(--brand-dominant)', background: 'var(--primary-ghost)',
+                                                    borderRadius: 10, padding: '4px 10px', cursor: 'pointer',
+                                                    display: 'flex', alignItems: 'center', gap: 5,
+                                                }}
+                                            >
+                                                <User size={12} /> ลูกค้าเดิม ({recentCustomers.length})
+                                            </button>
+                                            {showRecentPicker && (
+                                                <div style={{
+                                                    position: 'absolute', top: '110%', right: 0, zIndex: 100,
+                                                    background: 'var(--surface)', border: '1.5px solid var(--border)',
+                                                    borderRadius: 14, boxShadow: '0 8px 32px rgba(30,40,80,0.15)',
+                                                    minWidth: 280, maxHeight: 280, overflowY: 'auto',
+                                                    padding: '8px 0',
+                                                }}>
+                                                    <div style={{ padding: '6px 14px 8px', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', marginBottom: 4 }}>
+                                                        เลือกลูกค้าที่เคยจองมาแล้ว
+                                                    </div>
+                                                    {recentCustomers.map((c: any, i: number) => (
+                                                        <button
+                                                            key={i}
+                                                            onClick={() => fillFromCustomer(c)}
+                                                            style={{
+                                                                width: '100%', border: 'none', background: 'transparent',
+                                                                textAlign: 'left', padding: '9px 14px', cursor: 'pointer',
+                                                                transition: 'background 0.12s',
+                                                            }}
+                                                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                                                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                                        >
+                                                            <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{c.name}</div>
+                                                            <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                                                                {c.phone && <span>{c.phone} • </span>}
+                                                                {c.brand} {c.model} {c.plate && `(${c.plate})`}
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                                 <div style={sectionBodyStyle}>
                                     <div style={fieldRow}>
@@ -1226,7 +1350,7 @@ function ManualBookingModal({ onClose, onCreated }: { onClose: () => void; onCre
                             onClick={handleSubmit}
                             disabled={submitting}
                         >
-                            {submitting ? <><span className="spinner" style={{ width: 16, height: 16 }} /> กำลังสร้าง...</> : <><Plus size={16} /> สร้างการจอง</>}
+                            {submitting ? <><span className="spinner" style={{ width: 16, height: 16 }} /> กำลังบันทึก...</> : <><Plus size={16} /> {isEdit ? 'บันทึกการแก้ไข' : 'สร้างการจอง'}</>}
                         </button>
                     </div>
                 </div>

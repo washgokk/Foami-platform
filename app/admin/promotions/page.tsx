@@ -262,7 +262,7 @@ export default function PromotionsPage() {
             target_segment: targetSegment,
             discount_code_id: type === 'promo' ? (discountCodeId || null) : null,
             flex_message_json: parsedJson,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
         }
 
         if (editingPromo) {
@@ -379,6 +379,26 @@ export default function PromotionsPage() {
                                     <Ticket size={14} /> โค้ดส่วนลด: <span style={{ fontWeight: 600 }}>{discountCodes.find(c => c.id === promo.discount_code_id)?.code || '...'}</span>
                                 </div>
                             )}
+                            {/* Condition badges */}
+                            {(() => {
+                                const p = promo as any
+                                const badges = []
+                                if (p.usage_type === 'recurring') badges.push({ label: '🔄 ประจำ', color: '#7C3AED' })
+                                else badges.push({ label: '🎯 ครั้งเดียว', color: '#059669' })
+                                if (p.valid_from || p.valid_until) badges.push({ label: `📅 ${p.valid_from || '?'} → ${p.valid_until || '?'}`, color: '#0369a1' })
+                                if (p.allowed_branch_ids?.length) badges.push({ label: `🏪 ${p.allowed_branch_ids.length} สาขา`, color: '#B45309' })
+                                if (p.allowed_zone_ids?.length) badges.push({ label: `📍 ${p.allowed_zone_ids.length} โซน`, color: '#B45309' })
+                                return badges.length > 0 ? (
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
+                                        {badges.map((b, i) => (
+                                            <span key={i} style={{ fontSize: '0.65rem', padding: '3px 7px', borderRadius: 8, fontWeight: 700, background: `${b.color}15`, color: b.color, border: `1px solid ${b.color}30` }}>
+                                                {b.label}
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : null
+                            })()}
+
                         </div>
                         
                         <div style={{ marginTop: 20 }}>
@@ -444,7 +464,7 @@ export default function PromotionsPage() {
 
                         <div style={{ flex: 1, display: 'flex', overflow: 'hidden', background: 'white' }}>
                             {/* LEFT COLUMN: CONFIG */}
-                            <div style={{ width: '340px', padding: 32, borderRight: '1.5px solid var(--border)', overflowY: 'auto', background: '#f8fafc' }}>
+                            <div style={{ width: '420px', padding: 28, borderRight: '1.5px solid var(--border)', overflowY: 'auto', background: '#f8fafc' }}>
                                 <div style={{ marginBottom: 24 }}>
                                     <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>ข้อมูลพื้นฐาน</label>
                                     <div style={{ background: 'white', padding: 20, borderRadius: 20, border: '1px solid var(--border)', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>

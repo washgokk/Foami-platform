@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
             payment_method,
             payment_status,
             customer_note,
+            customer_id,
         } = body
 
         if (!bookingId || !service_id || !scheduled_date || !scheduled_time || !staff_id || !zone_id || !branch_id) {
@@ -81,41 +82,54 @@ export async function POST(req: NextRequest) {
             customer_note ? `หมายเหตุ: ${customer_note}` : '',
         ].filter(Boolean).join('\n')
 
-        const customerId = `WALKIN-${bookingId}`
+        const finalCustomerId = customer_id || `WALKIN-${bookingId}`
 
-        const initialVehicle = {
-            id: `VH-${bookingId}`,
-            vehicle_brand: vehicle_brand || '',
-            vehicle_model: vehicle_model || '',
-            vehicle_color: vehicle_color || '',
-            license_plate: license_plate || '',
-            vehicle_size: vehicle_size || 'S'
-        }
+        if (!customer_id) {
+            const initialVehicle = {
+                id: `VH-${bookingId}`,
+                vehicle_brand: vehicle_brand || '',
+                vehicle_model: vehicle_model || '',
+                vehicle_color: vehicle_color || '',
+                license_plate: license_plate || '',
+                vehicle_size: vehicle_size || 'S'
+            }
 
-        // Insert a dummy/walk-in customer record to satisfy foreign key constraint
-        const { error: customerError } = await supabase
-            .from('customers')
-            .insert({
-                id: customerId,
-                line_user_id: `walkin_${bookingId}`,
+            // Insert a dummy/walk-in customer record to satisfy foreign key constraint
+            const { error: customerError } = await supabase
+                .from('customers')
+                .insert({
+                    id: finalCustomerId,
+                    line_user_id: `walkin_${bookingId}`,
+                    full_name: customer_name || 'ลูกค้า Walk-in',
+                    phone: customer_phone || '',
+                    vehicle_brand: vehicle_brand || '',
+                    vehicle_model: vehicle_model || '',
+                    vehicle_color: vehicle_color || '',
+                    license_plate: license_plate || '',
+                    vehicle_size: vehicle_size || 'S',
+                    saved_vehicles: [initialVehicle],
+                    saved_locations: [],
+                    interests: [],
+                    is_profile_complete: false,
+                    reward_claimed: false,
+                    created_at: new Date().toISOString()
+                })
+
+            if (customerError) {
+                console.error('[Manual Booking] Customer Insert error:', customerError)
+                return NextResponse.json({ error: `ไม่สามารถบันทึกข้อมูลลูกค้าได้: ${customerError.message}` }, { status: 400 })
+            }
+        } else if (finalCustomerId.startsWith('WALKIN-')) {
+            // Optional: update their details if they changed
+            await supabase.from('customers').update({
                 full_name: customer_name || 'ลูกค้า Walk-in',
-                phone: customer_phone || '',
+                phone: customer_phone || null,
                 vehicle_brand: vehicle_brand || '',
                 vehicle_model: vehicle_model || '',
                 vehicle_color: vehicle_color || '',
                 license_plate: license_plate || '',
                 vehicle_size: vehicle_size || 'S',
-                saved_vehicles: [initialVehicle],
-                saved_locations: [],
-                interests: [],
-                is_profile_complete: false,
-                reward_claimed: false,
-                created_at: new Date().toISOString()
-            })
-
-        if (customerError) {
-            console.error('[Manual Booking] Customer Insert error:', customerError)
-            return NextResponse.json({ error: `ไม่สามารถบันทึกข้อมูลลูกค้าได้: ${customerError.message}` }, { status: 400 })
+            }).eq('id', finalCustomerId)
         }
 
         const todayStr = (() => {
@@ -131,7 +145,7 @@ export async function POST(req: NextRequest) {
             .from('bookings')
             .insert({
                 id: bookingId,
-                customer_id: customerId,
+                customer_id: finalCustomerId,
                 staff_id,
                 service_id,
                 addon_ids: addon_ids || [],

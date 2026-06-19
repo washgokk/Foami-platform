@@ -647,6 +647,39 @@ export default function BookPage() {
                 }
             }
 
+            // --- New Condition Checks ---
+            if (discount.valid_from && new Date() < new Date(discount.valid_from)) {
+                throw new Error(`เริ่มใช้ได้ตั้งแต่วันที่ ${new Date(discount.valid_from).toLocaleDateString('th-TH')}`)
+            }
+            if (discount.usage_type === 'date_range' && discount.valid_until && new Date() > new Date(discount.valid_until + 'T23:59:59')) {
+                throw new Error(`โค้ดนี้สิ้นสุดแคมเปญไปแล้วเมื่อวันที่ ${new Date(discount.valid_until).toLocaleDateString('th-TH')}`)
+            }
+
+            if (discount.usage_type === 'specific_days' && discount.valid_days && discount.valid_days.length > 0) {
+                const daysMap = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์']
+                const currentDayStr = daysMap[new Date().getDay()]
+                if (!discount.valid_days.includes(currentDayStr)) {
+                    throw new Error(`ใช้ได้เฉพาะวัน ${discount.valid_days.join(', ')} เท่านั้น`)
+                }
+            }
+
+            const activeSlot = slots[selectedDate]?.find((s: any) => s.time_slot === selectedSlot)
+            const activeBranchId = activeSlot ? zones.find((z: any) => z.id === activeSlot.serving_zone_id)?.branch_id : branches[0]?.id
+            const activeZoneId = zoneId
+
+            if (discount.allowed_branch_ids && discount.allowed_branch_ids.length > 0) {
+                if (!activeBranchId || !discount.allowed_branch_ids.includes(activeBranchId)) {
+                    throw new Error('ไม่สามารถใช้กับสาขาที่เลือกได้')
+                }
+            }
+
+            if (discount.allowed_zone_ids && discount.allowed_zone_ids.length > 0) {
+                if (!activeZoneId || !discount.allowed_zone_ids.includes(activeZoneId)) {
+                    throw new Error('ไม่สามารถใช้กับพื้นที่(โซน)ที่เลือกได้')
+                }
+            }
+            // ----------------------------
+
             let amountToDiscount = 0
             // ── Rebooking codes apply discount on total price (all fees), normal codes apply on pkgPrice only ──
             const discountBase = discount.is_refund_code ? displayTotal : pkgPrice
