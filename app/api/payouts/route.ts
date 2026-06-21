@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
         }
 
         const supabase = createServiceClient()
-        let slip_url = ''
+        let slip_url: string | null = null
 
         if (slip) {
             try {
@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
                 end_date,
                 notes,
                 slip_url,
+                booking_ids: booking_ids, // store for fallback lookup
                 status: 'completed'
             })
             .select()
@@ -62,14 +63,17 @@ export async function POST(req: NextRequest) {
 
         if (payoutError) throw payoutError
 
-        // Link bookings to this payout
+        // Link bookings to this payout via payout_id column
         if (booking_ids.length > 0) {
             const { error: linkError } = await supabase
                 .from('bookings')
                 .update({ payout_id: payout.id })
                 .in('id', booking_ids)
             
-            if (linkError) throw linkError
+            // Non-fatal: if payout_id column doesn't exist yet, log but don't fail
+            if (linkError) {
+                console.error('Booking payout_id link failed (non-fatal):', linkError.message)
+            }
         }
 
         return NextResponse.json(payout)

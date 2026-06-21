@@ -33,7 +33,8 @@ import {
     Briefcase,
     Banknote,
     Lock,
-    Trash2
+    Trash2,
+    Receipt
 } from 'lucide-react'
 import { Payout, THAI_BANKS } from '@/lib/types'
 import ImageUpload from '@/components/ImageUpload'
@@ -144,10 +145,22 @@ export default function StaffPage() {
     const openHistoryDetail = async (payout: Payout) => {
         setShowHistoryDetail(payout)
         setLoadingHistoryDetail(true)
-        const { data } = await supabase
+
+        // Primary: query by payout_id column (requires migration)
+        let { data } = await supabase
             .from('bookings')
             .select('*, customers(full_name), services(name)')
             .eq('payout_id', payout.id)
+        
+        // Fallback: use booking_ids stored directly in the payout record
+        const storedIds: string[] = (payout as any).booking_ids || []
+        if ((!data || data.length === 0) && storedIds.length > 0) {
+            const fallback = await supabase
+                .from('bookings')
+                .select('*, customers(full_name), services(name)')
+                .in('id', storedIds)
+            data = fallback.data
+        }
         
         let resolved = data || []
         if (typeof window !== 'undefined' && localStorage.getItem('foami_mock_db_enabled') === 'true') {
@@ -162,6 +175,7 @@ export default function StaffPage() {
         setHistoryDetailBookings(resolved)
         setLoadingHistoryDetail(false)
     }
+
 
     const handleRecordPayout = async (staffId: string, bookingIds: string[], baseAmount: number, staffExtra: number) => {
         const staffSlip = staffSlips[staffId]
@@ -936,13 +950,17 @@ export default function StaffPage() {
                                             ) : historyDetailBookings.map(b => {
                                                 const s = staff.find(st => st.id === b.staff_id)
                                                 const bData = s ? (s as any).branch_data : null
+                                                // Use snapshot values stored at booking time; fallback to current branch defaults
+                                                const labor = (b as any).labor_cost ?? bData?.labor_cost_per_job ?? 0
+                                                const rental = (b as any).rental_cost ?? bData?.vehicle_rental_per_job ?? 0
+                                                const fuel = (b as any).fuel_cost ?? bData?.fuel_cost_per_job ?? 0
                                                 return (
                                                     <tr key={b.id}>
                                                         <td>{format(new Date(b.scheduled_date), 'dd/MM/yy')} {b.scheduled_time}</td>
                                                         <td>{(b as any).services?.name}</td>
-                                                        <td style={{ textAlign: 'center' }}>{(bData?.labor_cost_per_job || 0).toLocaleString()}</td>
-                                                        <td style={{ textAlign: 'center' }}>{(bData?.vehicle_rental_per_job || 0).toLocaleString()}</td>
-                                                        <td style={{ textAlign: 'center' }}>{(bData?.fuel_cost_per_job || 0).toLocaleString()}</td>
+                                                        <td style={{ textAlign: 'center' }}>{labor.toLocaleString()}</td>
+                                                        <td style={{ textAlign: 'center' }}>{rental.toLocaleString()}</td>
+                                                        <td style={{ textAlign: 'center' }}>{fuel.toLocaleString()}</td>
                                                         <td style={{ textAlign: 'right', color: 'var(--brand-dominant)', fontWeight: 600 }}>{b.additional_price ? `+${b.additional_price.toLocaleString()}` : '-'}</td>
                                                     </tr>
                                                 )
@@ -967,10 +985,29 @@ export default function StaffPage() {
                                         <span style={{ color: 'var(--brand-dominant)' }}>{(showHistoryDetail.amount + showHistoryDetail.extra_costs).toLocaleString()} ฿</span>
                                     </div>
                                 </div>
-                                {showHistoryDetail.slip_url && (
-                                    <div style={{ background: 'var(--surface-2)', padding: 12, borderRadius: 'var(--radius)', border: '2.5px solid var(--border)' }}>
-                                        <div style={{ fontSize: '0.85rem', fontWeight: 800, marginBottom: 8 }}>สลิปการโอน</div>
-                                        <img src={showHistoryDetail.slip_url} alt="Slip" style={{ width: '100%', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }} />
+                                {showHistoryDetail.slip_url ? (
+                                    <div style={{ background: 'var(--surface-2)', padding: 12, borderRadius: 'var(--radius)', border: '2.5px solid var(--brand-dominant-light)' }}>
+                                        <div style={{ fontSize: '0.85rem', fontWeight: 800, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <span>สลิปการโอน</span>
+                                            <button
+                                                className="btn btn-ghost btn-xs"
+                                                onClick={() => setZoomConfig({ images: [{ src: showHistoryDetail.slip_url!, alt: 'สลิปการโอน' }], initialIndex: 0 })}
+                                                style={{ color: 'var(--brand-dominant)', gap: 4 }}
+                                            >
+                                                <ExternalLink size={14} /> ขยาย
+                                            </button>
+                                        </div>
+                                        <img
+                                            src={showHistoryDetail.slip_url}
+                                            alt="Slip"
+                                            style={{ width: '100%', borderRadius: 'var(--radius)', border: '1px solid var(--border)', cursor: 'zoom-in', display: 'block' }}
+                                            onClick={() => setZoomConfig({ images: [{ src: showHistoryDetail.slip_url!, alt: 'สลิปการโอน' }], initialIndex: 0 })}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div style={{ background: 'var(--surface-2)', padding: 20, borderRadius: 'var(--radius)', border: '2px dashed var(--border)', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                        <Receipt size={32} style={{ opacity: 0.3, marginBottom: 8 }} />
+                                        <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>ยังไม่มีสลิป</div>
                                     </div>
                                 )}
                             </div>
