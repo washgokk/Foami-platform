@@ -22,21 +22,27 @@ export async function POST(req: NextRequest) {
         let slip_url = ''
 
         if (slip) {
-            const fileExt = slip.name.split('.').pop()
-            const fileName = `${staff_id}_${Date.now()}.${fileExt}`
-            const filePath = `slips/${fileName}`
+            try {
+                const fileExt = slip.name.split('.').pop()
+                const fileName = `${staff_id}_${Date.now()}.${fileExt}`
+                const filePath = `slips/${fileName}`
 
-            const { error: uploadError } = await supabase.storage
-                .from('staff_payouts')
-                .upload(filePath, slip)
+                const { error: uploadError } = await supabase.storage
+                    .from('staff_payouts')
+                    .upload(filePath, slip)
 
-            if (uploadError) throw uploadError
-
-            const { data: { publicUrl } } = supabase.storage
-                .from('staff_payouts')
-                .getPublicUrl(filePath)
-            
-            slip_url = publicUrl
+                if (uploadError) {
+                    // Non-fatal: log the error but continue saving the payout record
+                    console.error('Payout slip upload failed (non-fatal):', uploadError.message)
+                } else {
+                    const { data: { publicUrl } } = supabase.storage
+                        .from('staff_payouts')
+                        .getPublicUrl(filePath)
+                    slip_url = publicUrl
+                }
+            } catch (uploadErr: any) {
+                console.error('Payout slip upload exception (non-fatal):', uploadErr.message)
+            }
         }
 
         const { data: payout, error: payoutError } = await supabase

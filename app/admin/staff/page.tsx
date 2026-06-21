@@ -165,7 +165,13 @@ export default function StaffPage() {
 
     const handleRecordPayout = async (staffId: string, bookingIds: string[], baseAmount: number, staffExtra: number) => {
         const staffSlip = staffSlips[staffId]
-        if (!staffId || bookingIds.length === 0 || !staffSlip) return
+        if (!staffId || bookingIds.length === 0) return
+        
+        // Slip is strongly recommended but not required — confirm if missing
+        if (!staffSlip) {
+            const proceed = window.confirm('ยังไม่ได้อัพโหลดสลิป\nต้องการบันทึกการจ่ายเงินโดยไม่มีสลิปหรือไม่?')
+            if (!proceed) return
+        }
         
         setRecordingPayout(true)
         try {
@@ -176,13 +182,16 @@ export default function StaffPage() {
             formData.append('start_date', dateRange.start || format(new Date(), 'yyyy-MM-01'))
             formData.append('end_date', dateRange.end || format(new Date(), 'yyyy-MM-dd'))
             formData.append('booking_ids', JSON.stringify(bookingIds))
-            formData.append('slip', staffSlip)
+            if (staffSlip) formData.append('slip', staffSlip)
 
             const res = await fetch('/api/payouts', {
                 method: 'POST',
                 body: formData
             })
-            if (!res.ok) throw new Error('Failed to record payout')
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}))
+                throw new Error(errData.error || 'ไม่สามารถบันทึกการจ่ายเงินได้')
+            }
             
             setStaffSlips(p => {
                 const next = { ...p }
@@ -192,9 +201,9 @@ export default function StaffPage() {
             
             setSelectedBookingIds(p => p.filter(id => !bookingIds.includes(id)))
             loadPayouts()
-            alert('บันทึกการโอนเงินเรียบร้อยแล้ว')
+            alert('บันทึกการโอนเงินเรียบร้อยแล้ว' + (!staffSlip ? '\n(ไม่มีสลิป — กรุณาอัพโหลดสลิปในภายหลัง)' : ''))
         } catch (err: any) {
-            alert(err.message)
+            alert('เกิดข้อผิดพลาด: ' + err.message)
         } finally {
             setRecordingPayout(false)
         }
@@ -822,7 +831,7 @@ export default function StaffPage() {
                                                         const extraCosts = data.extraFromJobs + data.bonusTotal;
                                                         handleRecordPayout(staffId, data.bookings.map(x => x.id), baseAmount, extraCosts);
                                                     }}
-                                                    disabled={recordingPayout || !staffSlips[staffId]}
+                                                    disabled={recordingPayout}
                                                 >
                                                     {recordingPayout ? <span className="spinner" /> : <><Banknote size={24} /> บันทึกการจ่ายเงิน</>}
                                                 </button>

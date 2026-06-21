@@ -38,6 +38,7 @@ export default function BookingChat({
     const [loading, setLoading] = useState(true)
     const [sending, setSending] = useState(false)
     const [uploadingImage, setUploadingImage] = useState(false)
+    const [sendError, setSendError] = useState<string | null>(null)
     const [zoomConfig, setZoomConfig] = useState<{ src: string } | null>(null)
     const bottomRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -71,7 +72,7 @@ export default function BookingChat({
         scrollToBottom()
     }, [messages, isOpen, scrollToBottom])
 
-    // ─── Supabase Realtime subscription ──────────────────────
+    // ─── Supabase Realtime subscription + polling fallback ───
     useEffect(() => {
         if (!isOpen) return
 
@@ -98,8 +99,22 @@ export default function BookingChat({
             )
             .subscribe()
 
+        // Polling fallback — in case realtime publication is not enabled for booking_messages
+        const pollInterval = setInterval(async () => {
+            const res = await fetch(`/api/chat?bookingId=${bookingId}`)
+            if (res.ok) {
+                const data = await res.json()
+                const fresh = data.messages || []
+                setMessages(prev => {
+                    if (fresh.length !== prev.length) return fresh
+                    return prev
+                })
+            }
+        }, 10000)
+
         return () => {
             supabase.removeChannel(channel)
+            clearInterval(pollInterval)
         }
     }, [bookingId, isOpen, STORAGE_KEY])
 
@@ -108,8 +123,13 @@ export default function BookingChat({
         const text = input.trim()
         if (!text && !imageUrl) return
         if (sending) return
+        if (!senderId) {
+            setSendError('ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่')
+            return
+        }
 
         setSending(true)
+        setSendError(null)
         if (!imageUrl) setInput('')
 
         try {
@@ -125,10 +145,16 @@ export default function BookingChat({
                     image_url: imageUrl || null
                 })
             })
-            if (!res.ok) throw new Error('Send failed')
-        } catch (e) {
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}))
+                throw new Error(errData.error || `ส่งข้อความไม่สำเร็จ (${res.status})`)
+            }
+        } catch (e: any) {
             console.error('[Chat] Send error:', e)
             if (!imageUrl) setInput(text) // restore on failure
+            setSendError(e.message || 'ส่งข้อความไม่สำเร็จ กรุณาลองใหม่')
+            // Auto-clear error after 5s
+            setTimeout(() => setSendError(null), 5000)
         } finally {
             setSending(false)
             if (!imageUrl) inputRef.current?.focus()
@@ -351,6 +377,25 @@ export default function BookingChat({
                 )}
                 <div ref={bottomRef} />
             </div>
+
+            {/* Error Banner */}
+            {sendError && (
+                <div style={{
+                    padding: '8px 16px',
+                    background: '#FEF2F2',
+                    borderTop: '1px solid #FECACA',
+                    color: '#B91C1C',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    flexShrink: 0
+                }}>
+                    <span style={{ fontSize: '1rem' }}>⚠️</span>
+                    {sendError}
+                </div>
+            )}
 
             {/* Input area */}
             <div style={{
