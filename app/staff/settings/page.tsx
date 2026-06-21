@@ -155,23 +155,24 @@ export default function StaffSettingsPage() {
         setShowHistoryDetail(payout)
         setLoadingHistoryDetail(true)
         
-        // Primary: query by payout_id column
-        let { data } = await supabase
-            .from('bookings')
-            .select('*, services(name)')
-            .eq('payout_id', payout.id)
-            
-        // Fallback: use booking_ids stored directly in the payout record
         const storedIds: string[] = (payout as any).booking_ids || []
-        if ((!data || data.length === 0) && storedIds.length > 0) {
-            const fallback = await supabase
+        let resolvedData: any[] = []
+
+        if (storedIds.length > 0) {
+            const { data } = await supabase
                 .from('bookings')
                 .select('*, services(name)')
                 .in('id', storedIds)
-            data = fallback.data
+            resolvedData = data || []
+        } else {
+            const { data } = await supabase
+                .from('bookings')
+                .select('*, services(name)')
+                .eq('payout_id', payout.id)
+            resolvedData = data || []
         }
         
-        setHistoryDetailBookings(data || [])
+        setHistoryDetailBookings(resolvedData)
         setLoadingHistoryDetail(false)
     }
 
@@ -410,89 +411,111 @@ export default function StaffSettingsPage() {
 
             {/* History Detail Modal */}
             {showHistoryDetail && (
-                <div className="overlay" onClick={() => setShowHistoryDetail(null)}>
-                    <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 600, maxWidth: '95vw' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+                <div className="overlay" onClick={() => setShowHistoryDetail(null)} style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', background: 'rgba(0,0,0,0.6)' }}>
+                    <div className="modal animate-fade" onClick={e => e.stopPropagation()} style={{ width: 600, maxWidth: '95vw', padding: 28, borderRadius: 24, boxShadow: '0 24px 60px rgba(0,0,0,0.1)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
                             <div>
-                                <h2 style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--primary)' }}>รายละเอียดการรับเงิน</h2>
-                                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{format(new Date(showHistoryDetail.created_at), 'dd/MM/yyyy')}</p>
+                                <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                                    <Receipt size={24} /> รายละเอียดการรับเงิน
+                                </h2>
+                                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginLeft: 34 }}>
+                                    รหัสทำรายการ: <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{showHistoryDetail.id.split('-')[0].toUpperCase()}</span> • วันที่: {format(new Date(showHistoryDetail.created_at), 'dd/MM/yyyy HH:mm')}
+                                </p>
                             </div>
-                            <button className="btn btn-ghost btn-sm" onClick={() => setShowHistoryDetail(null)}><X size={20} /></button>
+                            <button className="btn btn-ghost btn-sm" style={{ borderRadius: 12, background: 'var(--surface-2)', padding: 8 }} onClick={() => setShowHistoryDetail(null)}><X size={20} /></button>
                         </div>
 
-                        <div className="table-wrapper" style={{ maxHeight: 300, overflowY: 'auto', marginBottom: 20 }}>
-                            <table style={{ fontSize: '0.8rem' }}>
-                                <thead>
-                                    <tr>
-                                        <th>วันที่ / เวลา</th>
-                                        <th>บริการ</th>
-                                        <th style={{ textAlign: 'center' }}>ค่าแรง</th>
-                                        <th style={{ textAlign: 'center' }}>ค่ารถ</th>
-                                        <th style={{ textAlign: 'center' }}>น้ำมัน</th>
-                                        <th style={{ textAlign: 'right' }}>เพิ่มเติม</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {loadingHistoryDetail ? (
-                                        <tr><td colSpan={6} style={{ textAlign: 'center', padding: 16 }}><span className="spinner" /></td></tr>
-                                    ) : historyDetailBookings.map(b => {
-                                        const bData = (staff as any)?.branch_data;
-                                        const labor = (b as any).labor_cost ?? bData?.labor_cost_per_job ?? 0;
-                                        const rental = (b as any).rental_cost ?? bData?.vehicle_rental_per_job ?? 0;
-                                        const fuel = (b as any).fuel_cost ?? bData?.fuel_cost_per_job ?? 0;
-                                        return (
-                                        <tr key={b.id}>
-                                            <td>{format(new Date(b.scheduled_date), 'dd/MM/yy')} {b.scheduled_time}</td>
-                                            <td>{(b as any).services?.name}</td>
-                                            <td style={{ textAlign: 'center' }}>{labor.toLocaleString()}</td>
-                                            <td style={{ textAlign: 'center' }}>{rental.toLocaleString()}</td>
-                                            <td style={{ textAlign: 'center' }}>{fuel.toLocaleString()}</td>
-                                            <td style={{ textAlign: 'right', color: 'var(--primary)', fontWeight: 600 }}>{b.additional_price ? `+${b.additional_price.toLocaleString()}` : '-'}</td>
+                        <div style={{ marginBottom: 20 }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}> 
+                                <CheckCircle2 size={16} color="var(--primary)" /> งานที่รวมในรอบนี้ ({historyDetailBookings.length} รายการ)
+                            </h3>
+                            <div className="table-wrapper" style={{ maxHeight: 300, overflowY: 'auto', borderRadius: 16, border: '1px solid var(--border)' }}>
+                                <table style={{ fontSize: '0.8rem' }}>
+                                    <thead style={{ background: 'var(--surface-2)', position: 'sticky', top: 0, zIndex: 1 }}>
+                                        <tr>
+                                            <th style={{ padding: '10px 14px' }}>วันที่ / เวลา</th>
+                                            <th>บริการ</th>
+                                            <th style={{ textAlign: 'center' }}>ค่าแรง</th>
+                                            <th style={{ textAlign: 'center' }}>ค่ารถ</th>
+                                            <th style={{ textAlign: 'center' }}>น้ำมัน</th>
+                                            <th style={{ textAlign: 'center' }}>ต้นทุน</th>
+                                            <th style={{ textAlign: 'center' }}>โบนัส</th>
+                                            <th style={{ textAlign: 'center' }}>เพิ่มเติม</th>
                                         </tr>
-                                        )
-                                    })}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {loadingHistoryDetail ? (
+                                            <tr><td colSpan={8} style={{ textAlign: 'center', padding: 32 }}><span className="spinner" style={{ width: 28, height: 28 }} /></td></tr>
+                                        ) : historyDetailBookings.map(b => {
+                                            const bData = (staff as any)?.branch_data;
+                                            const labor = (b as any).labor_cost ?? bData?.labor_cost_per_job ?? 0;
+                                            const rental = (b as any).rental_cost ?? bData?.vehicle_rental_per_job ?? 0;
+                                            const fuel = (b as any).fuel_cost ?? bData?.fuel_cost_per_job ?? 0;
+                                            const capital = (b as any).capital_cost ?? bData?.max_capital_per_job ?? 0;
+                                            return (
+                                            <tr key={b.id} style={{ transition: 'background 0.2s' }} onMouseOver={e => e.currentTarget.style.background = 'var(--surface-2)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+                                                <td style={{ padding: '10px 14px' }}>
+                                                    <div style={{ fontWeight: 600 }}>{format(new Date(b.scheduled_date), 'dd/MM/yy')}</div>
+                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{b.scheduled_time}</div>
+                                                </td>
+                                                <td>{(b as any).services?.name}</td>
+                                                <td style={{ textAlign: 'center', fontWeight: 600 }}>{labor.toLocaleString()}</td>
+                                                <td style={{ textAlign: 'center', fontWeight: 600 }}>{rental.toLocaleString()}</td>
+                                                <td style={{ textAlign: 'center', fontWeight: 600 }}>{fuel.toLocaleString()}</td>
+                                                <td style={{ textAlign: 'center', fontWeight: 600 }}>{capital.toLocaleString()}</td>
+                                                <td style={{ textAlign: 'center', color: 'var(--primary)', fontWeight: 800 }}>{b.staff_extra_payout ? b.staff_extra_payout.toLocaleString() : '-'}</td>
+                                                <td style={{ textAlign: 'center', color: 'var(--primary)', fontWeight: 600 }}>{b.additional_price ? `+${b.additional_price.toLocaleString()}` : '-'}</td>
+                                            </tr>
+                                            )
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
 
-                        <div style={{ background: 'var(--surface-2)', padding: 16, borderRadius: 'var(--radius)', border: '2.5px solid var(--border)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: '0.85rem' }}>
-                                <span>ค่าแรงพื้นฐาน</span>
+                        <div style={{ background: 'var(--surface)', padding: 20, borderRadius: 20, border: '1px solid var(--border)', boxShadow: '0 8px 24px rgba(0,0,0,0.06)' }}>
+                            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: 14, textTransform: 'uppercase', letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 6 }}><Wallet size={14} /> สรุปยอดโอนเงิน</div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, fontSize: '0.9rem' }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>ค่าแรงพื้นฐาน</span>
                                 <span style={{ fontWeight: 700 }}>{showHistoryDetail.amount.toLocaleString()} ฿</span>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: '0.85rem' }}>
-                                <span>ค่าใช้จ่ายเพิ่มเติม</span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, fontSize: '0.9rem' }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>ค่าใช้จ่ายเพิ่มเติม</span>
                                 <span style={{ fontWeight: 700, color: 'var(--primary)' }}>+{showHistoryDetail.extra_costs.toLocaleString()} ฿</span>
                             </div>
-                            <div style={{ borderTop: '1px dashed var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 900 }}>
-                                <span>ยอดโอนสุทธิ</span>
-                                <span style={{ color: 'var(--primary)' }}>{(showHistoryDetail.amount + showHistoryDetail.extra_costs).toLocaleString()} ฿</span>
+                            <div style={{ borderTop: '2px dashed var(--border)', paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontWeight: 800, fontSize: '1.05rem' }}>ยอดโอนสุทธิ</span>
+                                <span style={{ color: 'var(--primary)', fontWeight: 900, fontSize: '1.5rem' }}>{(showHistoryDetail.amount + showHistoryDetail.extra_costs).toLocaleString()} <span style={{ fontSize: '1rem', fontWeight: 700 }}>฿</span></span>
                             </div>
                         </div>
 
                         {showHistoryDetail.slip_url ? (
-                            <div style={{ marginTop: 16, background: 'var(--surface-2)', padding: 12, borderRadius: 'var(--radius)', border: '2.5px solid var(--primary)' }}>
-                                <div style={{ fontSize: '0.85rem', fontWeight: 800, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <span>สลิปหลักฐาน</span>
+                            <div style={{ marginTop: 16, background: 'var(--primary-ghost, rgba(var(--primary-rgb), 0.05))', padding: 16, borderRadius: 20, border: '1px solid var(--primary-light, var(--primary))' }}>
+                                <div style={{ fontSize: '0.9rem', fontWeight: 800, marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--primary)' }}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Banknote size={16} /> หลักฐานการโอนเงิน</span>
                                     <button
                                         className="btn btn-ghost btn-xs"
                                         onClick={() => setZoomConfig({ images: [{ src: showHistoryDetail.slip_url!, alt: 'สลิปการโอน' }], initialIndex: 0 })}
-                                        style={{ color: 'var(--primary)', gap: 4 }}
+                                        style={{ color: 'var(--primary)', gap: 6, background: 'var(--surface)', borderRadius: 8, padding: '4px 8px' }}
                                     >
-                                        <ExternalLink size={14} /> ขยาย
+                                        <ExternalLink size={14} /> ขยายดู
                                     </button>
                                 </div>
-                                <img 
-                                    src={showHistoryDetail.slip_url} 
-                                    alt="Slip" 
-                                    style={{ width: '100%', borderRadius: 'var(--radius)', border: '1px solid var(--border)', cursor: 'zoom-in', display: 'block' }}
-                                    onClick={() => setZoomConfig({ images: [{ src: showHistoryDetail.slip_url!, alt: 'หลักฐานการโอนเงิน (Slip)' }], initialIndex: 0 })} 
-                                />
+                                <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', background: 'var(--surface)' }}>
+                                    <img 
+                                        src={showHistoryDetail.slip_url} 
+                                        alt="Slip" 
+                                        style={{ width: '100%', display: 'block', cursor: 'zoom-in', transition: 'transform 0.2s', maxHeight: 200, objectFit: 'cover' }}
+                                        onClick={() => setZoomConfig({ images: [{ src: showHistoryDetail.slip_url!, alt: 'หลักฐานการโอนเงิน (Slip)' }], initialIndex: 0 })} 
+                                        onMouseOver={e => e.currentTarget.style.transform = 'scale(1.02)'}
+                                        onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
+                                    />
+                                </div>
                             </div>
                         ) : (
-                            <div style={{ marginTop: 16, background: 'var(--surface-2)', padding: 20, borderRadius: 'var(--radius)', border: '2px dashed var(--border)', textAlign: 'center', color: 'var(--text-muted)' }}>
-                                <Receipt size={32} style={{ opacity: 0.3, marginBottom: 8 }} />
-                                <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>ยังไม่มีสลิป</div>
+                            <div style={{ marginTop: 16, background: 'var(--surface-2)', padding: 24, borderRadius: 20, border: '2px dashed var(--border)', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                <Receipt size={36} style={{ opacity: 0.2, marginBottom: 12 }} />
+                                <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>ยังไม่มีสลิปอัพโหลด</div>
                             </div>
                         )}
                     </div>
