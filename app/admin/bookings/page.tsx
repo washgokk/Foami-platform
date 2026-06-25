@@ -741,6 +741,38 @@ function ManualBookingModal({ onClose, onCreated, initialBooking = null }: { onC
     const [recentCustomers, setRecentCustomers] = useState<any[]>([])
     const [showRecentPicker, setShowRecentPicker] = useState(false)
 
+    // ── Live search by phone ──
+    const [foundCustomer, setFoundCustomer] = useState<any>(null)
+    const [isSearchingPhone, setIsSearchingPhone] = useState(false)
+
+    useEffect(() => {
+        if (!customerPhone || customerPhone.length < 9) {
+            setFoundCustomer(null)
+            return
+        }
+        const timer = setTimeout(async () => {
+            setIsSearchingPhone(true)
+            const { data } = await supabase
+                .from('customers')
+                .select('id, full_name, phone, vehicle_brand, vehicle_model, vehicle_color, license_plate, vehicle_size, saved_locations, line_user_id')
+                .eq('phone', customerPhone.trim())
+                .limit(1)
+                
+            if (data && data.length > 0) {
+                // don't show prompt if it's already filled with this exact customer
+                if (customerId !== data[0].id) {
+                    setFoundCustomer(data[0])
+                } else {
+                    setFoundCustomer(null)
+                }
+            } else {
+                setFoundCustomer(null)
+            }
+            setIsSearchingPhone(false)
+        }, 500)
+        return () => clearTimeout(timer)
+    }, [customerPhone, customerId])
+
     // ── Fill from a previous/recent customer ──
     const fillFromCustomer = (c: any) => {
         setCustomerId(c.id || '')
@@ -1106,6 +1138,34 @@ supabase.from('service_addons').select('*').eq('is_active', true),
                                         <div>
                                             <label style={labelStyle}>เบอร์โทร</label>
                                             <input style={inputStyle} placeholder="08x-xxx-xxxx" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
+                                            {foundCustomer && (
+                                                <div style={{ marginTop: 8, padding: '10px 12px', background: 'var(--primary-ghost)', borderRadius: 10, border: '1px solid var(--brand-dominant)', fontSize: '0.8rem', animation: 'modalPopIn 0.2s ease-out' }}>
+                                                    <div style={{ color: 'var(--brand-dominant)', fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                        <User size={14} /> พบข้อมูลในระบบ: {foundCustomer.full_name} 
+                                                        <span style={{ fontWeight: 400, opacity: 0.8 }}>
+                                                            {foundCustomer.line_user_id?.startsWith('walkin_') ? '(Walk-in)' : '(สมาชิกระบบ)'}
+                                                        </span>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => fillFromCustomer({
+                                                            id: foundCustomer.id,
+                                                            name: foundCustomer.full_name,
+                                                            phone: foundCustomer.phone,
+                                                            brand: foundCustomer.vehicle_brand,
+                                                            model: foundCustomer.vehicle_model,
+                                                            color: foundCustomer.vehicle_color,
+                                                            plate: foundCustomer.license_plate,
+                                                            size: foundCustomer.vehicle_size,
+                                                            pickup: foundCustomer.saved_locations?.[0]?.address || ''
+                                                        })}
+                                                        style={{ background: 'var(--brand-dominant)', color: 'white', padding: '6px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, width: '100%', transition: 'opacity 0.2s' }}
+                                                        onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+                                                        onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                                                    >
+                                                        ใช้ข้อมูลและรถของลูกค้ารายนี้
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     <div style={fieldRow}>

@@ -79,6 +79,35 @@ export default function CRMPage() {
     const [savedSegments, setSavedSegments] = useState<any[]>([])
     const [editingSegmentId, setEditingSegmentId] = useState<string | null>(null)
 
+    // Merge State
+    const [isMerging, setIsMerging] = useState(false)
+
+    const handleMergeWalkins = async () => {
+        if (!confirm('ระบบจะค้นหาลูกค้าที่ถูกเพิ่มแบบแมนนวล (WALKIN) และนำเบอร์โทรไปเทียบกับฐานข้อมูลลูกค้าจริงที่มีอยู่ หากตรงกันระบบจะรวมข้อมูลและประวัติการจองทั้งหมดให้โดยอัตโนมัติ ยืนยันการดำเนินการ?')) return
+        setIsMerging(true)
+        try {
+            const adminToken = localStorage.getItem('admin_token') || ''
+            const res = await fetch('/api/admin/merge-customers', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${adminToken}` }
+            })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || 'Failed to merge')
+            
+            if (data.mergedCount > 0) {
+                const detailsStr = data.details?.length > 0 ? `\n\nรายละเอียด:\n- ${data.details.join('\n- ')}` : ''
+                alert(`สำเร็จ! ${data.message}\nรวมข้อมูลลูกค้าที่ซ้ำซ้อนไปทั้งหมด: ${data.mergedCount} รายการ${detailsStr}`)
+                window.location.reload()
+            } else {
+                alert(`สำเร็จ! ${data.message}`)
+            }
+        } catch (e: any) {
+            alert('เกิดข้อผิดพลาด: ' + e.message)
+        } finally {
+            setIsMerging(false)
+        }
+    }
+
     // Load Data & Segments
     useEffect(() => {
         const loadSavedConfig = localStorage.getItem('foami_crm_config')
@@ -537,9 +566,19 @@ export default function CRMPage() {
                                     <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>รวมข้อมูลพื้นฐาน พฤติกรรม และความสนใจของลูกค้ารายบุคคล</p>
                                 </div>
                             </div>
-                            <div style={{ position: 'relative', width: 280 }}>
-                                <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                                <input className="form-input" style={{ width: '100%', paddingLeft: 36 }} placeholder="ค้นหาชื่อ, เบอร์, ทะเบียน..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                                <button 
+                                    className="btn btn-ghost btn-sm" 
+                                    style={{ background: 'var(--primary-ghost)', color: 'var(--primary)', gap: 6 }}
+                                    onClick={handleMergeWalkins}
+                                    disabled={isMerging}
+                                >
+                                    {isMerging ? 'กำลังตรวจสอบ...' : <><Users size={16} /> ตรวจสอบเบอร์ซ้ำ</>}
+                                </button>
+                                <div style={{ position: 'relative', width: 280 }}>
+                                    <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                                    <input className="form-input" style={{ width: '100%', paddingLeft: 36 }} placeholder="ค้นหาชื่อ, เบอร์, ทะเบียน..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                                </div>
                             </div>
                         </div>
 

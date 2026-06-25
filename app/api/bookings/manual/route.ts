@@ -84,9 +84,24 @@ export async function POST(req: NextRequest) {
             customer_note ? `หมายเหตุ: ${customer_note}` : '',
         ].filter(Boolean).join('\n')
 
-        const finalCustomerId = customer_id || `WALKIN-${bookingId}`
+        let finalCustomerId = customer_id
 
-        if (!customer_id) {
+        // Attempt to find existing customer by phone if ID is missing
+        if (!finalCustomerId && customer_phone) {
+            const { data: existingCustomers } = await supabase
+                .from('customers')
+                .select('id')
+                .eq('phone', customer_phone)
+                .limit(1)
+
+            if (existingCustomers && existingCustomers.length > 0) {
+                finalCustomerId = existingCustomers[0].id
+                console.log(`[Manual Booking] Found existing customer by phone: ${customer_phone} -> ID: ${finalCustomerId}`)
+            }
+        }
+
+        if (!finalCustomerId) {
+            finalCustomerId = `WALKIN-${bookingId}`
             const initialVehicle = {
                 id: `VH-${bookingId}`,
                 vehicle_brand: vehicle_brand || '',
@@ -121,8 +136,8 @@ export async function POST(req: NextRequest) {
                 console.error('[Manual Booking] Customer Insert error:', customerError)
                 return NextResponse.json({ error: `ไม่สามารถบันทึกข้อมูลลูกค้าได้: ${customerError.message}` }, { status: 400 })
             }
-        } else if (finalCustomerId.startsWith('WALKIN-')) {
-            // Optional: update their details if they changed
+        } else {
+            // Optional: update their details if they changed (useful for WALKIN updates or adding cars)
             await supabase.from('customers').update({
                 full_name: customer_name || 'ลูกค้า Walk-in',
                 phone: customer_phone || null,
