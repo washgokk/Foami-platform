@@ -859,7 +859,7 @@ export default function BookPage() {
                     extra_fee: extraFee,
                     travel_surcharge: travelSurchargeState,
                     different_spot_fee: differentSpotFee,
-                    staff_extra_payout: (travelSurchargeState + differentSpotFee) * 0.5,
+                    staff_extra_payout: (travelSurchargeState + differentSpotFee) * 0.7,
                     base_price: basePrice,
                     gross_total: displayTotal, // [Fix ข้อ2] Gross before discount — accurate DB record
                     discount_code: discountCode || null,

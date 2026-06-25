@@ -114,7 +114,7 @@ export async function GET(req: NextRequest) {
         // Try to include extra reporting fields
         const extraData = {
             travel_surcharge: picked.fee,
-            staff_extra_payout: picked.fee * 0.5,
+            staff_extra_payout: picked.fee * 0.7,
         }
 
         let { error: updateError } = await supabase.from('bookings').update({ ...updateData, ...extraData }).eq('id', booking.id)
