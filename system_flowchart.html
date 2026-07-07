@@ -1,0 +1,1605 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Foami Platform 2.0 — System Flowchart</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --foami-blue: #315EC3;
+  --foami-blue-dark: #1E3A8A;
+  --foami-blue-light: #DBEAFE;
+  --foami-pink: #F1BFDB;
+  --foami-cyan: #A0D9F6;
+  --platform-violet: #6D28D9;
+  --shop-amber: #D97706;
+  --staff-teal: #0F766E;
+  --customer-blue: #2563EB;
+  --money-green: #15803D;
+  --danger-red: #DC2626;
+  --bg: #F0F4FF;
+  --surface: #FFFFFF;
+  --border: #D1D9F0;
+  --text-1: #0F172A;
+  --text-2: #475569;
+  --text-3: #94A3B8;
+  --font: 'Kanit', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text-1);
+  min-height: 100vh;
+}
+
+/* ─── Header ─── */
+.header {
+  background: linear-gradient(135deg, var(--foami-blue-dark) 0%, var(--foami-blue) 60%, #4F7FE8 100%);
+  padding: 32px 40px 24px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+.header::before {
+  content: '';
+  position: absolute;
+  top: -40px; right: -40px;
+  width: 300px; height: 300px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 50%;
+}
+.header::after {
+  content: '';
+  position: absolute;
+  bottom: -60px; left: 30%;
+  width: 200px; height: 200px;
+  background: rgba(161,217,246,0.12);
+  border-radius: 50%;
+}
+.header-inner { position: relative; z-index: 1; }
+.header h1 { font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; }
+.header p { font-size: 1rem; opacity: 0.75; margin-top: 4px; font-weight: 300; }
+.badge-row { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.badge {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+/* ─── Tabs ─── */
+.tabs-bar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 40px;
+  display: flex;
+  gap: 0;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.tab-btn {
+  padding: 16px 24px;
+  font-family: var(--font);
+  font-size: 0.9rem;
+  font-weight: 500;
+  border: none;
+  background: none;
+  color: var(--text-3);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.tab-btn:hover { color: var(--foami-blue); }
+.tab-btn.active { color: var(--foami-blue); border-bottom-color: var(--foami-blue); font-weight: 700; }
+
+/* ─── Main canvas ─── */
+.canvas { padding: 40px; max-width: 1400px; margin: 0 auto; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ─── Section headings ─── */
+.section-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ─── Flow Diagram Nodes ─── */
+.flow-grid {
+  display: grid;
+  gap: 32px;
+}
+
+.flow-row {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  position: relative;
+}
+
+/* Role Cards (entry points) */
+.role-card {
+  border-radius: 16px;
+  padding: 20px 24px;
+  border: 2px solid transparent;
+  position: relative;
+  min-width: 180px;
+  flex-shrink: 0;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.role-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+
+.role-platform { background: #F3F0FF; border-color: #7C3AED; }
+.role-owner    { background: #FFFBEB; border-color: var(--shop-amber); }
+.role-staff    { background: #F0FDFA; border-color: var(--staff-teal); }
+.role-customer { background: #EFF6FF; border-color: var(--customer-blue); }
+.role-line     { background: #F0FDF4; border-color: #16A34A; }
+
+.role-icon {
+  font-size: 2rem;
+  margin-bottom: 8px;
+  display: block;
+}
+.role-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.role-sub {
+  font-size: 0.78rem;
+  color: var(--text-2);
+  line-height: 1.4;
+}
+.role-tag {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-family: var(--mono);
+}
+.tag-platform { background: #EDE9FE; color: var(--platform-violet); }
+.tag-owner    { background: #FEF3C7; color: var(--shop-amber); }
+.tag-staff    { background: #CCFBF1; color: var(--staff-teal); }
+.tag-customer { background: #DBEAFE; color: var(--customer-blue); }
+.tag-line     { background: #DCFCE7; color: #16A34A; }
+
+/* Arrow connector */
+.arrow {
+  display: flex;
+  align-items: center;
+  color: var(--text-3);
+  font-size: 1.4rem;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.arrow-down {
+  display: flex;
+  justify-content: center;
+  color: var(--text-3);
+  font-size: 1.4rem;
+  padding: 4px 0;
+}
+
+/* Process nodes */
+.process-node {
+  border-radius: 12px;
+  padding: 16px 20px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  flex: 1;
+  transition: all 0.2s;
+  position: relative;
+}
+.process-node:hover {
+  border-color: var(--foami-blue);
+  box-shadow: 0 4px 16px rgba(49,94,195,0.1);
+}
+.node-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.node-steps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.node-steps li {
+  font-size: 0.78rem;
+  color: var(--text-2);
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  line-height: 1.4;
+}
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: var(--foami-blue-light);
+  color: var(--foami-blue);
+  border-radius: 50%;
+  font-size: 0.6rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Decision diamond */
+.decision {
+  border-radius: 12px;
+  padding: 14px 18px;
+  background: #FFFBEB;
+  border: 2px dashed var(--shop-amber);
+  flex: 1;
+  text-align: center;
+}
+.decision-icon { font-size: 1.3rem; margin-bottom: 4px; }
+.decision-text { font-size: 0.82rem; font-weight: 600; color: var(--shop-amber); }
+.decision-options {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+.opt-yes, .opt-no {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 12px;
+  border-radius: 999px;
+}
+.opt-yes { background: #D1FAE5; color: #059669; }
+.opt-no  { background: #FEE2E2; color: #DC2626; }
+
+/* System block */
+.system-block {
+  border-radius: 12px;
+  padding: 20px;
+  border: 1.5px solid;
+}
+.sys-platform { background: #F5F3FF; border-color: #7C3AED; }
+.sys-foami    { background: #EFF6FF; border-color: var(--foami-blue); }
+.sys-shop     { background: #FFFBEB; border-color: var(--shop-amber); }
+.sys-db       { background: #F0FDF4; border-color: var(--money-green); }
+.sys-money    { background: #FFF7ED; border-color: #EA580C; }
+.sys-notif    { background: #FDF4FF; border-color: #9333EA; }
+
+.block-header {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.block-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.block-item {
+  font-size: 0.78rem;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.7);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.3;
+}
+.item-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-violet { background: var(--platform-violet); }
+.dot-blue   { background: var(--foami-blue); }
+.dot-amber  { background: var(--shop-amber); }
+.dot-green  { background: var(--money-green); }
+.dot-orange { background: #EA580C; }
+.dot-purple { background: #9333EA; }
+.dot-teal   { background: var(--staff-teal); }
+
+/* ─── Big Diagram (Overview) ─── */
+.overview-layout {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+.center-platform {
+  border-radius: 20px;
+  background: linear-gradient(145deg, #1E3A8A, #315EC3);
+  color: white;
+  padding: 28px 24px;
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(49,94,195,0.3);
+}
+.center-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.center-sub { font-size: 0.8rem; opacity: 0.7; margin-bottom: 20px; }
+.center-routes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+.route-item {
+  background: rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.route-url { font-family: var(--mono); font-size: 0.72rem; opacity: 0.8; }
+.route-name { font-weight: 600; }
+
+/* Connector Lines */
+.connector-block {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.connector-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Money Flow specific */
+.money-flow {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+  align-items: center;
+  margin: 24px 0;
+}
+.money-node {
+  text-align: center;
+  padding: 20px 12px;
+  border-radius: 16px;
+}
+.money-amount {
+  font-size: 1.8rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.money-label {
+  font-size: 0.78rem;
+  color: var(--text-2);
+  margin-top: 4px;
+}
+.money-arrow-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.money-arrow-line {
+  width: 100%;
+  height: 2px;
+  background: var(--border);
+  position: relative;
+}
+.money-arrow-line::after {
+  content: '▶';
+  position: absolute;
+  right: -6px;
+  top: -9px;
+  font-size: 0.7rem;
+  color: var(--text-3);
+}
+.money-percent {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-3);
+}
+
+/* Status flow */
+.status-flow {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  overflow-x: auto;
+  padding: 24px 0;
+  scrollbar-width: thin;
+}
+.status-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.status-circle {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  position: relative;
+  transition: transform 0.2s;
+}
+.status-circle:hover { transform: scale(1.1); }
+.s-pending   { background: #FEF3C7; }
+.s-confirmed { background: #DBEAFE; }
+.s-pickup    { background: #CFFAFE; }
+.s-washing   { background: #EDE9FE; }
+.s-deliver   { background: #FED7AA; }
+.s-complete  { background: #D1FAE5; }
+.s-cancel    { background: #FEE2E2; }
+
+.status-name {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+  max-width: 70px;
+}
+.status-arrow {
+  font-size: 1.2rem;
+  color: var(--text-3);
+  flex-shrink: 0;
+  padding: 0 8px;
+  margin-bottom: 20px;
+}
+
+/* Who triggers */
+.trigger-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+.trigger-pill {
+  font-size: 0.62rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tp-customer { background: #DBEAFE; color: var(--customer-blue); }
+.tp-staff    { background: #CCFBF1; color: var(--staff-teal); }
+.tp-admin    { background: #EDE9FE; color: var(--platform-violet); }
+.tp-auto     { background: #FEF3C7; color: var(--shop-amber); }
+
+/* Notification channels */
+.notif-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+}
+.notif-card {
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+  border: 1.5px solid;
+}
+.nc-line   { background: #F0FDF4; border-color: #16A34A; }
+.nc-push   { background: #EFF6FF; border-color: var(--foami-blue); }
+.nc-email  { background: #FDF4FF; border-color: #9333EA; }
+.nc-rt     { background: #FFF7ED; border-color: #EA580C; }
+.notif-icon { font-size: 1.8rem; margin-bottom: 6px; }
+.notif-title { font-size: 0.82rem; font-weight: 700; margin-bottom: 4px; }
+.notif-events { font-size: 0.72rem; color: var(--text-2); line-height: 1.5; }
+
+/* DB tables grid */
+.db-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.db-group {
+  border-radius: 14px;
+  padding: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+}
+.db-group-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.db-table-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.db-table {
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 7px;
+  background: var(--bg);
+  font-family: var(--mono);
+}
+.db-table-note {
+  font-family: var(--font);
+  font-size: 0.68rem;
+  color: var(--text-3);
+  font-style: italic;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.new-badge {
+  font-size: 0.58rem;
+  background: var(--foami-blue);
+  color: white;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 700;
+  font-family: var(--font);
+}
+
+/* Journey tabs */
+.journey-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+.jtab {
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 2px solid transparent;
+  background: var(--surface);
+  border-color: var(--border);
+  transition: all 0.2s;
+}
+.jtab:hover { border-color: var(--foami-blue); color: var(--foami-blue); }
+.jtab.active-j { background: var(--foami-blue); color: white; border-color: var(--foami-blue); }
+
+.journey-panel { display: none; }
+.journey-panel.active-jp { display: block; }
+
+/* Journey steps */
+.journey-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.journey-step {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 16px;
+  position: relative;
+  padding-bottom: 24px;
+}
+.journey-step:last-child { padding-bottom: 0; }
+.journey-step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 19px;
+  top: 40px;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+.step-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+  border: 2px solid;
+  background: var(--surface);
+  position: relative;
+  z-index: 1;
+}
+.sc-blue   { border-color: var(--foami-blue); }
+.sc-violet { border-color: var(--platform-violet); }
+.sc-amber  { border-color: var(--shop-amber); }
+.sc-teal   { border-color: var(--staff-teal); }
+.sc-green  { border-color: var(--money-green); }
+
+.step-content { padding-top: 8px; }
+.step-title { font-size: 0.92rem; font-weight: 700; margin-bottom: 6px; }
+.step-desc { font-size: 0.82rem; color: var(--text-2); line-height: 1.6; }
+.step-api {
+  display: inline-block;
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  background: var(--bg);
+  padding: 3px 10px;
+  border-radius: 5px;
+  color: var(--foami-blue);
+}
+.step-branches {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.branch-pill {
+  font-size: 0.72rem;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--foami-blue-light);
+  color: var(--foami-blue);
+  font-weight: 500;
+}
+.branch-pill.alt { background: #D1FAE5; color: var(--money-green); }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .canvas { padding: 20px; }
+  .overview-layout { grid-template-columns: 1fr; }
+  .money-flow { grid-template-columns: 1fr; gap: 12px; }
+  .db-grid { grid-template-columns: 1fr; }
+  .notif-grid { grid-template-columns: 1fr 1fr; }
+  .tabs-bar { padding: 0 16px; overflow-x: auto; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <h1>🫧 Foami Platform 2.0</h1>
+    <p>System Architecture Flowchart — ภาพรวมระบบทั้งหมด</p>
+    <div class="badge-row">
+      <span class="badge">Next.js 15</span>
+      <span class="badge">Supabase</span>
+      <span class="badge">Stripe</span>
+      <span class="badge">LINE API</span>
+      <span class="badge">Multi-tenant</span>
+      <span class="badge">5 Roles</span>
+    </div>
+  </div>
+</div>
+
+<div class="tabs-bar">
+  <button class="tab-btn active" onclick="switchTab('overview')">🗺️ ภาพรวมระบบ</button>
+  <button class="tab-btn" onclick="switchTab('journey')">🚶 User Journeys</button>
+  <button class="tab-btn" onclick="switchTab('booking')">📋 Booking Flow</button>
+  <button class="tab-btn" onclick="switchTab('money')">💰 Money Flow</button>
+  <button class="tab-btn" onclick="switchTab('database')">🗄️ Database</button>
+  <button class="tab-btn" onclick="switchTab('notif')">🔔 Notifications</button>
+</div>
+
+<div class="canvas">
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- TAB 1: Overview                               -->
+  <!-- ══════════════════════════════════════════════ -->
+  <div class="tab-panel active" id="tab-overview">
+    <div class="section-label">ภาพรวมระบบ Platform 2.0</div>
+
+    <div class="overview-layout">
+      <!-- Left: Who enters -->
+      <div class="connector-block">
+        <div class="section-label" style="font-size:0.65rem;">ผู้ใช้งาน</div>
+
+        <div class="role-card role-platform">
+          <span class="role-icon">⚙️</span>
+          <div class="role-title">Platform Admin</div>
+          <div class="role-sub">โนฟท — ดูแลระบบทั้งหมด</div>
+          <span class="role-tag tag-platform">platform-admin.vercel.app</span>
+        </div>
+
+        <div style="text-align:center; color:var(--text-3); font-size:1.2rem;">↕</div>
+
+        <div class="role-card role-owner">
+          <span class="role-icon">🏪</span>
+          <div class="role-title">Shop Owner</div>
+          <div class="role-sub">เจ้าของร้านพาร์ทเนอร์</div>
+          <span class="role-tag tag-owner">shop.vercel.app/[shopId]</span>
+        </div>
+
+        <div style="text-align:center; color:var(--text-3); font-size:1.2rem;">↕</div>
+
+        <div class="role-card role-staff">
+          <span class="role-icon">🧑‍🔧</span>
+          <div class="role-title">Staff</div>
+          <div class="role-sub">พนักงานล้างรถ ทุกร้าน</div>
+          <span class="role-tag tag-staff">shop.vercel.app/[shopId]/staff</span>
+        </div>
+
+        <div style="text-align:center; color:var(--text-3); font-size:1.2rem;">↕</div>
+
+        <div class="role-card role-customer">
+          <span class="role-icon">👤</span>
+          <div class="role-title">Customer</div>
+          <div class="role-sub">ลูกค้า (Email/LINE auth)</div>
+          <span class="role-tag tag-customer">foami.vercel.app (marketplace)</span>
+        </div>
+
+        <div style="text-align:center; color:var(--text-3); font-size:1.2rem;">↕</div>
+
+        <div class="role-card role-line">
+          <span class="role-icon">💬</span>
+          <div class="role-title">LINE User</div>
+          <div class="role-sub">ลูกค้า Foami เดิม (LIFF)</div>
+          <span class="role-tag tag-line">LINE LIFF App</span>
+        </div>
+      </div>
+
+      <!-- Center: Platform -->
+      <div>
+        <div class="center-platform">
+          <div style="font-size:3rem;margin-bottom:8px;">🫧</div>
+          <div class="center-title">Foami Platform</div>
+          <div class="center-sub">Next.js 15 + Supabase + Stripe</div>
+
+          <div class="center-routes">
+            <div class="route-item">
+              <div class="route-url">foami-wash.vercel.app</div>
+              <div class="route-name">🗺️ Marketplace — แผนที่หาร้าน</div>
+            </div>
+            <div class="route-item">
+              <div class="route-url">foami-wash.vercel.app/foami</div>
+              <div class="route-name">🫧 Foami Store — ร้านของตัวเอง</div>
+            </div>
+            <div class="route-item">
+              <div class="route-url">shop.foami-wash.vercel.app/[id]</div>
+              <div class="route-name">🏪 Partner Shop — ร้านพาร์ทเนอร์</div>
+            </div>
+            <div class="route-item">
+              <div class="route-url">platform.foami-wash.vercel.app</div>
+              <div class="route-name">⚙️ Platform Admin — จัดการทั้งหมด</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:24px;">
+          <div class="section-label" style="font-size:0.65rem;">Services & Infrastructure</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="system-block sys-db">
+              <div class="block-header" style="color:var(--money-green)">🗄️ Supabase</div>
+              <div class="block-items">
+                <div class="block-item"><span class="item-dot dot-green"></span>PostgreSQL + RLS</div>
+                <div class="block-item"><span class="item-dot dot-green"></span>Realtime (Chat, Status)</div>
+                <div class="block-item"><span class="item-dot dot-green"></span>Auth (JWT)</div>
+                <div class="block-item"><span class="item-dot dot-green"></span>Storage (Photos, Slips)</div>
+              </div>
+            </div>
+            <div class="system-block sys-money">
+              <div class="block-header" style="color:#EA580C">💳 Stripe</div>
+              <div class="block-items">
+                <div class="block-item"><span class="item-dot dot-orange"></span>Payment Intent</div>
+                <div class="block-item"><span class="item-dot dot-orange"></span>Webhook</div>
+                <div class="block-item"><span class="item-dot dot-orange"></span>Refund</div>
+                <div class="block-item"><span class="item-dot dot-orange"></span>Internal Ledger</div>
+              </div>
+            </div>
+            <div class="system-block sys-notif">
+              <div class="block-header" style="color:#9333EA">🔔 Notifications</div>
+              <div class="block-items">
+                <div class="block-item"><span class="item-dot dot-purple"></span>LINE Messaging API</div>
+                <div class="block-item"><span class="item-dot dot-purple"></span>Web Push (VAPID)</div>
+                <div class="block-item"><span class="item-dot dot-purple"></span>Resend Email</div>
+              </div>
+            </div>
+            <div class="system-block sys-platform">
+              <div class="block-header" style="color:var(--platform-violet)">🤖 Automation</div>
+              <div class="block-items">
+                <div class="block-item"><span class="item-dot dot-violet"></span>Vercel Cron Jobs</div>
+                <div class="block-item"><span class="item-dot dot-violet"></span>Auto-assign Staff</div>
+                <div class="block-item"><span class="item-dot dot-violet"></span>Reminder (24h)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: What they can do -->
+      <div class="connector-block">
+        <div class="section-label" style="font-size:0.65rem;">เข้าถึงอะไรได้บ้าง</div>
+
+        <div class="system-block sys-platform">
+          <div class="block-header" style="color:var(--platform-violet); font-size:0.72rem;">⚙️ Platform Admin</div>
+          <div class="block-items">
+            <div class="block-item"><span class="item-dot dot-violet"></span>สร้างรหัสเชิญร้าน</div>
+            <div class="block-item"><span class="item-dot dot-violet"></span>จัดการ Plans</div>
+            <div class="block-item"><span class="item-dot dot-violet"></span>อนุมัติถอนเงิน</div>
+            <div class="block-item"><span class="item-dot dot-violet"></span>ดู Revenue ทั้งหมด</div>
+          </div>
+        </div>
+
+        <div class="system-block sys-shop" style="margin-top:12px;">
+          <div class="block-header" style="color:var(--shop-amber); font-size:0.72rem;">🏪 Shop Admin</div>
+          <div class="block-items">
+            <div class="block-item"><span class="item-dot dot-amber"></span>Dashboard + Analytics</div>
+            <div class="block-item"><span class="item-dot dot-amber"></span>จัดการ Staff+Schedule</div>
+            <div class="block-item"><span class="item-dot dot-amber"></span>CRM + Segments</div>
+            <div class="block-item"><span class="item-dot dot-amber"></span>Discounts + Promotions</div>
+            <div class="block-item"><span class="item-dot dot-amber"></span>Wallet + ถอนเงิน</div>
+          </div>
+        </div>
+
+        <div class="system-block sys-foami" style="margin-top:12px;">
+          <div class="block-header" style="color:var(--foami-blue); font-size:0.72rem;">🧑‍🔧 Staff Portal</div>
+          <div class="block-items">
+            <div class="block-item"><span class="item-dot dot-blue"></span>ดูงานวันนี้</div>
+            <div class="block-item"><span class="item-dot dot-blue"></span>อัปเดต Status</div>
+            <div class="block-item"><span class="item-dot dot-blue"></span>ถ่ายรูปก่อน/หลัง</div>
+            <div class="block-item"><span class="item-dot dot-blue"></span>Chat กับลูกค้า</div>
+          </div>
+        </div>
+
+        <div class="system-block sys-db" style="margin-top:12px;">
+          <div class="block-header" style="color:var(--money-green); font-size:0.72rem;">👤 Customer</div>
+          <div class="block-items">
+            <div class="block-item"><span class="item-dot dot-green"></span>ค้นหาร้านบนแผนที่</span></div>
+            <div class="block-item"><span class="item-dot dot-green"></span>จองบริการ</div>
+            <div class="block-item"><span class="item-dot dot-green"></span>ชำระเงิน</div>
+            <div class="block-item"><span class="item-dot dot-green"></span>ติดตาม + Chat</div>
+            <div class="block-item"><span class="item-dot dot-green"></span>รีวิว</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- TAB 2: User Journeys                          -->
+  <!-- ══════════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-journey">
+    <div class="section-label">User Journeys แยกตาม Role</div>
+
+    <div class="journey-tabs">
+      <button class="jtab active-j" onclick="switchJourney('j-platform')">⚙️ Platform Admin</button>
+      <button class="jtab" onclick="switchJourney('j-owner')">🏪 Shop Owner</button>
+      <button class="jtab" onclick="switchJourney('j-staff')">🧑‍🔧 Staff</button>
+      <button class="jtab" onclick="switchJourney('j-customer')">👤 Customer</button>
+    </div>
+
+    <!-- Platform Admin Journey -->
+    <div class="journey-panel active-jp" id="j-platform">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:32px;">
+        <div>
+          <div class="section-label" style="font-size:0.68rem; color:var(--platform-violet);">⚙️ Platform Admin — Daily Workflow</div>
+          <div class="journey-steps">
+            <div class="journey-step">
+              <div class="step-circle sc-violet">🔑</div>
+              <div class="step-content">
+                <div class="step-title">Login Platform Admin</div>
+                <div class="step-desc">เข้า platform.foami-wash.vercel.app ด้วย Email + Password ที่ Foami กำหนด</div>
+                <code class="step-api">POST /api/auth/platform-login</code>
+              </div>
+            </div>
+            <div class="journey-step">
+              <div class="step-circle sc-violet">📊</div>
+              <div class="step-content">
+                <div class="step-title">ดู Platform Dashboard</div>
+                <div class="step-desc">ดูรายรับรวมทุกร้าน, จำนวน shops, bookings วันนี้, withdrawal requests ที่รอ</div>
+                <code class="step-api">GET /api/platform/stats</code>
+              </div>
+            </div>
+            <div class="journey-step">
+              <div class="step-circle sc-violet">✉️</div>
+              <div class="step-content">
+                <div class="step-title">สร้างรหัสเชิญร้านใหม่</div>
+                <div class="step-desc">ใส่ Email ร้าน, เลือก Plan → Generate Code → ส่ง Email อัตโนมัติผ่าน Resend</div>
+                <code class="step-api">POST /api/platform/invitations</code>
+                <div class="step-branches">
+                  <span class="branch-pill">Code: FOAMI-XXXXX</span>
+                  <span class="branch-pill">Expires: 7 วัน</span>
+                </div>
+              </div>
+            </div>
+            <div class="journey-step">
+              <div class="step-circle sc-violet">💸</div>
+              <div class="step-content">
+                <div class="step-title">อนุมัติการถอนเงิน</div>
+                <div class="step-desc">ดูรายการถอนที่รอ → ตรวจสอบ → โอน PromptPay จริง → Upload Slip → Mark Complete</div>
+                <code class="step-api">PUT /api/platform/withdrawals/[id]/complete</code>
+              </div>
+            </div>
+            <div class="journey-step">
+              <div class="step-circle sc-violet">⚙️</div>
+              <div class="step-content">
+                <div class="step-title">ปรับ Commission Rate</div>
+                <div class="step-desc">ปรับ % commission รายร้าน (default 20%) ได้ตามข้อตกลงพิเศษ</div>
+                <code class="step-api">PUT /api/platform/shops/[id]/commission</code>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="section-label" style="font-size:0.68rem; color:var(--shop-amber);">🏪 Shop Owner — Onboarding</div>
+          <div class="journey-steps">
+            <div class="journey-step">
+              <div class="step-circle sc-amber">📧</div>
+              <div class="step-content">
+                <div class="step-title">ได้รับ Email เชิญ</div>
+                <div class="step-desc">คลิก Link ใน Email → เข้าหน้า Register พร้อม Code สำเร็จ</div>
+              </div>
+            </div>
+            <div class="journey-step">
+              <div class="step-circle sc-amber">📝</div>
+              <div class="step-content">
+                <div class="step-title">ลงทะเบียน Shop</div>
+                <div class="step-desc">กรอกชื่อร้าน, ที่อยู่, โลโก้, เบอร์ติดต่อ, และสร้าง Email+Password</div>
+                <code class="step-api">POST /api/platform/shops/register</code>
+              </div>
+            </div>
+            <div class="journey-step">
+              <div class="step-circle sc-amber">🧙</div>
+              <div class="step-content">
+                <div class="step-title">Onboarding Wizard (5 ขั้น)</div>
+                <div class="step-desc">ตั้งค่า Services → สร้าง Branches → วาด Zones (polygon) → เพิ่ม Staff → ตั้ง Schedule</div>
+                <div class="step-branches">
+                  <span class="branch-pill">ขั้น 1: Services</span>
+                  <span class="branch-pill">ขั้น 2: Branches</span>
+                  <span class="branch-pill">ขั้น 3: Zones</span>
+                  <span class="branch-pill">ขั้น 4: Staff</span>
+                  <span class="branch-pill">ขั้น 5: Schedule</span>
+                </div>
+              </div>
+            </div>
+            <div class="journey-step">
+              <div class="step-circle sc-amber">🗺️</div>
+              <div class="step-content">
+                <div class="step-title">ร้านขึ้น Marketplace</div>
+                <div class="step-desc">ร้านจะปรากฏบนแผนที่ Marketplace ทันที (ถ้าเปิด is_marketplace_listed)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shop Owner Dashboard Journey -->
+    <div class="journey-panel" id="j-owner">
+      <div class="section-label" style="font-size:0.68rem; color:var(--shop-amber);">🏪 Shop Admin — Daily Operations</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:20px;">
+        <div class="process-node">
+          <div class="node-title">📊 Dashboard</div>
+          <ul class="node-steps">
+            <li><span class="step-num">1</span>ดู Bookings วันนี้ + พรุ่งนี้</li>
+            <li><span class="step-num">2</span>ดูรายรับ / Wallet Balance</li>
+            <li><span class="step-num">3</span>Alert งานที่ยังไม่มีพนักงาน</li>
+            <li><span class="step-num">4</span>ดู Staff ที่ Online</li>
+          </ul>
+        </div>
+        <div class="process-node">
+          <div class="node-title">📋 จัดการ Bookings</div>
+          <ul class="node-steps">
+            <li><span class="step-num">1</span>รับ/ปฏิเสธ Booking</li>
+            <li><span class="step-num">2</span>สร้าง Manual Booking (walk-in)</li>
+            <li><span class="step-num">3</span>แก้ไข Schedule/Staff</li>
+            <li><span class="step-num">4</span>ยกเลิก + Refund</li>
+            <li><span class="step-num">5</span>Export CSV</li>
+          </ul>
+        </div>
+        <div class="process-node">
+          <div class="node-title">👥 จัดการ Staff</div>
+          <ul class="node-steps">
+            <li><span class="step-num">1</span>เพิ่ม/ลบ Staff</li>
+            <li><span class="step-num">2</span>ตั้ง Schedule รายวัน</li>
+            <li><span class="step-num">3</span>กำหนด Zone ที่รับ</li>
+            <li><span class="step-num">4</span>จ่าย Payout</li>
+          </ul>
+        </div>
+        <div class="process-node">
+          <div class="node-title">📈 CRM (Growth+)</div>
+          <ul class="node-steps">
+            <li><span class="step-num">1</span>ดูโปรไฟล์ลูกค้า</li>
+            <li><span class="step-num">2</span>RFM Score (Pro+)</li>
+            <li><span class="step-num">3</span>สร้าง Segment</li>
+            <li><span class="step-num">4</span>ส่ง Promotion</li>
+          </ul>
+        </div>
+        <div class="process-node">
+          <div class="node-title">🏷️ Discounts</div>
+          <ul class="node-steps">
+            <li><span class="step-num">1</span>สร้าง Code</li>
+            <li><span class="step-num">2</span>ตั้งเงื่อนไข (วัน, สาขา, จำนวน)</li>
+            <li><span class="step-num">3</span>Target Segment (Pro+)</li>
+            <li><span class="step-num">4</span>ดูสถิติการใช้</li>
+          </ul>
+        </div>
+        <div class="process-node">
+          <div class="node-title">💰 Wallet</div>
+          <ul class="node-steps">
+            <li><span class="step-num">1</span>ดูยอดเงิน Available</li>
+            <li><span class="step-num">2</span>ดู Pending (รอ settle)</li>
+            <li><span class="step-num">3</span>ขอถอนเงิน</li>
+            <li><span class="step-num">4</span>ดูประวัติธุรกรรม</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Staff Journey -->
+    <div class="journey-panel" id="j-staff">
+      <div class="section-label" style="font-size:0.68rem; color:var(--staff-teal);">🧑‍🔧 Staff — Job Workflow</div>
+      <div class="journey-steps" style="max-width:600px;">
+        <div class="journey-step">
+          <div class="step-circle sc-teal">🔑</div>
+          <div class="step-content">
+            <div class="step-title">Login Staff Portal</div>
+            <div class="step-desc">Email + Password → ระบบ auto-detect shop จาก staff table</div>
+          </div>
+        </div>
+        <div class="journey-step">
+          <div class="step-circle sc-teal">📱</div>
+          <div class="step-content">
+            <div class="step-title">รับ Push/LINE Notification</div>
+            <div class="step-desc">มีงานใหม่เข้า → Staff ได้รับแจ้งเตือนบน LINE และ Web Push</div>
+          </div>
+        </div>
+        <div class="journey-step">
+          <div class="step-circle sc-teal">✅</div>
+          <div class="step-content">
+            <div class="step-title">รับงาน</div>
+            <div class="step-desc">กด "รับงาน" → Status เปลี่ยนเป็น confirmed → ลูกค้าได้รับแจ้ง</div>
+            <code class="step-api">PUT /api/bookings/[id]/accept</code>
+          </div>
+        </div>
+        <div class="journey-step">
+          <div class="step-circle sc-teal">🏍️</div>
+          <div class="step-content">
+            <div class="step-title">ออกรับรถ</div>
+            <div class="step-desc">กด "ออกรับรถ" → Status: picking_up → ถ่ายรูปรถก่อนล้าง (Before Photo)</div>
+            <code class="step-api">POST /api/photos { type: 'before' }</code>
+          </div>
+        </div>
+        <div class="journey-step">
+          <div class="step-circle sc-teal">🫧</div>
+          <div class="step-content">
+            <div class="step-title">เริ่มล้างรถ</div>
+            <div class="step-desc">Status: washing → Chat กับลูกค้าได้ → ถ่ายรูปหลังล้าง (After Photo)</div>
+            <code class="step-api">POST /api/photos { type: 'after' }</code>
+          </div>
+        </div>
+        <div class="journey-step">
+          <div class="step-circle sc-teal">🚗</div>
+          <div class="step-content">
+            <div class="step-title">ส่งรถ + แจ้งยอดเพิ่ม (ถ้ามี)</div>
+            <div class="step-desc">Status: delivering → ถ้ามีค่าบริการเพิ่ม → แจ้ง Admin → รอลูกค้าจ่าย</div>
+          </div>
+        </div>
+        <div class="journey-step">
+          <div class="step-circle sc-teal">🎉</div>
+          <div class="step-content">
+            <div class="step-title">งานเสร็จ</div>
+            <div class="step-desc">Status: completed → ลูกค้า rate + review → Platform settle เงิน 80% เข้า Wallet ร้าน</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Customer Journey -->
+    <div class="journey-panel" id="j-customer">
+      <div class="section-label" style="font-size:0.68rem; color:var(--customer-blue);">👤 Customer — จองบริการ</div>
+      <div class="journey-steps" style="max-width:600px;">
+        <div class="journey-step">
+          <div class="step-circle sc-blue">🗺️</div>
+          <div class="step-content">
+            <div class="step-title">เข้า Marketplace หรือ Link ร้านโดยตรง</div>
+            <div class="step-desc">ค้นหาร้านบนแผนที่ → เลือกร้าน → หรือเข้า shop.foami.app/[shopId] โดยตรง</div>
+            <div class="step-branches">
+              <span class="branch-pill">ผ่าน Marketplace</span>
+              <span class="branch-pill alt">ผ่าน LINE QR</span>
+              <span class="branch-pill alt">ผ่าน Link โดยตรง</span>
+            </div>
+          </div>
+        </div>
+        <div class="journey-step">
+          <div class="step-circle sc-blue">🔑</div>
+          <div class="step-content">
+            <div class="step-title">Login / Register</div>
+            <div class="step-desc">สร้าง account ด้วย Email+Password หรือ LINE OAuth (ถ้าร้านรองรับ LIFF)</div>
+            <code class="step-api">POST /api/auth/register | /api/auth/login</code>
+          </div>
+        </div>
+        <div class="journey-step">
+          <div class="step-circle sc-blue">📦</div>
+          <div class="step-content">
+            <div class="step-title">Step 1: เลือก Package + Addon</div>
+            <div class="step-desc">เลือกบริการ (ล้างสี, ล้าง+เคลือบ, บำรุงรักษา) + เสริม (เติมลม, น้ำมัน, เปลี่ยนน้ำมัน)</div>
+            <code class="step-api">GET /api/shops/[id]/services</code>
+          </div>
+        </div>
+        <div class="journey-step">
+          <div class="step-circle sc-blue">📍</div>
+          <div class="step-content">
+            <div class="step-title">Step 2: Pin ตำแหน่งรับ-ส่ง</div>
+            <div class="step-desc">ใช้ MapPicker → ระบบตรวจ Zone → คำนวณ Extra Fee ถ้าอยู่นอก Zone</div>
+            <div class="step-branches">
+              <span class="branch-pill">ใน Zone → ฟรี</span>
+              <span class="branch-pill alt">นอก Zone → +ค่าเดินทาง</span>
+            </div>
+          </div>
+        </div>
+        <div class="journey-step">
+          <div class="step-circle sc-blue">🕐</div>
+          <div class="step-content">
+            <div class="step-title">Step 3: เลือกวันและเวลา</div>
+            <div class="step-desc">ดู Time Slots ที่มีพนักงานว่าง → เลือกวัน+เวลา (ต้องล่วงหน้า 20 นาที)</div>
+            <code class="step-api">GET /api/shops/[id]/availability</code>
+          </div>
+        </div>
+        <div class="journey-step">
+          <div class="step-circle sc-blue">📋</div>
+          <div class="step-content">
+            <div class="step-title">Step 4: สรุปและใส่ Discount</div>
+            <div class="step-desc">ดูสรุปราคา → ใส่ Discount Code (ถ้ามี) → ยืนยันรายการ</div>
+            <code class="step-api">POST /api/discount/validate</code>
+          </div>
+        </div>
+        <div class="journey-step">
+          <div class="step-circle sc-blue">💳</div>
+          <div class="step-content">
+            <div class="step-title">Step 5: ชำระเงิน</div>
+            <div class="step-desc">เลือก Stripe (บัตร/PromptPay) หรือ โอนเงิน+แนบสลิป</div>
+            <div class="step-branches">
+              <span class="branch-pill">Stripe → Auto confirm</span>
+              <span class="branch-pill alt">โอน → Admin ตรวจสอบ</span>
+            </div>
+          </div>
+        </div>
+        <div class="journey-step">
+          <div class="step-circle sc-blue">🎉</div>
+          <div class="step-content">
+            <div class="step-title">ติดตาม + รับรถ + รีวิว</div>
+            <div class="step-desc">ดู Real-time Status → Chat กับ Staff → รับรถ → ให้คะแนน (1-5 ดาว)</div>
+            <code class="step-api">POST /api/bookings/[id]/review</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- TAB 3: Booking Flow                           -->
+  <!-- ══════════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-booking">
+    <div class="section-label">Booking Status Lifecycle</div>
+
+    <div class="status-flow">
+      <div class="status-node">
+        <div class="trigger-row">
+          <span class="trigger-pill tp-customer">ลูกค้าจอง</span>
+        </div>
+        <div class="status-circle s-pending">📥</div>
+        <div class="status-name">pending<br><span style="font-size:0.62rem;color:var(--text-3);">รอยืนยัน</span></div>
+      </div>
+      <div class="status-arrow">→</div>
+      <div class="status-node">
+        <div class="trigger-row">
+          <span class="trigger-pill tp-staff">Staff รับ</span>
+          <span class="trigger-pill tp-auto">Auto-assign</span>
+        </div>
+        <div class="status-circle s-confirmed">✅</div>
+        <div class="status-name">confirmed<br><span style="font-size:0.62rem;color:var(--text-3);">ยืนยันแล้ว</span></div>
+      </div>
+      <div class="status-arrow">→</div>
+      <div class="status-node">
+        <div class="trigger-row">
+          <span class="trigger-pill tp-staff">Staff กด</span>
+        </div>
+        <div class="status-circle s-pickup">🏍️</div>
+        <div class="status-name">picking_up<br><span style="font-size:0.62rem;color:var(--text-3);">กำลังรับรถ</span></div>
+      </div>
+      <div class="status-arrow">→</div>
+      <div class="status-node">
+        <div class="trigger-row">
+          <span class="trigger-pill tp-staff">Staff กด</span>
+        </div>
+        <div class="status-circle s-washing">🫧</div>
+        <div class="status-name">washing<br><span style="font-size:0.62rem;color:var(--text-3);">กำลังล้าง</span></div>
+      </div>
+      <div class="status-arrow">→</div>
+      <div class="status-node">
+        <div class="trigger-row">
+          <span class="trigger-pill tp-staff">Staff กด</span>
+        </div>
+        <div class="status-circle s-deliver">🚗</div>
+        <div class="status-name">delivering<br><span style="font-size:0.62rem;color:var(--text-3);">กำลังส่งรถ</span></div>
+      </div>
+      <div class="status-arrow">→</div>
+      <div class="status-node">
+        <div class="trigger-row">
+          <span class="trigger-pill tp-staff">Staff กด</span>
+        </div>
+        <div class="status-circle s-complete">🎉</div>
+        <div class="status-name">completed<br><span style="font-size:0.62rem;color:var(--text-3);">เสร็จสิ้น</span></div>
+      </div>
+    </div>
+
+    <div style="margin-top: 12px; display:flex; align-items:center; gap:12px;">
+      <div class="status-circle s-cancel" style="width:40px;height:40px;font-size:1.1rem;">❌</div>
+      <div>
+        <div style="font-size:0.82rem; font-weight:700;">cancelled — ยกเลิก</div>
+        <div style="font-size:0.76rem; color:var(--text-2);">ลูกค้าหรือ Admin ยกเลิกได้ตั้งแต่ pending → confirmed เท่านั้น (หลังจากนั้นต้องโทรแจ้ง)</div>
+      </div>
+    </div>
+
+    <div style="margin-top:32px;">
+      <div class="section-label">Auto-assign Algorithm (Cron ทุก 15 นาที)</div>
+      <div style="display:grid; grid-template-columns: repeat(5,1fr); gap:12px; align-items:center;">
+        <div class="process-node">
+          <div class="node-title">🔍 Query</div>
+          <ul class="node-steps">
+            <li><span class="step-num">1</span>pending bookings</li>
+            <li><span class="step-num">2</span>staff_id IS NULL</li>
+            <li><span class="step-num">3</span>ภายใน 4 ชั่วโมง</li>
+          </ul>
+        </div>
+        <div class="arrow">→</div>
+        <div class="process-node">
+          <div class="node-title">🧮 Match Staff</div>
+          <ul class="node-steps">
+            <li><span class="step-num">1</span>หา staff ที่ว่างใน slot</li>
+            <li><span class="step-num">2</span>ตรวจ Zone polygon</li>
+            <li><span class="step-num">3</span>คำนวณ fee (ระยะทาง)</li>
+          </ul>
+        </div>
+        <div class="arrow">→</div>
+        <div class="process-node">
+          <div class="node-title">📌 Assign</div>
+          <ul class="node-steps">
+            <li><span class="step-num">1</span>เลือก fee ต่ำสุด</li>
+            <li><span class="step-num">2</span>UPDATE booking</li>
+            <li><span class="step-num">3</span>Lock schedule slot</li>
+          </ul>
+        </div>
+        <div class="arrow">→</div>
+        <div class="process-node">
+          <div class="node-title">🔔 Notify</div>
+          <ul class="node-steps">
+            <li><span class="step-num">1</span>LINE → Staff</li>
+            <li><span class="step-num">2</span>Push → Staff</li>
+            <li><span class="step-num">3</span>LINE → ลูกค้า</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- TAB 4: Money Flow                             -->
+  <!-- ══════════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-money">
+    <div class="section-label">💰 Money Flow — Wallet Model (เหมือนเติมเกม)</div>
+
+    <div style="background:var(--surface); border-radius:20px; padding:32px; border:1.5px solid var(--border); margin-bottom:24px;">
+      <div class="money-flow">
+        <div class="money-node" style="background:#EFF6FF; border-radius:16px;">
+          <div style="font-size:2rem; margin-bottom:4px;">👤</div>
+          <div class="money-amount" style="color:var(--customer-blue);">฿500</div>
+          <div class="money-label">ลูกค้าจ่าย</div>
+        </div>
+        <div class="money-arrow-container">
+          <div class="money-percent">Stripe</div>
+          <div class="money-arrow-line"></div>
+          <div class="money-percent">Webhook</div>
+        </div>
+        <div class="money-node" style="background:#F5F3FF; border-radius:16px;">
+          <div style="font-size:2rem; margin-bottom:4px;">🫧</div>
+          <div class="money-amount" style="color:var(--platform-violet);">฿500</div>
+          <div class="money-label">Foami รับ</div>
+          <div style="margin-top:8px; font-size:0.7rem; background:#EDE9FE; color:var(--platform-violet); padding:3px 10px; border-radius:999px; font-weight:600;">Platform holds</div>
+        </div>
+        <div class="money-arrow-container">
+          <div class="money-percent">แบ่ง</div>
+          <div class="money-arrow-line"></div>
+          <div class="money-percent">20% / 80%</div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:12px; flex:1;">
+          <div class="money-node" style="background:#FEF3C7; border-radius:14px;">
+            <div style="font-size:1.4rem; margin-bottom:2px;">🫧</div>
+            <div class="money-amount" style="color:var(--shop-amber); font-size:1.3rem;">฿100</div>
+            <div class="money-label" style="font-size:0.7rem;">Platform Fee (20%)</div>
+          </div>
+          <div class="money-node" style="background:#D1FAE5; border-radius:14px;">
+            <div style="font-size:1.4rem; margin-bottom:2px;">🏪</div>
+            <div class="money-amount" style="color:var(--money-green); font-size:1.3rem;">฿400</div>
+            <div class="money-label" style="font-size:0.7rem;">Shop Credit (80%)</div>
+          </div>
+        </div>
+        <div class="money-arrow-container">
+          <div class="money-percent">24-48h</div>
+          <div class="money-arrow-line"></div>
+          <div class="money-percent">Settle</div>
+        </div>
+        <div class="money-node" style="background:#F0FDF4; border-radius:16px; border:2px solid var(--money-green);">
+          <div style="font-size:2rem; margin-bottom:4px;">💼</div>
+          <div class="money-amount" style="color:var(--money-green);">฿400</div>
+          <div class="money-label">Shop Wallet</div>
+          <div style="margin-top:8px; font-size:0.7rem; background:#D1FAE5; color:var(--money-green); padding:3px 10px; border-radius:999px; font-weight:600;">Available</div>
+        </div>
+        <div class="money-arrow-container">
+          <div class="money-percent">ร้านขอถอน</div>
+          <div class="money-arrow-line"></div>
+          <div class="money-percent">โนฟทอนุมัติ</div>
+        </div>
+        <div class="money-node" style="background:#FFF7ED; border-radius:16px;">
+          <div style="font-size:2rem; margin-bottom:4px;">🏦</div>
+          <div class="money-amount" style="color:#EA580C;">฿400</div>
+          <div class="money-label">โอนเข้าบัญชีร้าน</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+      <div class="process-node">
+        <div class="node-title">💰 Shop Wallet States</div>
+        <ul class="node-steps">
+          <li><span class="step-num">1</span><strong>pending_balance</strong> — เงินที่รอ settle (1-2 วัน)</li>
+          <li><span class="step-num">2</span><strong>balance</strong> — เงินที่ถอนได้แล้ว</li>
+          <li><span class="step-num">3</span><strong>total_earned</strong> — รวมทั้งหมดที่เคยได้</li>
+          <li><span class="step-num">4</span><strong>total_withdrawn</strong> — รวมที่ถอนแล้ว</li>
+        </ul>
+      </div>
+      <div class="process-node">
+        <div class="node-title">📤 Withdrawal Flow</div>
+        <ul class="node-steps">
+          <li><span class="step-num">1</span>ร้านขอถอน → status: <strong>pending</strong></li>
+          <li><span class="step-num">2</span>Balance ถูก reserved ทันที</li>
+          <li><span class="step-num">3</span>โนฟทโอนเงิน (PromptPay)</li>
+          <li><span class="step-num">4</span>Upload slip → status: <strong>completed</strong></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- TAB 5: Database                               -->
+  <!-- ══════════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-database">
+    <div class="section-label">🗄️ Database Tables — 20 Tables แบ่ง 6 กลุ่ม</div>
+    <div class="db-grid">
+      <div class="db-group">
+        <div class="db-group-title" style="color:var(--platform-violet);">⚙️ Platform (ระดับ Platform)</div>
+        <div class="db-table-list">
+          <div class="db-table"><span style="color:var(--platform-violet)">●</span> shops <span class="new-badge">NEW</span><span class="db-table-note">ข้อมูลร้านทุกร้าน</span></div>
+          <div class="db-table"><span style="color:var(--platform-violet)">●</span> platform_plans <span class="new-badge">NEW</span><span class="db-table-note">Starter/Growth/Pro</span></div>
+          <div class="db-table"><span style="color:var(--platform-violet)">●</span> shop_invitations <span class="new-badge">NEW</span><span class="db-table-note">รหัสเชิญร้าน</span></div>
+          <div class="db-table"><span style="color:var(--platform-violet)">●</span> shop_members <span class="new-badge">NEW</span><span class="db-table-note">Owner/Manager</span></div>
+        </div>
+      </div>
+      <div class="db-group">
+        <div class="db-group-title" style="color:var(--customer-blue);">👤 Customer</div>
+        <div class="db-table-list">
+          <div class="db-table"><span style="color:var(--customer-blue)">●</span> customer_accounts <span class="new-badge">NEW</span><span class="db-table-note">Cross-shop profile</span></div>
+          <div class="db-table"><span style="color:var(--customer-blue)">●</span> customer_shop_profiles <span class="new-badge">NEW</span><span class="db-table-note">Per-shop CRM data</span></div>
+          <div class="db-table" style="opacity:0.5;"><span>○</span> customers<span class="db-table-note">เดิม → migrate</span></div>
+        </div>
+      </div>
+      <div class="db-group">
+        <div class="db-group-title" style="color:var(--foami-blue);">🏪 Shop Operations</div>
+        <div class="db-table-list">
+          <div class="db-table"><span style="color:var(--foami-blue)">●</span> branches<span class="db-table-note">+ shop_id</span></div>
+          <div class="db-table"><span style="color:var(--foami-blue)">●</span> zones<span class="db-table-note">+ shop_id, polygon</span></div>
+          <div class="db-table"><span style="color:var(--foami-blue)">●</span> staff<span class="db-table-note">+ shop_id, ลบ password</span></div>
+          <div class="db-table"><span style="color:var(--foami-blue)">●</span> services<span class="db-table-note">+ shop_id</span></div>
+          <div class="db-table"><span style="color:var(--foami-blue)">●</span> service_addons<span class="db-table-note">+ shop_id</span></div>
+          <div class="db-table"><span style="color:var(--foami-blue)">●</span> cc_price_groups<span class="db-table-note">+ shop_id</span></div>
+        </div>
+      </div>
+      <div class="db-group">
+        <div class="db-group-title" style="color:var(--staff-teal);">📋 Bookings & Jobs</div>
+        <div class="db-table-list">
+          <div class="db-table"><span style="color:var(--staff-teal)">●</span> bookings<span class="db-table-note">+ shop_id, platform_fee</span></div>
+          <div class="db-table"><span style="color:var(--staff-teal)">●</span> staff_schedules<span class="db-table-note">+ shop_id</span></div>
+          <div class="db-table"><span style="color:var(--staff-teal)">●</span> job_photos<span class="db-table-note">+ shop_id</span></div>
+          <div class="db-table"><span style="color:var(--staff-teal)">●</span> chat_messages<span class="db-table-note">+ shop_id</span></div>
+        </div>
+      </div>
+      <div class="db-group">
+        <div class="db-group-title" style="color:var(--money-green);">💰 Financial</div>
+        <div class="db-table-list">
+          <div class="db-table"><span style="color:var(--money-green)">●</span> platform_transactions <span class="new-badge">NEW</span></div>
+          <div class="db-table"><span style="color:var(--money-green)">●</span> shop_wallets <span class="new-badge">NEW</span><span class="db-table-note">balance ledger</span></div>
+          <div class="db-table"><span style="color:var(--money-green)">●</span> withdrawal_requests <span class="new-badge">NEW</span></div>
+          <div class="db-table"><span style="color:var(--money-green)">●</span> staff_payouts<span class="db-table-note">+ shop_id</span></div>
+        </div>
+      </div>
+      <div class="db-group">
+        <div class="db-group-title" style="color:#EA580C;">🔧 System & CRM</div>
+        <div class="db-table-list">
+          <div class="db-table"><span style="color:#EA580C">●</span> discount_codes<span class="db-table-note">+ shop_id</span></div>
+          <div class="db-table"><span style="color:#EA580C">●</span> crm_segments<span class="db-table-note">+ shop_id</span></div>
+          <div class="db-table"><span style="color:#EA580C">●</span> shop_reviews <span class="new-badge">NEW</span></div>
+          <div class="db-table"><span style="color:#EA580C">●</span> marketplace_listings <span class="new-badge">NEW</span></div>
+          <div class="db-table"><span style="color:#EA580C">●</span> audit_logs<span class="db-table-note">+ shop_id</span></div>
+          <div class="db-table"><span style="color:#EA580C">●</span> push_subscriptions<span class="db-table-note">+ shop_id</span></div>
+          <div class="db-table"><span style="color:#EA580C">●</span> app_settings<span class="db-table-note">+ shop_id</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- TAB 6: Notifications                          -->
+  <!-- ══════════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-notif">
+    <div class="section-label">🔔 Notification Channels & Triggers</div>
+    <div class="notif-grid">
+      <div class="notif-card nc-line">
+        <div class="notif-icon">💬</div>
+        <div class="notif-title">LINE Messaging API</div>
+        <div class="notif-events">
+          มีงานใหม่ → Staff<br>
+          Auto-assign → Staff + ลูกค้า<br>
+          Status update → ลูกค้า<br>
+          ล้างเสร็จแล้ว → ลูกค้า<br>
+          งานถูกยกเลิก → Staff<br>
+          แจ้งยอดเพิ่ม → ลูกค้า<br>
+          Broadcast โปรโมชั่น<br>
+        </div>
+      </div>
+      <div class="notif-card nc-push">
+        <div class="notif-icon">📱</div>
+        <div class="notif-title">Web Push (VAPID)</div>
+        <div class="notif-events">
+          ทุก Event เดียวกับ LINE<br>
+          ทำงานบน Browser/PWA<br>
+          ไม่ต้องมี LINE<br>
+          รองรับ Android + iOS<br>
+          Offline → Queue ไว้<br>
+          <br>
+          (ใช้ push_subscriptions table)
+        </div>
+      </div>
+      <div class="notif-card nc-email">
+        <div class="notif-icon">📧</div>
+        <div class="notif-title">Resend Email</div>
+        <div class="notif-events">
+          เชิญร้านใหม่ (Invitation)<br>
+          ยืนยัน Email ลูกค้า<br>
+          Booking Confirmation<br>
+          ใบเสร็จ (Receipt)<br>
+          Password Reset<br>
+          Withdrawal Approved<br>
+          <br>
+          (สำหรับ Non-LINE users)
+        </div>
+      </div>
+      <div class="notif-card nc-rt">
+        <div class="notif-icon">⚡</div>
+        <div class="notif-title">Supabase Realtime</div>
+        <div class="notif-events">
+          Chat messages (in-app)<br>
+          Booking status live update<br>
+          Admin dashboard alerts<br>
+          Staff job list refresh<br>
+          <br>
+          Subscribe ผ่าน WebSocket<br>
+          ไม่ต้อง poll API
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:24px;">
+      <div class="section-label">Trigger Matrix — ใครได้รับอะไร</div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:0.8rem; background:var(--surface); border-radius:14px; overflow:hidden; border:1.5px solid var(--border);">
+          <thead>
+            <tr style="background:var(--bg);">
+              <th style="padding:12px 16px; text-align:left; border-bottom:1.5px solid var(--border); font-weight:700;">Event</th>
+              <th style="padding:12px 16px; text-align:center; border-bottom:1.5px solid var(--border);">ลูกค้า LINE</th>
+              <th style="padding:12px 16px; text-align:center; border-bottom:1.5px solid var(--border);">ลูกค้า Push</th>
+              <th style="padding:12px 16px; text-align:center; border-bottom:1.5px solid var(--border);">Staff LINE</th>
+              <th style="padding:12px 16px; text-align:center; border-bottom:1.5px solid var(--border);">Staff Push</th>
+              <th style="padding:12px 16px; text-align:center; border-bottom:1.5px solid var(--border);">Email</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:10px 16px; font-weight:600;">จองสำเร็จ</td>
+              <td style="text-align:center;">✅</td><td style="text-align:center;">✅</td><td style="text-align:center;">✅</td><td style="text-align:center;">✅</td><td style="text-align:center;">✅</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border); background:#FAFBFF;">
+              <td style="padding:10px 16px; font-weight:600;">Auto-assign</td>
+              <td style="text-align:center;">✅</td><td style="text-align:center;">✅</td><td style="text-align:center;">✅</td><td style="text-align:center;">✅</td><td style="text-align:center;">—</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:10px 16px; font-weight:600;">กำลังรับรถ (picking_up)</td>
+              <td style="text-align:center;">✅</td><td style="text-align:center;">✅</td><td style="text-align:center;">—</td><td style="text-align:center;">—</td><td style="text-align:center;">—</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border); background:#FAFBFF;">
+              <td style="padding:10px 16px; font-weight:600;">เริ่มล้าง (washing)</td>
+              <td style="text-align:center;">✅</td><td style="text-align:center;">✅</td><td style="text-align:center;">—</td><td style="text-align:center;">—</td><td style="text-align:center;">—</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:10px 16px; font-weight:600;">ส่งรถ (delivering)</td>
+              <td style="text-align:center;">✅</td><td style="text-align:center;">✅</td><td style="text-align:center;">—</td><td style="text-align:center;">—</td><td style="text-align:center;">—</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border); background:#FAFBFF;">
+              <td style="padding:10px 16px; font-weight:600;">เสร็จสิ้น (completed)</td>
+              <td style="text-align:center;">✅</td><td style="text-align:center;">✅</td><td style="text-align:center;">—</td><td style="text-align:center;">—</td><td style="text-align:center;">✅</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:10px 16px; font-weight:600;">ยกเลิก (cancelled)</td>
+              <td style="text-align:center;">✅</td><td style="text-align:center;">✅</td><td style="text-align:center;">✅</td><td style="text-align:center;">✅</td><td style="text-align:center;">—</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border); background:#FAFBFF;">
+              <td style="padding:10px 16px; font-weight:600;">แจ้งยอดเพิ่ม</td>
+              <td style="text-align:center;">✅</td><td style="text-align:center;">✅</td><td style="text-align:center;">—</td><td style="text-align:center;">—</td><td style="text-align:center;">—</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:10px 16px; font-weight:600;">Chat Message</td>
+              <td style="text-align:center;">✅</td><td style="text-align:center;">✅</td><td style="text-align:center;">✅</td><td style="text-align:center;">✅</td><td style="text-align:center;">—</td>
+            </tr>
+            <tr>
+              <td style="padding:10px 16px; font-weight:600;">Withdrawal Approved</td>
+              <td style="text-align:center;">—</td><td style="text-align:center;">—</td><td style="text-align:center;">—</td><td style="text-align:center;">—</td><td style="text-align:center;">✅ (Owner)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /canvas -->
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function switchJourney(name) {
+  document.querySelectorAll('.journey-panel').forEach(p => p.classList.remove('active-jp'));
+  document.querySelectorAll('.jtab').forEach(b => b.classList.remove('active-j'));
+  document.getElementById(name).classList.add('active-jp');
+  event.target.classList.add('active-j');
+}
+</script>
+</body>
+</html>

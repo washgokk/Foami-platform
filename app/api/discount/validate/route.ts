@@ -26,29 +26,39 @@ export async function POST(req: NextRequest) {
     }
 
     // 3.5 Check new conditions (valid_from, valid_until, days, branch, zone)
-    if (discount.valid_from && new Date() < new Date(discount.valid_from)) {
-        return NextResponse.json({ error: `เริ่มใช้ได้ตั้งแต่วันที่ ${new Date(discount.valid_from).toLocaleDateString('th-TH')}` }, { status: 400 })
+    // Use Thailand timezone (UTC+7) for date comparisons
+    const nowTH = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }))
+    const todayTHStr = `${nowTH.getFullYear()}-${String(nowTH.getMonth() + 1).padStart(2, '0')}-${String(nowTH.getDate()).padStart(2, '0')}`
+
+    // Check valid_from (applies to both date_range usage_type AND as a general start gate)
+    if (discount.usage_type === 'date_range' && discount.valid_from && todayTHStr < discount.valid_from) {
+        return NextResponse.json({ error: `โค้ดนี้เริ่มใช้ได้ตั้งแต่วันที่ ${new Date(discount.valid_from + 'T00:00:00').toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}` }, { status: 400 })
     }
-    if (discount.usage_type === 'date_range' && discount.valid_until && new Date() > new Date(discount.valid_until + 'T23:59:59')) {
-        return NextResponse.json({ error: `โค้ดนี้สิ้นสุดแคมเปญไปแล้วเมื่อวันที่ ${new Date(discount.valid_until).toLocaleDateString('th-TH')}` }, { status: 400 })
+    // Check valid_until (campaign end date)
+    if (discount.usage_type === 'date_range' && discount.valid_until && todayTHStr > discount.valid_until) {
+        return NextResponse.json({ error: `โค้ดนี้สิ้นสุดแคมเปญไปแล้วเมื่อวันที่ ${new Date(discount.valid_until + 'T00:00:00').toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}` }, { status: 400 })
     }
+    // Check specific days of week
     if (discount.usage_type === 'specific_days' && discount.valid_days && discount.valid_days.length > 0) {
         const daysMap = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์']
-        const currentDayStr = daysMap[new Date().getDay()]
+        const currentDayStr = daysMap[nowTH.getDay()]
         if (!discount.valid_days.includes(currentDayStr)) {
-            return NextResponse.json({ error: `ใช้ได้เฉพาะวัน ${discount.valid_days.join(', ')} เท่านั้น` }, { status: 400 })
+            return NextResponse.json({ error: `โค้ดนี้ใช้ได้เฉพาะวัน ${discount.valid_days.join(', ')} เท่านั้น (วันนี้คือวัน${currentDayStr})` }, { status: 400 })
         }
     }
+    // Check branch restriction
     if (discount.allowed_branch_ids && discount.allowed_branch_ids.length > 0) {
         if (!branchId || !discount.allowed_branch_ids.includes(branchId)) {
-            return NextResponse.json({ error: 'ไม่สามารถใช้กับสาขาที่เลือกได้' }, { status: 400 })
+            return NextResponse.json({ error: 'ไม่สามารถใช้โค้ดนี้กับสาขาที่เลือกได้' }, { status: 400 })
         }
     }
+    // Check zone restriction
     if (discount.allowed_zone_ids && discount.allowed_zone_ids.length > 0) {
         if (!zoneId || !discount.allowed_zone_ids.includes(zoneId)) {
-            return NextResponse.json({ error: 'ไม่สามารถใช้กับพื้นที่(โซน)ที่เลือกได้' }, { status: 400 })
+            return NextResponse.json({ error: 'ไม่สามารถใช้โค้ดนี้กับพื้นที่(โซน)ที่เลือกได้' }, { status: 400 })
         }
     }
+
 
     // 4. Check Customer Caps & Segments (If customer ID is provided)
     if (customerId) {
