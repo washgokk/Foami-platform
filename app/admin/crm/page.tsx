@@ -36,23 +36,29 @@ import {
     Check,
     Download,
     Save,
-    RotateCcw
+    RotateCcw,
+    Bike,
+    FileCheck,
+    Phone,
+    AlertCircle
 } from 'lucide-react'
 import { trackAuditLog } from '@/lib/audit'
 import { evaluateSegmentMatch } from '@/lib/segment-engine'
+import VehicleActTracker from '@/components/Admin/crm/VehicleActTracker'
 
 /* 
-This CRM Page groups customer data into 4 tabs:
+This CRM Page groups customer data into 5 tabs:
 1. Profiles (All customer info & dynamic flags)
 2. Transactions (All booking history)
 3. Analytics (RFM scoring algorithms & behaviors)
 4. Segments (Custom segment builder for discounts)
+5. ACT & Tax Tracker (Vehicle compulsory insurance and tax tracker)
 */
 
 // B3 FIX: Accept optional branchId
 export default function CRMPage(props: any) {
     const branchId: string | undefined = props?.branchId
-    const [activeTab, setActiveTab] = useState<'profiles' | 'transactions' | 'analytics' | 'segments'>('profiles')
+    const [activeTab, setActiveTab] = useState<'profiles' | 'transactions' | 'analytics' | 'segments' | 'act_tracker'>('profiles')
 
     // Data State
     const [customers, setCustomers] = useState<any[]>([])
@@ -80,6 +86,17 @@ export default function CRMPage(props: any) {
     const [crmConfig, setCrmConfig] = useState(DEFAULT_CRM_CONFIG)
     const [savedSegments, setSavedSegments] = useState<any[]>([])
     const [editingSegmentId, setEditingSegmentId] = useState<string | null>(null)
+
+    // ACT & Tax Tracker State
+    const [actStatusFilter, setActStatusFilter] = useState<'all' | 'expired' | 'expiring_soon' | 'valid'>('all')
+    const [actSearch, setActSearch] = useState('')
+    const [editingVehicle, setEditingVehicle] = useState<{
+        customerId: string
+        customerName: string
+        vehicleIndex: number
+        vehicle: any
+    } | null>(null)
+    const [savingVehicle, setSavingVehicle] = useState(false)
 
     // Merge State
     const [isMerging, setIsMerging] = useState(false)
@@ -1708,7 +1725,28 @@ export default function CRMPage(props: any) {
                     </div>
                 </div>
             )}
-            {selectedCustomer && (
+            
+                {/* TAB 5: ACT & TAX TRACKER */}
+                {activeTab === 'act_tracker' && (
+                    <div className={styles.card}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+                            <div style={{ background: 'var(--primary-ghost)', color: 'var(--primary)', width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <FileCheck size={24} />
+                            </div>
+                            <div>
+                                <h2 className={styles.tableTitle} style={{ margin: 0 }}>ติดตาม พ.ร.บ. & ภาษีรถ (Tax & ACT Tracker)</h2>
+                                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>บันทึกและตรวจสอบวันหมดอายุ พ.ร.บ. / ภาษีประจำปี ต่อคัน แยกตามรถยนต์และมอเตอร์ไซค์</p>
+                            </div>
+                        </div>
+
+                        <VehicleActTracker customers={customers} onRefreshCustomers={async () => {
+                            const { data } = await supabase.from('customers').select('*').order('created_at', { ascending: false });
+                            if (data) setCustomers(data);
+                        }} />
+                    </div>
+                )}
+
+{selectedCustomer && (
                 <div className={styles.fullscreenOverlay} onClick={() => setSelectedCustomer(null)}>
                     <div className={styles.fullscreenModal} style={{ maxWidth: 800 }} onClick={e => e.stopPropagation()}>
                         <div className={styles.modalHeader} style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
