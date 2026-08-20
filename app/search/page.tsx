@@ -5,7 +5,8 @@ import Link from 'next/link'
 import {
   MapPin, Search as SearchIcon, Navigation2, Star, Clock,
   ChevronRight, Bike, Droplets, Wrench, Zap, Filter, X, RefreshCw,
-  Map as MapIcon, List as ListIcon, Shield, SlidersHorizontal, ArrowUpDown
+  Map as MapIcon, List as ListIcon, Shield, SlidersHorizontal, ArrowUpDown,
+  Award, Columns, Check, Sparkles
 } from 'lucide-react'
 import Logo from '@/components/Branding/Logo'
 
@@ -124,8 +125,11 @@ function ShopCard({
             background: 'linear-gradient(135deg, #F59E0B, #EF4444)',
             color: '#fff', borderRadius: 8, padding: '3px 8px',
             fontSize: 10.5, fontWeight: 800, letterSpacing: '.04em',
-            boxShadow: '0 2px 8px rgba(245, 158, 11, 0.4)'
-          }}>⭐ แนะนำพิเศษ</div>
+            boxShadow: '0 2px 8px rgba(245, 158, 11, 0.4)',
+            display: 'flex', alignItems: 'center', gap: 4
+          }}>
+            <Award size={12} /> แนะนำพิเศษ
+          </div>
         )}
 
         {shop.distance_km !== undefined && (
@@ -352,6 +356,9 @@ export default function MarketplacePage() {
           <button
             onClick={() => setViewMode('split')}
             style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
               padding: '6px 12px',
               borderRadius: 8,
               border: 'none',
@@ -363,11 +370,14 @@ export default function MarketplacePage() {
               boxShadow: viewMode === 'split' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none'
             }}
           >
-            🌓 Split View
+            <Columns size={13} /> แยกหน้าต่าง
           </button>
           <button
             onClick={() => setViewMode('list')}
             style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
               padding: '6px 12px',
               borderRadius: 8,
               border: 'none',
@@ -379,11 +389,14 @@ export default function MarketplacePage() {
               boxShadow: viewMode === 'list' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none'
             }}
           >
-            📋 รายการ
+            <ListIcon size={13} /> รายการ
           </button>
           <button
             onClick={() => setViewMode('map')}
             style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
               padding: '6px 12px',
               borderRadius: 8,
               border: 'none',
@@ -395,24 +408,9 @@ export default function MarketplacePage() {
               boxShadow: viewMode === 'map' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none'
             }}
           >
-            🗺️ แผนที่
+            <MapIcon size={13} /> แผนที่
           </button>
         </div>
-
-        <Link
-          href="/portal"
-          style={{
-            fontSize: 12.5,
-            fontWeight: 700,
-            color: '#315EC3',
-            textDecoration: 'none',
-            padding: '6px 12px',
-            borderRadius: 10,
-            background: '#EFF3FD'
-          }}
-        >
-          สำหรับพาร์ทเนอร์
-        </Link>
       </header>
 
       {/* Filter & Search Bar Area */}
@@ -482,7 +480,7 @@ export default function MarketplacePage() {
             }}
           >
             <Navigation2 size={14} />
-            {locLoading ? 'กำลังหาพิกัด...' : userLoc ? 'พิกัดของฉัน ✓' : '📍 ใกล้ฉัน'}
+            {locLoading ? 'กำลังหาพิกัด...' : userLoc ? 'พิกัดของฉัน' : 'ตำแหน่งใกล้ฉัน'}
           </button>
         </div>
 

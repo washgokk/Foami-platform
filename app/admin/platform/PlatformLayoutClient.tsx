@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Store, Ticket, Wallet, BarChart3,
-  Settings, LogOut, ChevronLeft, Shield, Menu, X, Crown, ExternalLink
+  Settings, LogOut, ChevronLeft, ChevronRight, Shield, Menu, X, Crown, ExternalLink
 } from 'lucide-react'
 import Logo from '@/components/Branding/Logo'
 import ConfirmModal from '@/components/Global/ConfirmModal'
@@ -188,8 +188,11 @@ export default function PlatformLayoutClient({ children }: { children: React.Rea
               fontWeight: 600
             }}
           >
-            <span>🚪 สลับพอร์ทัล</span>
-            <ExternalLink size={13} />
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <ExternalLink size={13} color="var(--brand-dominant, #315EC3)" />
+              สลับพอร์ทัล
+            </span>
+            <ChevronRight size={13} />
           </Link>
 
           <button 

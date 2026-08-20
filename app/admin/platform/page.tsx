@@ -1,8 +1,10 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import {
   Store, ClipboardList, Wallet, TrendingUp, Users,
-  Clock, CheckCircle, AlertTriangle, ArrowUpRight, RefreshCw
+  Clock, CheckCircle, AlertTriangle, ArrowUpRight, RefreshCw,
+  DollarSign, ArrowDownLeft
 } from 'lucide-react'
 
 interface Stats {
@@ -23,24 +25,29 @@ function StatCard({ label, value, sub, icon: Icon, color = '#315EC3', bg = '#EFF
 }) {
   return (
     <div style={{
-      background: 'var(--surface)', border: '1px solid var(--border)',
-      borderRadius: 20, padding: '20px 22px', boxShadow: 'var(--shadow-card)',
-      display: 'flex', alignItems: 'flex-start', gap: 16
+      background: 'var(--surface, #FFFFFF)', 
+      border: '1.5px solid var(--border, #DDE3F5)',
+      borderRadius: 20, 
+      padding: '20px', 
+      boxShadow: '0 4px 14px rgba(49, 94, 195, 0.04)',
+      display: 'flex', 
+      alignItems: 'flex-start', 
+      gap: 16
     }}>
       <div style={{
-        width: 44, height: 44, borderRadius: 13, background: bg,
+        width: 44, height: 44, borderRadius: 12, background: bg,
         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
       }}>
-        <Icon size={20} color={color} strokeWidth={2} />
+        <Icon size={22} color={color} strokeWidth={2.2} />
       </div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 11.5, color: 'var(--text-secondary, #5A6589)', fontWeight: 700, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.05em' }}>
           {label}
         </div>
-        <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>
+        <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--text-primary, #1A2340)', lineHeight: 1.1 }}>
           {value}
         </div>
-        {sub && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{sub}</div>}
+        {sub && <div style={{ fontSize: 11.5, color: 'var(--text-muted, #9AA5C4)', marginTop: 4, fontWeight: 500 }}>{sub}</div>}
       </div>
     </div>
   )
@@ -60,28 +67,34 @@ export default function PlatformOverviewPage() {
         fetch('/api/platform/withdrawals?status=pending', { headers: { Authorization: `Bearer ${token}` } }),
       ])
 
-      const shopsData = await shopsRes.json()
-      const bookingsData = await bookingsRes.json()
-      const withdrawalsData = await withdrawalsRes.json()
+      const [shopsData, bookingsData, withdrawalsData] = await Promise.all([
+        shopsRes.json(), bookingsRes.json(), withdrawalsRes.json()
+      ])
 
       const shops: any[] = shopsData.shops || []
       const bookings: any[] = bookingsData.bookings || []
       const withdrawals: any[] = withdrawalsData.withdrawals || []
 
+      const completed = bookings.filter((b: any) => b.status === 'completed')
+      const active = bookings.filter((b: any) => ['pending', 'confirmed', 'in_progress', 'washing'].includes(b.status))
+      const totalRev = shops.reduce((s: number, sh: any) => s + (sh.total_revenue || 0), 0)
+      const platformRev = shops.reduce((s: number, sh: any) => {
+        const fee = sh.platform_fee_pct ?? 0.2
+        return s + (sh.total_revenue || 0) * fee
+      }, 0)
+      const pendingAmount = withdrawals.reduce((s: number, w: any) => s + (w.amount_thb || 0), 0)
+
       setStats({
         total_shops: shops.length,
-        active_shops: shops.filter(s => s.is_active !== false).length,
+        active_shops: shops.filter((s: any) => s.is_active).length,
         total_bookings: bookings.length,
-        completed_bookings: bookings.filter(b => b.status === 'completed').length,
-        platform_revenue: bookings.filter(b => b.payment_status === 'paid')
-          .reduce((s, b) => s + (b.total_price || 0) * 0.20, 0),
+        completed_bookings: completed.length,
+        platform_revenue: platformRev,
         pending_withdrawals: withdrawals.length,
-        pending_withdrawal_amount: withdrawals.reduce((s: number, w: any) => s + (w.amount_thb || 0), 0),
-        active_bookings: bookings.filter(b => ['confirmed', 'picking_up', 'washing', 'delivering'].includes(b.status)).length,
+        pending_withdrawal_amount: pendingAmount,
+        active_bookings: active.length,
         recent_shops: shops.slice(0, 5),
       })
-    } catch (e) {
-      console.error(e)
     } finally {
       setLoading(false)
     }
@@ -89,173 +102,188 @@ export default function PlatformOverviewPage() {
 
   useEffect(() => { load() }, [])
 
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}>
-      <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
-        <RefreshCw size={28} style={{ animation: 'spin 1s linear infinite', marginBottom: 12 }} />
-        <div style={{ fontSize: 13 }}>กำลังโหลด...</div>
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: 'var(--text-muted)' }}>
+        <RefreshCw size={24} style={{ animation: 'spin 1s linear infinite', marginRight: 10 }} />
+        <span>กำลังโหลดข้อมูลภาพรวม...</span>
       </div>
-    </div>
-  )
+    )
+  }
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>ภาพรวม Platform</h1>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>Foami Wash &amp; Delivery — Control Center</div>
+          <h1 style={{ fontSize: 24, fontWeight: 900, color: 'var(--text-primary, #1A2340)', margin: 0 }}>
+            ภาพรวมระบบ Platform
+          </h1>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary, #5A6589)', marginTop: 4 }}>
+            ศูนย์ควบคุมระบบ Foami Multitenant Platform Super Admin
+          </div>
         </div>
         <button onClick={load} style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '8px 14px', borderRadius: 12, border: '1px solid var(--border)',
-          background: 'var(--surface)', color: 'var(--text-secondary)',
-          cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'Kanit, sans-serif'
+          display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px',
+          borderRadius: 12, border: '1.5px solid var(--border, #DDE3F5)', background: 'var(--surface, #FFFFFF)',
+          cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+          color: 'var(--text-secondary)'
         }}>
-          <RefreshCw size={13} /> รีเฟรช
+          <RefreshCw size={14} /> รีเฟรชข้อมูล
         </button>
       </div>
 
-      {/* KPI Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>
+      {/* KPI Cards Grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+        gap: 16
+      }}>
         <StatCard
           label="ร้านพาร์ทเนอร์ทั้งหมด"
-          value={stats?.total_shops ?? 0}
-          sub={`${stats?.active_shops ?? 0} ร้าน Active`}
+          value={`${stats?.total_shops || 0}`}
+          sub={`เปิดบริการ ${stats?.active_shops || 0} ร้าน`}
           icon={Store}
-          color="#315EC3" bg="#EFF3FD"
+          color="#315EC3"
+          bg="#EFF3FD"
         />
         <StatCard
-          label="งานทั้งหมด"
-          value={stats?.total_bookings ?? 0}
-          sub={`${stats?.completed_bookings ?? 0} เสร็จสิ้น`}
+          label="งานทั้งหมดในระบบ"
+          value={`${stats?.total_bookings || 0}`}
+          sub={`เสร็จสิ้นแล้ว ${stats?.completed_bookings || 0} งาน`}
           icon={ClipboardList}
-          color="#22C55E" bg="#DCFCE7"
+          color="#22C55E"
+          bg="#DCFCE7"
         />
         <StatCard
-          label="Platform Revenue"
-          value={`฿${((stats?.platform_revenue ?? 0)).toLocaleString('th', { minimumFractionDigits: 0 })}`}
-          sub="Platform fee 20% (ประมาณการ)"
+          label="รายได้ Platform Fee"
+          value={`฿${(stats?.platform_revenue || 0).toLocaleString('th', { maximumFractionDigits: 0 })}`}
+          sub="ส่วนแบ่งค่าธรรมเนียมรวม"
           icon={TrendingUp}
-          color="#F59E0B" bg="#FEF3C7"
+          color="#8B5CF6"
+          bg="#EDE9FE"
         />
         <StatCard
-          label="งาน Active ขณะนี้"
-          value={stats?.active_bookings ?? 0}
-          sub="กำลังดำเนินการ"
+          label="คำขอถอนเงินรออนุมัติ"
+          value={`${stats?.pending_withdrawals || 0} รายการ`}
+          sub={`รวม ฿${(stats?.pending_withdrawal_amount || 0).toLocaleString('th')} บาท`}
           icon={Clock}
-          color="#8B5CF6" bg="#EDE9FE"
+          color={stats?.pending_withdrawals ? '#F59E0B' : '#9AA5C4'}
+          bg={stats?.pending_withdrawals ? '#FEF3C7' : '#F3F4F6'}
         />
       </div>
 
-      {/* Row 2 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 24 }}>
-        {/* Pending Withdrawals Alert */}
-        <div style={{
-          background: stats?.pending_withdrawals ? '#FEF3C7' : 'var(--success-light)',
-          border: `1px solid ${stats?.pending_withdrawals ? '#FCD34D' : '#86EFAC'}`,
-          borderRadius: 20, padding: '20px 22px',
-          display: 'flex', alignItems: 'center', gap: 16
-        }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 13,
-            background: stats?.pending_withdrawals ? '#FCD34D' : '#86EFAC',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-          }}>
-            {stats?.pending_withdrawals
-              ? <AlertTriangle size={20} color="#92400E" />
-              : <CheckCircle size={20} color="#14532D" />}
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: stats?.pending_withdrawals ? '#92400E' : '#14532D', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>
-              Withdrawal Requests
-            </div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: stats?.pending_withdrawals ? '#92400E' : '#14532D' }}>
-              {stats?.pending_withdrawals ?? 0} รายการ
-            </div>
-            <div style={{ fontSize: 11, color: stats?.pending_withdrawals ? '#92400E' : '#14532D', marginTop: 2, opacity: .8 }}>
-              ยอดรวม ฿{(stats?.pending_withdrawal_amount ?? 0).toLocaleString('th')}
-            </div>
-          </div>
-          <a href="/admin/platform/finance" style={{
-            marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4,
-            fontSize: 11, fontWeight: 700, color: '#92400E', textDecoration: 'none'
-          }}>
-            จัดการ <ArrowUpRight size={12} />
-          </a>
-        </div>
-
-        {/* Quick Links */}
-        <div style={{
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 20, padding: '20px 22px', boxShadow: 'var(--shadow-card)'
-        }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 14, textTransform: 'uppercase', letterSpacing: '.05em' }}>
-            Quick Actions
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {[
-              { href: '/admin/platform/invitations', label: '+ สร้าง Invitation Code', color: '#315EC3', bg: '#EFF3FD' },
-              { href: '/admin/platform/shops', label: 'จัดการร้านพาร์ทเนอร์', color: '#22C55E', bg: '#DCFCE7' },
-              { href: '/admin/platform/finance', label: 'อนุมัติการถอนเงิน', color: '#F59E0B', bg: '#FEF3C7' },
-            ].map(({ href, label, color, bg }) => (
-              <a key={href} href={href} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '10px 14px', borderRadius: 12, background: bg,
-                color, textDecoration: 'none', fontSize: 13, fontWeight: 600
-              }}>
-                {label}
-                <ArrowUpRight size={14} />
-              </a>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Shops */}
+      {/* Quick Links & Summary Section */}
       <div style={{
-        background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 20, padding: '20px 22px', boxShadow: 'var(--shadow-card)'
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+        gap: 20
       }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          ร้านล่าสุด
-          <a href="/admin/platform/shops" style={{ fontSize: 11, color: 'var(--brand)', textDecoration: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}>
-            ดูทั้งหมด <ArrowUpRight size={11} />
-          </a>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-          {(stats?.recent_shops || []).map((shop: any) => (
-            <div key={shop.id} style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              padding: '12px 0', borderBottom: '1px solid var(--border)'
-            }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: 10, background: 'var(--brand-ghost)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0
+        {/* Recent Shops */}
+        <div style={{
+          background: 'var(--surface, #FFFFFF)',
+          border: '1.5px solid var(--border, #DDE3F5)',
+          borderRadius: 20,
+          padding: '22px',
+          boxShadow: '0 4px 14px rgba(49, 94, 195, 0.04)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary, #1A2340)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Store size={18} color="var(--brand-dominant, #315EC3)" /> ร้านค้าในระบบ
+            </div>
+            <Link href="/admin/platform/shops" style={{ fontSize: 12.5, color: 'var(--brand-dominant, #315EC3)', textDecoration: 'none', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+              ดูทั้งหมด <ArrowUpRight size={13} />
+            </Link>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {(stats?.recent_shops || []).map((shop: any) => (
+              <div key={shop.id} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '12px 14px', borderRadius: 14, background: 'var(--bg, #F6F8FF)',
+                border: '1px solid var(--border, #DDE3F5)'
               }}>
-                🏪
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 10, background: '#FFFFFF',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    border: '1px solid var(--border)'
+                  }}>
+                    <Store size={18} color="#315EC3" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>{shop.name}</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>/{shop.slug}</div>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: '#16A34A' }}>
+                    ฿{(shop.total_revenue || 0).toLocaleString('th', { maximumFractionDigits: 0 })}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    {shop.booking_count || 0} งาน
+                  </div>
+                </div>
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{shop.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{shop.address || shop.slug}</div>
+            ))}
+            {(!stats?.recent_shops || stats.recent_shops.length === 0) && (
+              <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+                ยังไม่มีร้านพาร์ทเนอร์ในระบบ
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--brand)' }}>{shop.booking_count || 0} งาน</div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>฿{((shop.total_revenue || 0) * 0.2).toLocaleString()} fee</div>
-              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Action Shortcuts */}
+        <div style={{
+          background: 'var(--surface, #FFFFFF)',
+          border: '1.5px solid var(--border, #DDE3F5)',
+          borderRadius: 20,
+          padding: '22px',
+          boxShadow: '0 4px 14px rgba(49, 94, 195, 0.04)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between'
+        }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary, #1A2340)', marginBottom: 16 }}>
+              เมนูลัดสำหรับผู้ดูแลระบบ
             </div>
-          ))}
-          {(!stats?.recent_shops || stats.recent_shops.length === 0) && (
-            <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: 13 }}>
-              ยังไม่มีร้านพาร์ทเนอร์
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <Link href="/admin/platform/invitations" style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '14px 16px', borderRadius: 14, background: 'var(--primary-ghost, #EFF3FD)',
+                color: 'var(--brand-dominant, #315EC3)', textDecoration: 'none', fontWeight: 700, fontSize: 13.5,
+                border: '1px solid rgba(49, 94, 195, 0.15)'
+              }}>
+                <span>+ สร้างรหัสเทียบเชิญพาร์ทเนอร์ใหม่ (Invitation)</span>
+                <ArrowUpRight size={16} />
+              </Link>
+
+              <Link href="/admin/platform/finance" style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '14px 16px', borderRadius: 14, background: 'var(--bg, #F6F8FF)',
+                color: 'var(--text-primary, #1A2340)', textDecoration: 'none', fontWeight: 700, fontSize: 13.5,
+                border: '1px solid var(--border, #DDE3F5)'
+              }}>
+                <span>ตรวจสอบและอนุมัติคำขอถอนเงิน ({stats?.pending_withdrawals || 0} รายการ)</span>
+                <ArrowUpRight size={16} />
+              </Link>
+
+              <Link href="/portal" style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '14px 16px', borderRadius: 14, background: 'var(--bg, #F6F8FF)',
+                color: 'var(--text-secondary, #5A6589)', textDecoration: 'none', fontWeight: 600, fontSize: 13.5,
+                border: '1px solid var(--border, #DDE3F5)'
+              }}>
+                <span>ไปที่หน้าพอร์ทัลกลาง Foami (/portal)</span>
+                <ArrowUpRight size={16} />
+              </Link>
             </div>
-          )}
+          </div>
         </div>
       </div>
-
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
     </div>
   )
 }
