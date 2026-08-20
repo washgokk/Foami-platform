@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+export const dynamic = 'force-dynamic'
+
 // One-time migration endpoint — DELETE this file after running!
 // Visit: GET /api/run-migration to apply the schema changes
 export async function GET() {
