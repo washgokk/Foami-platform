@@ -42,7 +42,8 @@ import ImageZoom from '@/components/Global/ImageZoom'
 import ConfirmModal from '@/components/Global/ConfirmModal'
 
 // B1 FIX: Accept optional branchId — when provided (shop admin), filter all staff to that branch only
-export default function StaffPage({ branchId: lockedBranchId }: { branchId?: string }) {
+export default function StaffPage(props: any) {
+    const lockedBranchId: string | undefined = props?.branchId
     const [staff, setStaff] = useState<Staff[]>([])
     const [branches, setBranches] = useState<Branch[]>([])
     const [showModal, setShowModal] = useState(false)

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState, useEffect } from 'react'
 import {
   Wallet, ArrowDownLeft, TrendingUp, Clock, CheckCircle,
@@ -48,7 +48,8 @@ const BANKS = [
 ]
 
 // B7 FIX: Accept optional branchId
-export default function AdminFinancePage({ branchId }: { branchId?: string }) {
+export default function AdminFinancePage(props: any) {
+    const branchId: string | undefined = props?.branchId
   const [wallet, setWallet] = useState<WalletData | null>(null)
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
   const [ledger, setLedger] = useState<LedgerEntry[]>([])

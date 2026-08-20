@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import styles from './crm.module.css'
@@ -50,7 +50,8 @@ This CRM Page groups customer data into 4 tabs:
 */
 
 // B3 FIX: Accept optional branchId
-export default function CRMPage({ branchId }: { branchId?: string }) {
+export default function CRMPage(props: any) {
+    const branchId: string | undefined = props?.branchId
     const [activeTab, setActiveTab] = useState<'profiles' | 'transactions' | 'analytics' | 'segments'>('profiles')
 
     // Data State

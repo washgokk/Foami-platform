@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -101,7 +101,7 @@ export default function ShopAdminDashboardPage() {
         const bDate = b.scheduled_date || (b.created_at ? b.created_at.split('T')[0] : '')
         if (bDate === todayStr) {
           todayCount++
-          if (isCompleted) todayRevenue += rev
+          if (isCompleted) todayRev += rev
         }
 
         if (b.status === 'pending') pendingCount++

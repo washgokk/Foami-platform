@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import styles from './discounts.module.css'
@@ -7,7 +7,8 @@ import ConfirmModal from '@/components/Global/ConfirmModal'
 import { trackAuditLog } from '@/lib/audit'
 
 // B6 FIX: Accept optional branchId
-export default function AdvancedDiscountsPage({ branchId }: { branchId?: string }) {
+export default function AdvancedDiscountsPage(props: any) {
+    const branchId: string | undefined = props?.branchId
     const [codes, setCodes] = useState<any[]>([])
     const [segments, setSegments] = useState<any[]>([])
     const [branches, setBranches] = useState<any[]>([])

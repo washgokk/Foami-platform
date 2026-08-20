@@ -1,5 +1,6 @@
-﻿import { redirect } from 'next/navigation'
+import { redirect } from 'next/navigation'
 
-export default function ShopAdminIndex({ params }: { params: { branchSlug: string } }) {
-    redirect(/+params.branchSlug+/admin/dashboard)
+export default async function ShopAdminIndex({ params }: { params: Promise<{ branchSlug: string }> }) {
+    const { branchSlug } = await params
+    redirect(`/${branchSlug}/admin/dashboard`)
 }

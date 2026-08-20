@@ -1,5 +1,6 @@
 'use client'
-import { useParams, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import AdminBookingsPage from '@/app/admin/bookings/page'
 

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '@/lib/supabase'
@@ -10,7 +10,8 @@ import ImageZoom from '@/components/Global/ImageZoom'
 import BookingChat from '@/components/Chat/BookingChat'
 
 // B2 FIX: Accept optional branchId — when provided (shop admin), filter all queries to that branch only
-export default function AdminBookingsPage({ branchId }: { branchId?: string }) {
+export default function AdminBookingsPage(props: any) {
+    const branchId: string | undefined = props?.branchId
     const [bookings, setBookings] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState<string>('all')
@@ -944,7 +945,7 @@ supabase.from('service_addons').select('*').eq('is_active', true),
 
         try {
             const bookingId = isEdit ? initialBooking.id : generateScalableId('BK')
-            const adminId = typeof window !== 'undefined' ? localStorage.getItem('shop_admin_token') || localStorage.getItem('admin_token') // BUG-11 FIX : 'unknown'
+            const adminId = typeof window !== 'undefined' ? (localStorage.getItem('shop_admin_token') || localStorage.getItem('admin_token') || 'unknown') : 'unknown'
             
             const payload = {
                 id: isEdit ? initialBooking.id : `MANUAL-${Date.now()}`,

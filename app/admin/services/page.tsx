@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Service, ServiceAddon, Branch, VEHICLE_SIZE_LABEL, CCPriceGroup } from '@/lib/types'
@@ -11,7 +11,8 @@ import { trackAuditLog } from '@/lib/audit'
 type Tab = 'services' | 'addons' | 'groups'
 
 // B4 FIX: Accept optional branchId
-export default function ServicesPage({ branchId }: { branchId?: string }) {
+export default function ServicesPage(props: any) {
+    const branchId: string | undefined = props?.branchId
     const [tab, setTab] = useState<Tab>('services')
     const [services, setServices] = useState<Service[]>([])
     const [addons, setAddons] = useState<ServiceAddon[]>([])
