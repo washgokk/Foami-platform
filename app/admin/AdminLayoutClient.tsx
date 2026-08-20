@@ -30,16 +30,16 @@ import ConfirmModal from '@/components/Global/ConfirmModal'
 import { supabase } from '@/lib/supabase'
 
 const NAV_ITEMS = [
-    { href: '/admin/dashboard', icon: LayoutDashboard, label: 'ภาพรวมแพลตฟอร์ม' },
-    { href: '/admin/shops', icon: Store, label: 'ร้านพาร์ทเนอร์' },
-    { href: '/admin/invitations', icon: Ticket, label: 'Invitation Codes' },
-    { href: '/admin/finance', icon: Wallet, label: 'อนุมัติการถอนเงิน' },
-    { href: '/admin/branches', icon: Store, label: 'จัดการสาขาในระบบ' },
-    { href: '/admin/services', icon: Wrench, label: 'บริการ & ราคา' },
+    { href: '/admin/dashboard', icon: LayoutDashboard, label: 'ภาพรวมร้านค้า' },
     { href: '/admin/bookings', icon: ClipboardList, label: 'การจองทั้งหมด' },
-    { href: '/admin/crm', icon: Users, label: 'CRM & ลูกค้า' },
+    { href: '/admin/schedule', icon: Calendar, label: 'ตารางงาน & จองคิว' },
+    { href: '/admin/services', icon: Wrench, label: 'บริการ & แพ็กเกจ' },
+    { href: '/admin/staff', icon: UserCircle2, label: 'จัดการทีมงาน' },
+    { href: '/admin/branches', icon: Store, label: 'สาขา & โซนบริการ' },
+    { href: '/admin/crm', icon: Users, label: 'ลูกค้า (CRM)' },
     { href: '/admin/discounts', icon: Ticket, label: 'โค้ดส่วนลด' },
-    { href: '/admin/promotions', icon: Bell, label: 'แจ้งโปรโมชั่น' },
+    { href: '/admin/finance', icon: Wallet, label: 'กระเป๋าเงิน & ถอนเงิน' },
+    { href: '/admin/promotions', icon: Bell, label: 'แจ้งโปรโมชั่น LINE' },
 ]
 
 interface AdminToast {
@@ -105,7 +105,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
                 schema: 'public',
                 table: 'bookings'
             }, () => {
-                addToast({ type: 'booking', message: '📋 มีการจองใหม่เข้ามา' })
+                addToast({ type: 'booking', message: 'มีการจองใหม่เข้ามา' })
             })
             .subscribe()
 
@@ -119,7 +119,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
                 const msg = payload.new as any
                 // Only notify for customer messages (not staff/admin sending)
                 if (msg.sender_type === 'customer') {
-                    addToast({ type: 'chat', message: '💬 ลูกค้าส่งข้อความใหม่' })
+                    addToast({ type: 'chat', message: 'ลูกค้าส่งข้อความใหม่' })
                 }
             })
             .subscribe()

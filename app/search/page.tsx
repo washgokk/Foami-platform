@@ -52,10 +52,11 @@ interface Shop {
 
 const CATEGORIES = [
   { label: 'ทั้งหมด', value: 'all' },
-  { label: 'ล้างสีดูดฝุ่น', value: 'ล้างรถ', icon: Droplets },
+  { label: 'ล้างสีดูดฝุ่น', value: 'ล้าง', icon: Droplets },
+  { label: 'เคลือบสี / เคลือบแก้ว', value: 'เคลือบ', icon: Sparkles },
+  { label: 'ซักเบาะ / พรม / สปา', value: 'ซัก', icon: Wrench },
   { label: 'มอเตอร์ไซค์', value: 'มอเตอร์ไซค์', icon: Bike },
-  { label: 'เคลือบแก้ว', value: 'อุปกรณ์', icon: Wrench },
-  { label: 'ล้างด่วน', value: 'ด่วน', icon: Zap },
+  { label: 'ล้างด่วน / เดลิเวอรี่', value: 'ด่วน', icon: Zap },
 ]
 
 // Haversine formula distance calculation (km)
@@ -339,16 +340,6 @@ export default function MarketplacePage() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <Logo width={130} />
-          <div style={{
-            fontSize: 11,
-            fontWeight: 800,
-            color: '#315EC3',
-            background: '#EFF3FD',
-            padding: '3px 10px',
-            borderRadius: 999
-          }}>
-            MARKETPLACE
-          </div>
         </div>
 
         {/* View Mode Toggle (Desktop) */}

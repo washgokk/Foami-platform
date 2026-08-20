@@ -116,7 +116,7 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, user
 
       L.marker([userLocation.lat, userLocation.lng], { icon: userIcon, zIndexOffset: 1000 })
         .addTo(markersGroupRef.current)
-        .bindTooltip('📍 ตำแหน่งของคุณ', { permanent: false, direction: 'top' })
+        .bindTooltip('ตำแหน่งของคุณ', { permanent: false, direction: 'top' })
     }
 
     const bounds = L.latLngBounds([])
