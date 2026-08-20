@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     const [bookings, wallet] = await Promise.all([
       supabaseAdmin
         .from('bookings')
-        .select('id, total_price, status', { count: 'exact' })
+        .select('*')
         .eq('branch_id', branch.id),
       supabaseAdmin
         .from('shop_wallets')
@@ -34,10 +34,33 @@ export async function GET(req: NextRequest) {
         .eq('shop_id', branch.id)
         .maybeSingle()
     ])
+
+    const allBooks = bookings.data || []
+    const completedBooks = allBooks.filter((b: any) => b.status === 'completed')
+
+    // Revenue calculation helper — matches shop admin formula exactly
+    const calcBookingRevenue = (b: any) => {
+      const isRebooking = b.discount_code && /rebook|refund/i.test(b.discount_code)
+      let fallbackGross = (Number(b.base_price) || 0)
+      if (Array.isArray(b.addon_ids)) {
+        b.addon_ids.forEach((a: any) => {
+          fallbackGross += (Number(a.price) || Number(a.selectedPrice) || Number(a.variableState?.customAmount) || 0)
+        })
+      }
+      fallbackGross += (Number(b.travel_surcharge) || 0) + (Number(b.different_spot_fee) || 0)
+      const grossTotal = b.total_price && b.total_price > 0 ? Number(b.total_price) : fallbackGross
+      const additional = Number(b.additional_price) || 0
+      const discount = Number(b.discount_amount) || 0
+      return isRebooking ? (grossTotal + additional) : Math.max(0, grossTotal - discount + additional)
+    }
+
+    const totalRevenue = completedBooks.reduce((s: number, b: any) => s + calcBookingRevenue(b), 0)
+
     return {
       ...branch,
-      booking_count: bookings.count ?? 0,
-      total_revenue: (bookings.data || []).reduce((s: number, b: any) => s + (b.total_price || 0), 0),
+      booking_count: allBooks.length,
+      completed_count: completedBooks.length,
+      total_revenue: totalRevenue,
       wallet: wallet.data
     }
   }))
