@@ -89,10 +89,14 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
         }, 8000)
     }, [])
 
+    const isPlatformRoute = pathname.startsWith('/admin/platform')
+    const isLoginPage = pathname === '/admin/login'
+
     // Realtime subscriptions — new bookings & new chat messages
     useEffect(() => {
+        if (isPlatformRoute || isLoginPage) return
         const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null
-        if (!token || pathname === '/admin/login') return
+        if (!token) return
 
         const bookingChannel = supabase
             .channel('admin_new_bookings')
@@ -124,16 +128,17 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
             supabase.removeChannel(bookingChannel)
             supabase.removeChannel(chatChannel)
         }
-    }, [pathname, addToast])
+    }, [pathname, isPlatformRoute, isLoginPage, addToast])
 
     useEffect(() => {
-        const token = localStorage.getItem('admin_token')
-        if (!token && pathname !== '/admin/login') {
+        if (isPlatformRoute || isLoginPage) return
+        const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null
+        if (!token) {
             router.replace('/admin/login')
         }
-    }, [pathname, router])
+    }, [pathname, router, isPlatformRoute, isLoginPage])
 
-    if (pathname === '/admin/login') return <>{children}</>
+    if (isPlatformRoute || isLoginPage) return <>{children}</>
 
     const handleLogout = () => {
         setLogoutConfirmOpen(true)
