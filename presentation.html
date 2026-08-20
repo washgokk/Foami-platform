@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Foami Platform — Journey & Roadmap</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── Foami Design Tokens ─── */
+    :root {
+      --brand:        #315EC3;
+      --brand-dark:   #214192;
+      --brand-ghost:  #EFF3FD;
+      --accent-blue:  #A0D9F6;
+      --accent-pink:  #F1BFDB;
+      --bg:           #F6F8FF;
+      --surface:      #FFFFFF;
+      --surface-2:    #F0F3FC;
+      --border:       #DDE3F5;
+      --border-dark:  #BFC8E8;
+      --text-1:       #1A2340;
+      --text-2:       #5A6589;
+      --text-m:       #9AA5C4;
+      --success:      #22C55E;
+      --success-lt:   #DCFCE7;
+      --warning:      #F59E0B;
+      --warning-lt:   #FEF3C7;
+      --danger:       #EF4444;
+      --danger-lt:    #FEE2E2;
+      --info:         #3B82F6;
+      --info-lt:      #DBEAFE;
+      --shadow-sm:    0 1px 2px rgba(26,35,64,.05);
+      --shadow:       0 6px 12px rgba(26,35,64,.04);
+      --shadow-md:    0 12px 24px rgba(26,35,64,.07), 0 4px 8px rgba(26,35,64,.04);
+      --shadow-card:  0 4px 16px rgba(26,35,64,.05);
+      --shadow-brand: 0 8px 20px rgba(49,94,195,.25);
+      --r-sm: 12px; --r: 16px; --r-lg: 20px; --r-xl: 28px; --r-full: 9999px;
+      --ease: .25s cubic-bezier(.4,0,.2,1);
+    }
+
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+    body {
+      font-family:'Kanit',sans-serif;
+      background:var(--bg); color:var(--text-1);
+      overflow:hidden; height:100vh; width:100vw;
+      -webkit-font-smoothing:antialiased;
+    }
+
+    /* ── Slide Engine ── */
+    #deck { width:100%; height:100vh; position:relative; }
+
+    .slide {
+      position:absolute; inset:0;
+      display:flex; flex-direction:column;
+      justify-content:center; align-items:center;
+      padding:44px 54px 74px;
+      opacity:0; pointer-events:none;
+      transform:translateX(44px);
+      transition:opacity .38s ease, transform .38s cubic-bezier(.4,0,.2,1);
+    }
+    .slide.active { opacity:1; pointer-events:all; transform:translateX(0); }
+    .slide.exit   { opacity:0; transform:translateX(-44px); }
+
+    /* ── Slide Backgrounds — consistent throughout ── */
+    .sl-bg    { background:var(--bg); }
+    .sl-white { background:var(--surface); }
+    .sl-brand { background:linear-gradient(140deg,#0f1e4a 0%,#1e3d8f 45%,var(--brand) 100%); }
+
+    /* ── Progress bar ── */
+    #progress-bar {
+      position:fixed; top:0; left:0; height:3px;
+      background:linear-gradient(90deg,var(--brand),var(--accent-blue));
+      transition:width .4s ease; z-index:1000;
+    }
+
+    /* ── Fixed UI elements ── */
+    .fixed-logo {
+      position:fixed; top:16px; left:22px; z-index:100;
+      display:flex; align-items:center; gap:7px;
+      font-size:14px; font-weight:800; color:var(--brand); letter-spacing:-.3px;
+    }
+    .fixed-logo .logo-icon { width:22px; height:22px; }
+
+    .slide-label {
+      position:fixed; top:18px; right:22px; z-index:100;
+      font-size:9px; font-weight:700; color:var(--text-m);
+      letter-spacing:2.5px; text-transform:uppercase;
+    }
+
+    /* ── Nav ── */
+    #nav {
+      position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+      display:flex; align-items:center; gap:10px;
+      background:var(--surface); border:1px solid var(--border);
+      box-shadow:var(--shadow-md);
+      padding:7px 18px; border-radius:var(--r-full); z-index:999;
+    }
+    #nav button {
+      background:none; border:none; color:var(--text-m); cursor:pointer;
+      width:28px; height:28px; display:flex; align-items:center; justify-content:center;
+      border-radius:8px; transition:all var(--ease);
+    }
+    #nav button:hover { color:var(--brand); background:var(--brand-ghost); }
+    #nav button svg { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+    #slide-counter { font-size:11px; color:var(--text-m); min-width:48px; text-align:center; font-weight:500; }
+    .dots { display:flex; gap:5px; }
+    .dot { width:5px; height:5px; border-radius:50%; background:var(--border-dark); transition:all .3s; cursor:pointer; }
+    .dot.active { background:var(--brand); width:18px; border-radius:3px; }
+
+    /* ── Typography ── */
+    .overline {
+      font-size:10px; font-weight:700; letter-spacing:3px; text-transform:uppercase;
+      color:var(--brand); margin-bottom:8px;
+    }
+    h1 { font-size:clamp(24px,4.5vw,52px); font-weight:800; line-height:1.1; color:var(--text-1); }
+    h2 { font-size:clamp(18px,3vw,36px); font-weight:700; line-height:1.2; color:var(--text-1); margin-bottom:4px; }
+    p.lead { font-size:clamp(13px,1.4vw,15px); font-weight:300; line-height:1.7; color:var(--text-2); max-width:600px; text-align:center; }
+
+    /* colour helpers */
+    .c-brand { color:var(--brand) !important; }
+    .c-white { color:#fff !important; }
+    .c-muted { color:var(--text-m) !important; }
+
+    /* on-brand slide overrides */
+    .sl-brand .overline    { color:rgba(255,255,255,.6); }
+    .sl-brand h1,.sl-brand h2,.sl-brand h3 { color:#fff; }
+    .sl-brand .lead        { color:rgba(255,255,255,.72); }
+    .sl-brand .fixed-logo  { color:#fff; }
+    .sl-brand .slide-label { color:rgba(255,255,255,.35); }
+
+    /* ── Icon wrapper ── */
+    .ic {
+      display:inline-flex; align-items:center; justify-content:center;
+      width:36px; height:36px; border-radius:10px;
+      background:var(--brand-ghost); flex-shrink:0;
+      margin-bottom:8px;
+    }
+    .ic svg { width:18px; height:18px; stroke:var(--brand); fill:none; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
+    .ic.ic-green  { background:var(--success-lt); }
+    .ic.ic-green  svg { stroke:var(--success); }
+    .ic.ic-yellow { background:var(--warning-lt); }
+    .ic.ic-yellow svg { stroke:var(--warning); }
+    .ic.ic-red    { background:var(--danger-lt); }
+    .ic.ic-red    svg { stroke:var(--danger); }
+    .ic.ic-purple { background:#ede9fe; }
+    .ic.ic-purple svg { stroke:#7c3aed; }
+    .ic.ic-pink   { background:#fff0f8; }
+    .ic.ic-pink   svg { stroke:#db2777; }
+    .ic.ic-white  { background:rgba(255,255,255,.15); }
+    .ic.ic-white  svg { stroke:#fff; }
+    .ic-sm { width:26px; height:26px; border-radius:7px; margin-bottom:0; }
+    .ic-sm svg { width:13px; height:13px; }
+
+    /* ── Cards ── */
+    .card {
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--r-lg); padding:16px 17px;
+      box-shadow:var(--shadow-card);
+    }
+    .card h4  { font-size:13px; font-weight:600; color:var(--text-1); margin-bottom:5px; margin-top:4px; }
+    .card p   { font-size:11.5px; font-weight:300; color:var(--text-2); line-height:1.55; }
+    .card-brand   { background:var(--brand-ghost); border-color:rgba(49,94,195,.18); }
+    .card-success { background:var(--success-lt);  border-color:#86efac; }
+    .card-warning { background:var(--warning-lt);  border-color:#fcd34d; }
+    .card-info    { background:var(--info-lt);     border-color:#93c5fd; }
+    .card-pink    { background:#fff0f8;            border-color:#fbcfe8; }
+    .card-purple  { background:#f5f3ff;            border-color:#c4b5fd; }
+    .card-surface { background:var(--surface-2);   border-color:var(--border); }
+
+    /* feature list */
+    .fl { list-style:none; margin-top:7px; display:flex; flex-direction:column; gap:4px; }
+    .fl li { font-size:11px; font-weight:400; color:var(--text-2); padding-left:13px; position:relative; line-height:1.45; }
+    .fl li::before { content:"›"; position:absolute; left:0; color:var(--brand); font-weight:700; }
+
+    /* ── Badges ── */
+    .badge { display:inline-flex; align-items:center; gap:4px; padding:2px 9px; border-radius:var(--r-full); font-size:10px; font-weight:600; }
+    .bd-done    { background:var(--success-lt); color:#15803d; }
+    .bd-wip     { background:var(--warning-lt); color:#92400e; }
+    .bd-next    { background:#ede9fe; color:#6d28d9; }
+    .bd-brand   { background:var(--brand-ghost); color:var(--brand); }
+    .bd-info    { background:var(--info-lt); color:#1d4ed8; }
+
+    /* ── Stats ── */
+    .stats-row { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin:14px 0; }
+    .stat-box {
+      text-align:center; background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--r-lg); padding:13px 18px; min-width:105px;
+      box-shadow:var(--shadow-card);
+    }
+    .stat-num   { font-size:26px; font-weight:800; color:var(--brand); line-height:1; margin-bottom:3px; }
+    .stat-label { font-size:10px; color:var(--text-m); line-height:1.35; }
+
+    /* ── Timeline ── */
+    .timeline { display:flex; flex-direction:column; width:100%; max-width:740px; }
+    .ti       { display:flex; gap:14px; align-items:flex-start; }
+    .ti-l     { display:flex; flex-direction:column; align-items:center; min-width:28px; }
+    .ti-dot   { width:9px; height:9px; border-radius:50%; background:var(--border-dark); border:2px solid var(--border-dark); flex-shrink:0; margin-top:4px; }
+    .ti-dot.done  { background:var(--success); border-color:var(--success); }
+    .ti-dot.wip   { background:var(--warning); border-color:var(--warning); }
+    .ti-dot.next  { background:#8b5cf6; border-color:#8b5cf6; }
+    .ti-dot.brand { background:var(--brand); border-color:var(--brand); }
+    .ti-line  { width:2px; flex:1; min-height:12px; background:var(--border); margin:3px auto 0; }
+    .ti-body  { padding-bottom:14px; flex:1; }
+    .ti-body h4 { font-size:12.5px; font-weight:600; color:var(--text-1); margin-bottom:2px; }
+    .ti-body p  { font-size:11px; font-weight:300; color:var(--text-2); line-height:1.5; }
+
+    /* ── Grids ── */
+    .g2  { display:grid; grid-template-columns:1fr 1fr; gap:11px; width:100%; max-width:800px; }
+    .g3  { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; width:100%; max-width:940px; }
+    .g4  { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px; width:100%; max-width:1000px; }
+    .g23 { display:grid; grid-template-columns:1fr 2fr; gap:14px; width:100%; max-width:940px; align-items:start; }
+    .g32 { display:grid; grid-template-columns:2fr 1fr; gap:14px; width:100%; max-width:940px; align-items:start; }
+    .g12 { display:grid; grid-template-columns:1fr 2fr; gap:14px; width:100%; max-width:940px; align-items:start; }
+
+    /* ── Phase bar ── */
+    .phase-row { display:flex; gap:0; width:100%; max-width:1000px; }
+    .pc { flex:1; background:var(--surface); border:1px solid var(--border); padding:14px 12px; box-shadow:var(--shadow-sm); }
+    .pc:first-child { border-radius:var(--r-sm) 0 0 var(--r-sm); }
+    .pc:last-child  { border-radius:0 var(--r-sm) var(--r-sm) 0; }
+    .pc.wip  { background:var(--warning-lt); border-color:#fcd34d; }
+    .pc.next { background:#f5f3ff; border-color:#c4b5fd; }
+    .pc-num  { font-size:9px; font-weight:700; letter-spacing:1px; color:var(--text-m); margin-bottom:5px; text-transform:uppercase; display:flex; align-items:center; gap:4px; }
+    .pc-ttl  { font-size:12px; font-weight:600; color:var(--text-1); margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+    .pc-ttl svg { width:13px; height:13px; stroke:var(--brand); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
+    .pc.wip .pc-ttl svg { stroke:var(--warning); }
+    .pc.next .pc-ttl svg { stroke:#7c3aed; }
+    .pc-desc { font-size:10.5px; font-weight:300; color:var(--text-2); line-height:1.55; }
+
+    /* ── Screen Mockup ── */
+    .screen { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); overflow:hidden; box-shadow:var(--shadow-md); }
+    .screen-bar { background:var(--surface-2); padding:6px 12px; display:flex; align-items:center; gap:5px; border-bottom:1px solid var(--border); }
+    .sd { width:7px; height:7px; border-radius:50%; }
+    .sd-r { background:#FF5F57; } .sd-y { background:#FFBD2E; } .sd-g { background:#28C840; }
+    .screen-url { font-size:10px; color:var(--text-m); flex:1; text-align:center; font-weight:400; }
+    .screen-body { padding:11px; display:flex; flex-direction:column; gap:5px; }
+
+    .fr { display:flex; align-items:flex-start; gap:8px; padding:6px 0; border-bottom:1px solid var(--border); }
+    .fr:last-child { border-bottom:none; }
+    .fr svg { width:14px; height:14px; stroke:var(--brand); fill:none; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; margin-top:2px; }
+    .fr-info h5 { font-size:11.5px; font-weight:600; color:var(--text-1); margin-bottom:1px; }
+    .fr-info p  { font-size:10px; font-weight:300; color:var(--text-m); line-height:1.4; }
+
+    /* ── Architecture chips ── */
+    .arch-box { display:flex; flex-direction:column; align-items:center; gap:6px; width:100%; max-width:840px; }
+    .arch-row { display:flex; gap:7px; justify-content:center; width:100%; }
+    .ac {
+      background:var(--surface); border:1px solid var(--border); border-radius:8px;
+      padding:7px 11px; font-size:11px; font-weight:500; text-align:center;
+      white-space:nowrap; box-shadow:var(--shadow-sm); color:var(--text-1);
+      display:flex; flex-direction:column; align-items:center; gap:3px;
+    }
+    .ac svg { width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+    .ac small { font-size:9px; font-weight:300; color:var(--text-m); }
+    .ac.ab { background:var(--brand-ghost); border-color:rgba(49,94,195,.2); color:var(--brand); }
+    .ac.ag { background:var(--success-lt);  border-color:#86efac; color:#166534; }
+    .ac.ap { background:#fff0f8; border-color:#fbcfe8; color:#9d174d; }
+    .arch-arr { color:var(--border-dark); line-height:1; }
+    .arch-arr svg { width:14px; height:14px; stroke:var(--border-dark); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+
+    /* ── Chips / Tags ── */
+    .chip { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--r-full); font-size:10px; color:var(--text-2); margin:2px; font-weight:500; }
+    .chip svg { width:10px; height:10px; stroke:currentColor; fill:none; stroke-width:2; }
+    .chip-brand   { background:var(--brand-ghost); border-color:rgba(49,94,195,.2); color:var(--brand); }
+    .chip-success { background:var(--success-lt);  border-color:#86efac; color:#15803d; }
+
+    /* ── Note / Info box ── */
+    .note { padding:10px 14px; border-radius:var(--r-sm); font-size:11.5px; font-weight:400; line-height:1.55; display:flex; align-items:flex-start; gap:8px; }
+    .note svg { width:15px; height:15px; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; margin-top:1px; }
+    .note-brand   { background:var(--brand-ghost); border:1px solid rgba(49,94,195,.15); color:var(--brand-dark); }
+    .note-brand   svg { stroke:var(--brand); }
+    .note-success { background:var(--success-lt);  border:1px solid #86efac; color:#14532d; }
+    .note-success svg { stroke:var(--success); }
+    .note-warning { background:var(--warning-lt);  border:1px solid #fcd34d; color:#92400e; }
+    .note-warning svg { stroke:var(--warning); }
+    .note-info    { background:var(--info-lt);     border:1px solid #93c5fd; color:#1d4ed8; }
+    .note-info    svg { stroke:var(--info); }
+
+    /* ── Slide header ── */
+    .sh { text-align:center; margin-bottom:18px; }
+
+    /* ── Divider ── */
+    .div { border:none; border-top:1px solid var(--border); margin:8px 0; }
+
+    /* ── On-brand card ── (used inside dark slides) */
+    .on-dark-card {
+      background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.18);
+      border-radius:var(--r-sm); padding:10px 16px; text-align:center;
+    }
+    .on-dark-card .label { font-size:10px; color:rgba(255,255,255,.55); margin-bottom:3px; }
+    .on-dark-card .value { font-size:12px; font-weight:600; color:#fff; }
+
+    /* ── Status dot ── */
+    .sdot { width:7px; height:7px; border-radius:50%; display:inline-block; flex-shrink:0; }
+    .sdot-green  { background:var(--success); }
+    .sdot-yellow { background:var(--warning); }
+    .sdot-purple { background:#8b5cf6; }
+    .sdot-muted  { background:var(--border-dark); }
+
+    /* ── PRINT / PDF ── */
+    @media print {
+      @page { size: A4 landscape; margin: 0; }
+
+      html, body { overflow: visible !important; height: auto !important; width: 100% !important; }
+
+      #deck { height: auto !important; position: static !important; }
+
+      .slide {
+        position: relative !important;
+        opacity: 1 !important;
+        transform: none !important;
+        pointer-events: all !important;
+        width: 100% !important;
+        height: 100vh !important;
+        min-height: 560px;
+        page-break-after: always;
+        break-after: page;
+        display: flex !important;
+        padding: 44px 54px 44px !important;
+      }
+
+      .slide:last-child { page-break-after: avoid; break-after: avoid; }
+
+      #nav, #progress-bar, .fixed-logo, .slide-label { display: none !important; }
+
+      /* Ensure backgrounds print */
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+      .sl-brand  { background: linear-gradient(140deg,#0f1e4a 0%,#1e3d8f 45%,#315EC3 100%) !important; }
+      .sl-bg     { background: #F6F8FF !important; }
+      .sl-white  { background: #FFFFFF !important; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ─── Lucide SVG Sprite ─── -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="ic-clock"      viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+  <symbol id="ic-store"      viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></symbol>
+  <symbol id="ic-chart"      viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></symbol>
+  <symbol id="ic-map"        viewBox="0 0 24 24"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></symbol>
+  <symbol id="ic-calendar"   viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></symbol>
+  <symbol id="ic-credit-card"viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></symbol>
+  <symbol id="ic-user"       viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="ic-users"      viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="ic-message"    viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="ic-bell"       viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></symbol>
+  <symbol id="ic-camera"     viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></symbol>
+  <symbol id="ic-star"       viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></symbol>
+  <symbol id="ic-shield"     viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+  <symbol id="ic-zap"        viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>
+  <symbol id="ic-settings"   viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+  <symbol id="ic-lock"       viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="ic-wallet"     viewBox="0 0 24 24"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><circle cx="16" cy="16" r="1"/></symbol>
+  <symbol id="ic-tag"        viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></symbol>
+  <symbol id="ic-package"    viewBox="0 0 24 24"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></symbol>
+  <symbol id="ic-file"       viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></symbol>
+  <symbol id="ic-rocket"     viewBox="0 0 24 24"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></symbol>
+  <symbol id="ic-trending"   viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></symbol>
+  <symbol id="ic-globe"      viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol>
+  <symbol id="ic-mail"       viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></symbol>
+  <symbol id="ic-pin"        viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></symbol>
+  <symbol id="ic-car"        viewBox="0 0 24 24"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v9a2 2 0 0 1-2 2h-2"/><circle cx="7" cy="19" r="2"/><circle cx="17" cy="19" r="2"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/></symbol>
+  <symbol id="ic-search"     viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></symbol>
+  <symbol id="ic-check"      viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+  <symbol id="ic-check-circ" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></symbol>
+  <symbol id="ic-info"       viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></symbol>
+  <symbol id="ic-alert"      viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+  <symbol id="ic-tool"       viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></symbol>
+  <symbol id="ic-arrow-down" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></symbol>
+  <symbol id="ic-chevron-l"  viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></symbol>
+  <symbol id="ic-chevron-r"  viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></symbol>
+  <symbol id="ic-droplet"    viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></symbol>
+  <symbol id="ic-crown"      viewBox="0 0 24 24"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7z"/><line x1="5" y1="20" x2="19" y2="20"/></symbol>
+  <symbol id="ic-layers"     viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></symbol>
+  <symbol id="ic-link"       viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+  <symbol id="ic-phone"      viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.38a2 2 0 0 1 1.99-2.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
+  <symbol id="ic-code"       viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></symbol>
+  <symbol id="ic-building"   viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M9 22V12h6v10"/><path d="M9 7h.01"/><path d="M12 7h.01"/><path d="M15 7h.01"/><path d="M9 11h.01"/><path d="M12 11h.01"/><path d="M15 11h.01"/></symbol>
+  <symbol id="ic-clipboard"  viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></symbol>
+  <symbol id="ic-key"        viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></symbol>
+  <symbol id="ic-log"        viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/><polyline points="14 2 14 8 20 8"/></symbol>
+  <symbol id="ic-plus"       viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+  <symbol id="ic-wifi"       viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></symbol>
+</svg>
+
+<div id="progress-bar"></div>
+
+<div class="fixed-logo">
+  <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+  </svg>
+  Foami
+</div>
+<div class="slide-label" id="slide-label">COVER</div>
+
+<div id="deck">
+
+<!-- ════════════════════════════ S1 COVER ════════════════════════════ -->
+<div class="slide sl-brand active" data-label="COVER">
+  <div style="text-align:center;max-width:620px;">
+    <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:var(--r-full);padding:6px 16px;margin-bottom:20px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#A0D9F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+      <span style="font-size:12px;font-weight:700;color:#fff;">Foami Wash &amp; Delivery</span>
+    </div>
+    <div class="overline" style="color:rgba(255,255,255,.6);">PLATFORM OVERVIEW</div>
+    <h1 style="color:#fff;margin-bottom:14px;">เราสร้างอะไรมา<br/><span style="color:var(--accent-blue);">และจะไปที่ไหนต่อ</span></h1>
+    <p class="lead" style="color:rgba(255,255,255,.72);margin:0 auto 24px;">ภาพรวมการออกแบบและพัฒนาแพลตฟอร์ม — สิ่งที่ผ่านมา สิ่งที่กำลังทำ และสิ่งที่จะสร้างต่อไป</p>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+      <span class="badge" style="background:rgba(34,197,94,.2);color:#86efac;border:1px solid rgba(34,197,94,.3);">
+        <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-check"/></svg> เสร็จแล้ว
+      </span>
+      <span class="badge" style="background:rgba(245,158,11,.2);color:#fde68a;border:1px solid rgba(245,158,11,.3);">
+        <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-tool"/></svg> กำลังทำ
+      </span>
+      <span class="badge" style="background:rgba(139,92,246,.2);color:#c4b5fd;border:1px solid rgba(139,92,246,.3);">
+        <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#ic-rocket"/></svg> แผนต่อไป
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════ S2 PROBLEM ════════════════════════════ -->
+<div class="slide sl-bg" data-label="PROBLEM">
+  <div class="sh"><div class="overline">จุดเริ่มต้น</div><h2>ปัญหาที่เราเห็นและแก้</h2></div>
+  <div class="g3" style="margin-bottom:12px;">
+    <div class="card">
+      <div class="ic ic-yellow"><svg><use href="#ic-clock"/></svg></div>
+      <h4>ข้อจำกัดด้านเวลา</h4>
+      <p>นักศึกษาและบุคลากร มข. ไม่มีเวลาล้างรถด้วยตนเอง ไม่มีสถานที่ ไม่มีอุปกรณ์</p>
+    </div>
+    <div class="card">
+      <div class="ic"><svg><use href="#ic-building"/></svg></div>
+      <h4>ตลาดกระจายตัว</h4>
+      <p>ร้านล้างรถอิสระมีมากแต่ขาดระบบ ไม่มีช่องทางออนไลน์ หาลูกค้าใหม่ยาก</p>
+    </div>
+    <div class="card">
+      <div class="ic ic-red"><svg><use href="#ic-chart"/></svg></div>
+      <h4>ขาดระบบจัดการ</h4>
+      <p>รับออเดอร์ผ่าน LINE แมนนวล ไม่มีระบบติดตามงาน ไม่มีข้อมูลลูกค้า</p>
+    </div>
+  </div>
+  <div class="stats-row">
+    <div class="stat-box"><div class="stat-num">37K+</div><div class="stat-label">นักศึกษา มข.<br/>ผู้ใช้รถจักรยานยนต์</div></div>
+    <div class="stat-box"><div class="stat-num">89%</div><div class="stat-label">ยอมจ่ายเพิ่ม<br/>เพื่อความสะดวก</div></div>
+    <div class="stat-box"><div class="stat-num">87</div><div class="stat-label">คัน ทดสอบจริง<br/>ใน 4 เดือนแรก</div></div>
+    <div class="stat-box"><div class="stat-num">3+</div><div class="stat-label">ร้านล้างรถที่<br/>เราติดต่อแล้ว</div></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════ S3 JOURNEY ════════════════════════════ -->
+<div class="slide sl-white" data-label="JOURNEY">
+  <div class="sh"><div class="overline">เส้นทางการพัฒนา</div><h2>จาก <span style="color:#db2777;">WashGO</span> สู่ <span class="c-brand">Foami Platform 2.0</span></h2></div>
+  <div class="timeline">
+    <div class="ti">
+      <div class="ti-l"><div class="ti-dot done"></div><div class="ti-line"></div></div>
+      <div class="ti-body">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:2px;"><h4>Phase 0 — ทดสอบตลาดจริง (WashGO)</h4><span class="badge bd-done"><svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.5"><use href="#ic-check"/></svg> เสร็จแล้ว</span></div>
+        <p>เปิดบริการล้างรถ B2C ตั้งแต่ 5 พ.ย. 68 รับออเดอร์ผ่าน LINE แมนนวล ทดสอบตลาด 87 คันใน 4 เดือน พิสูจน์ความต้องการตลาดได้จริง</p>
+      </div>
+    </div>
+    <div class="ti">
+      <div class="ti-l"><div class="ti-dot done"></div><div class="ti-line"></div></div>
+      <div class="ti-body">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:2px;"><h4>Phase 1 — Rebranding &amp; Business Model Pivot</h4><span class="badge bd-done"><svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.5"><use href="#ic-check"/></svg> เสร็จแล้ว</span></div>
+        <p>รีแบรนด์เป็น Foami ปรับโมเดลจาก B2C เป็น Hybrid Marketplace ออกแบบ Business Plan + Revenue 3-stream</p>
+      </div>
+    </div>
+    <div class="ti">
+      <div class="ti-l"><div class="ti-dot done"></div><div class="ti-line"></div></div>
+      <div class="ti-body">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:2px;"><h4>Phase 2 — Platform Architecture &amp; Core Build</h4><span class="badge bd-done"><svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.5"><use href="#ic-check"/></svg> เสร็จแล้ว</span></div>
+        <p>Technical Blueprint ครบ — 20+ DB Tables, Multi-tenant + RLS, Booking System, Payment, LINE Bot, Deploy บน Vercel</p>
+      </div>
+    </div>
+    <div class="ti">
+      <div class="ti-l"><div class="ti-dot done"></div><div class="ti-line"></div></div>
+      <div class="ti-body">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:2px;"><h4>Phase 3 — Value-Added Services &amp; Partner Outreach</h4><span class="badge bd-done"><svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.5"><use href="#ic-check"/></svg> เสร็จแล้ว</span></div>
+        <p>รับต่อ <strong>พ.ร.บ. รถจักรยานยนต์แบบ Manual</strong> และ <strong>ติดต่อร้านล้างรถอื่น</strong> เพื่อ Demo ระบบการจองของ Foami</p>
+      </div>
+    </div>
+    <div class="ti">
+      <div class="ti-l"><div class="ti-dot wip"></div><div class="ti-line"></div></div>
+      <div class="ti-body">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:2px;"><h4>Phase 4 — Marketplace Layer &amp; Partner Onboarding System</h4><span class="badge bd-wip"><svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.5"><use href="#ic-tool"/></svg> กำลังทำ</span></div>
+        <p>Admin Dashboard, Partner invitation + onboarding wizard, Marketplace map, Multi-shop Wallet System</p>
+      </div>
+    </div>
+    <div class="ti">
+      <div class="ti-l"><div class="ti-dot next"></div></div>
+      <div class="ti-body">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:2px;"><h4>Phase 5+ — System Integration &amp; Scale Out</h4><span class="badge bd-next"><svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.5"><use href="#ic-rocket"/></svg> ต่อไป</span></div>
+        <p>รวม พ.ร.บ. เข้าระบบ Auto, CRM + Analytics, ขยายพาร์ทเนอร์, ขยายจังหวัด</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════ S4 FOAMI STORE ════════════════════════════ -->
+<div class="slide sl-bg" data-label="FOAMI STORE">
+  <div class="sh">
+    <div class="overline">หน้าที่ 1 — ลูกค้า</div>
+    <h2>Foami Official Store &nbsp;<code style="font-size:12px;color:var(--text-m);background:var(--surface-2);padding:2px 7px;border-radius:6px;font-weight:400;">foami.app/store</code></h2>
+  </div>
+  <div class="g23" style="max-width:940px;">
+    <div>
+      <div class="screen">
+        <div class="screen-bar"><div class="sd sd-r"></div><div class="sd sd-y"></div><div class="sd sd-g"></div><div class="screen-url">foami.app/store</div></div>
+        <div class="screen-body">
+          <div class="fr"><svg><use href="#ic-package"/></svg><div class="fr-info"><h5>เลือกแพ็กเกจล้างรถ</h5><p>Package 1-3 (129/169/189 บาท) ราคา S/M/L ตามขนาดรถ</p></div></div>
+          <div class="fr"><svg><use href="#ic-plus"/></svg><div class="fr-info"><h5>บริการเสริม (Add-ons)</h5><p>เติมลม · เปลี่ยนน้ำมันเครื่อง · เติมน้ำมัน · ต่อ พ.ร.บ. (Manual)</p></div></div>
+          <div class="fr"><svg><use href="#ic-pin"/></svg><div class="fr-info"><h5>ปักหมุดจุดรับรถ</h5><p>เลือก Location บนแผนที่ คำนวณโซนและค่าเดินทางอัตโนมัติ</p></div></div>
+          <div class="fr"><svg><use href="#ic-car"/></svg><div class="fr-info"><h5>ข้อมูลรถ</h5><p>ยี่ห้อ รุ่น สี ทะเบียน ขนาด S/M/L กำหนดราคาอัตโนมัติ</p></div></div>
+          <div class="fr"><svg><use href="#ic-calendar"/></svg><div class="fr-info"><h5>เลือกวัน-เวลา</h5><p>ดู Slot ว่างจริงจาก Staff Schedule — ไม่ให้จองซ้ำ</p></div></div>
+          <div class="fr"><svg><use href="#ic-credit-card"/></svg><div class="fr-info"><h5>ชำระเงิน</h5><p>Stripe Card · โอนธนาคาร + อัปโหลดสลิป · จ่ายทีหลัง</p></div></div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div class="card card-brand">
+        <div class="ic ic-sm"><svg><use href="#ic-bell"/></svg></div>
+        <h4 class="c-brand" style="margin-top:8px;">แจ้งเตือน Real-time</h4>
+        <ul class="fl">
+          <li>ยืนยันการจองทันที (LINE + Web Push)</li>
+          <li>แจ้งเมื่อพนักงานออกไปรับรถ</li>
+          <li>แจ้งเมื่อเริ่มล้าง (รูป Before)</li>
+          <li>แจ้งเมื่อล้างเสร็จ กำลังนำรถกลับ</li>
+          <li>แจ้งเมื่อส่งรถแล้ว (รูป After) + ขอ Rating</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="ic ic-sm ic-purple"><svg><use href="#ic-camera"/></svg></div>
+        <h4 style="margin-top:8px;">Job Photo System</h4>
+        <ul class="fl">
+          <li>Staff ถ่ายรูปก่อน-หลังล้างทุกคัน</li>
+          <li>ลูกค้าดูรูปได้ใน Dashboard ทันที</li>
+          <li>ลดข้อพิพาทเรื่องความเสียหาย</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="ic ic-sm ic-yellow"><svg><use href="#ic-star"/></svg></div>
+        <h4 style="margin-top:8px;">Rating &amp; Review</h4>
+        <ul class="fl">
+          <li>ลูกค้าให้คะแนน 1-5 ดาว + ความคิดเห็น</li>
+          <li>คะแนนสะสมแสดงใน Marketplace</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════ S5 SHOP DASHBOARD ════════════════════════════ -->
+<div class="slide sl-white" data-label="SHOP DASHBOARD">
+  <div class="sh">
+    <div class="overline">หน้าที่ 2 — Admin ร้าน</div>
+    <h2>Shop Admin Dashboard &nbsp;<code style="font-size:12px;color:var(--text-m);background:var(--surface-2);padding:2px 7px;border-radius:6px;font-weight:400;">shop.foami.app/[id]</code></h2>
+  </div>
+  <div class="g4" style="max-width:1000px;">
+    <div class="card"><div class="ic ic-sm"><svg><use href="#ic-clipboard"/></svg></div><h4 style="margin-top:8px;">จัดการงาน</h4><ul class="fl"><li>ดูงานทั้งหมด กรองวัน/สถานะ</li><li>Confirm / Cancel / Edit งาน</li><li>เพิ่มค่าบริการพิเศษภายหลัง</li><li>แก้ไขข้อมูลรถ/วันเวลา</li></ul></div>
+    <div class="card"><div class="ic ic-sm"><svg><use href="#ic-users"/></svg></div><h4 style="margin-top:8px;">จัดการพนักงาน</h4><ul class="fl"><li>เพิ่ม/ลบ Staff ด้วย Email invite</li><li>กำหนดบทบาท admin / staff</li><li>บันทึก Bank / PromptPay</li><li>คำนวณ Payout รายงวด</li></ul></div>
+    <div class="card"><div class="ic ic-sm"><svg><use href="#ic-map"/></svg></div><h4 style="margin-top:8px;">จัดการโซน</h4><ul class="fl"><li>วาด Polygon บนแผนที่</li><li>ตั้งค่าธรรมเนียมนอกโซน/กม.</li><li>กำหนดโซนให้ Staff แต่ละคน</li><li>สลับเปิด/ปิดโซนทันที</li></ul></div>
+    <div class="card"><div class="ic ic-sm"><svg><use href="#ic-tag"/></svg></div><h4 style="margin-top:8px;">จัดการ Services</h4><ul class="fl"><li>ตั้งราคา S/M/L รายสาขา</li><li>เพิ่ม Add-on บริการเสริม</li><li>Price Group หลาย Branch</li><li>เปิด/ปิดบริการรายสาขา</li></ul></div>
+    <div class="card"><div class="ic ic-sm"><svg><use href="#ic-wallet"/></svg></div><h4 style="margin-top:8px;">การเงิน</h4><ul class="fl"><li>ดู Wallet Balance คงเหลือ</li><li>ยื่น Withdrawal Request</li><li>ดู Wallet Ledger ทุก Transaction</li><li>รายรับ own-store vs commission</li></ul></div>
+    <div class="card"><div class="ic ic-sm"><svg><use href="#ic-zap"/></svg></div><h4 style="margin-top:8px;">Discount Codes</h4><ul class="fl"><li>สร้างโค้ดลด % หรือ Fixed</li><li>กำหนดช่วงวันเวลา / โซน</li><li>จำกัด Max use / ต่อลูกค้า</li></ul></div>
+    <div class="card card-brand"><div class="ic ic-sm"><svg><use href="#ic-message"/></svg></div><h4 class="c-brand" style="margin-top:8px;">Chat กับลูกค้า</h4><ul class="fl"><li>Admin และ <strong>Staff</strong> แชทกับลูกค้าได้</li><li>Chat ผูกกับ Booking นั้นๆ เสมอ</li><li>แนบรูปภาพ Real-time</li><li>แจ้งเตือนเมื่อมีข้อความใหม่</li></ul></div>
+    <div class="card"><div class="ic ic-sm"><svg><use href="#ic-calendar"/></svg></div><h4 style="margin-top:8px;">Staff Schedule</h4><ul class="fl"><li>เปิด Slot ล่วงหน้ารายวัน</li><li>Auto-assign งานให้ Staff ว่าง</li><li>Cron ทำงานทุก 15 นาที</li></ul></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════ S6 STAFF APP ════════════════════════════ -->
+<div class="slide sl-bg" data-label="STAFF APP">
+  <div class="sh">
+    <div class="overline">หน้าที่ 3 — พนักงาน</div>
+    <h2>Staff App &nbsp;<code style="font-size:12px;color:var(--text-m);background:var(--surface-2);padding:2px 7px;border-radius:6px;font-weight:400;">/staff</code></h2>
+  </div>
+  <div class="g12" style="max-width:940px;">
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div class="card card-brand">
+        <div class="ic ic-sm"><svg><use href="#ic-message"/></svg></div>
+        <h4 class="c-brand" style="margin-top:8px;">Staff แชทกับลูกค้าได้โดยตรง</h4>
+        <ul class="fl">
+          <li>Staff เปิด Chat ของ Booking ตัวเองได้เลย</li>
+          <li>ไม่ต้องผ่าน Admin — แชทตรงกับลูกค้า</li>
+          <li>ส่งข้อความ + รูปภาพได้</li>
+          <li>ลูกค้าเห็นชื่อ Staff ที่ส่งมา</li>
+          <li>แจ้งเตือน LINE + Web Push ทันที</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="ic ic-sm ic-purple"><svg><use href="#ic-camera"/></svg></div>
+        <h4 style="margin-top:8px;">Job Photos</h4>
+        <ul class="fl">
+          <li>ถ่ายรูป Before ตอนรับรถ</li>
+          <li>ถ่ายรูป After ตอนล้างเสร็จ</li>
+          <li>ลูกค้าเห็นรูปผ่าน Dashboard ทันที</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card">
+      <h4 style="margin-bottom:12px;">Job Workflow ที่ Staff ทำ</h4>
+      <div class="timeline" style="max-width:none;">
+        <div class="ti">
+          <div class="ti-l"><div class="ti-dot done"></div><div class="ti-line"></div></div>
+          <div class="ti-body"><h4>รับงาน &amp; ดูรายละเอียด</h4><p>เห็น Location รถ Package เวลานัด + แชทถามลูกค้าได้ทันที</p></div>
+        </div>
+        <div class="ti">
+          <div class="ti-l"><div class="ti-dot done"></div><div class="ti-line"></div></div>
+          <div class="ti-body"><h4>กด "ออกไปรับรถ"</h4><p>ระบบแจ้งลูกค้าทาง LINE + Web Push ทันที</p></div>
+        </div>
+        <div class="ti">
+          <div class="ti-l"><div class="ti-dot done"></div><div class="ti-line"></div></div>
+          <div class="ti-body"><h4>กด "เริ่มล้าง" + ถ่ายรูป Before</h4><p>อัปโหลดรูปสภาพรถก่อนล้าง ระบบแจ้งลูกค้า</p></div>
+        </div>
+        <div class="ti">
+          <div class="ti-l"><div class="ti-dot done"></div><div class="ti-line"></div></div>
+          <div class="ti-body"><h4>กด "ล้างเสร็จ" + ถ่ายรูป After</h4><p>รูปผลลัพธ์ + แจ้งลูกค้า "กำลังนำรถกลับ"</p></div>
+        </div>
+        <div class="ti">
+          <div class="ti-l"><div class="ti-dot done"></div><div class="ti-line"></div></div>
+          <div class="ti-body"><h4>กด "ส่งรถแล้ว"</h4><p>ลูกค้าได้รับแจ้ง + ระบบ release เงินเข้า Shop Wallet</p></div>
+        </div>
+        <div class="ti">
+          <div class="ti-l"><div class="ti-dot brand"></div></div>
+          <div class="ti-body"><h4>แชทหลังส่งงาน</h4><p>ยังคุยกับลูกค้าต่อได้หากมีข้อสงสัยหรือปัญหา</p></div>
+        </div>
+      </div>
+      <hr class="div"/>
+      <div class="note note-info" style="margin-top:6px;">
+        <svg><use href="#ic-info"/></svg>
+        <span><strong>Sender แสดงชัด:</strong> ลูกค้าเห็นว่าเป็น Staff ชื่ออะไรส่งมา สร้างความรับผิดชอบและความไว้วางใจ</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════ S7 MARKETPLACE ════════════════════════════ -->
+<div class="slide sl-white" data-label="MARKETPLACE">
+  <div class="sh">
+    <div class="overline">หน้าที่ 4 — ลูกค้า (กำลังสร้าง)</div>
+    <h2>Marketplace Map &nbsp;<code style="font-size:12px;color:var(--text-m);background:var(--surface-2);padding:2px 7px;border-radius:6px;font-weight:400;">foami.app</code></h2>
+  </div>
+  <div class="g32" style="max-width:940px;">
+    <div class="g2" style="max-width:none;">
+      <div class="card"><div class="ic ic-sm"><svg><use href="#ic-search"/></svg></div><h4 style="margin-top:8px;">ค้นหาร้าน</h4><ul class="fl"><li>แสดงร้านทั้งหมดบนแผนที่</li><li>Filter ระยะทาง / Rating / ราคา</li><li>Filter ประเภทบริการ</li><li>Popup ข้อมูลร้านเมื่อคลิก</li></ul></div>
+      <div class="card"><div class="ic ic-sm"><svg><use href="#ic-store"/></svg></div><h4 style="margin-top:8px;">Shop Profile</h4><ul class="fl"><li>ชื่อร้าน โลโก้ รายละเอียด</li><li>Gallery รูปผลงาน</li><li>Services + ราคาทั้งหมด</li><li>รีวิวจากลูกค้าจริง</li></ul></div>
+      <div class="card"><div class="ic ic-sm ic-yellow"><svg><use href="#ic-star"/></svg></div><h4 style="margin-top:8px;">Rating &amp; Reviews</h4><ul class="fl"><li>คะแนนเฉลี่ยรวมทุก Booking</li><li>รีวิว verified จากลูกค้าจริง</li><li>กรองร้านจาก Rating ขั้นต่ำ</li></ul></div>
+      <div class="card"><div class="ic ic-sm ic-green"><svg><use href="#ic-check-circ"/></svg></div><h4 style="margin-top:8px;">จองผ่าน Marketplace</h4><ul class="fl"><li>กด "จองเลย" ไปหน้าจองของร้าน</li><li>Flow จองเหมือน Foami Official</li><li>Platform หัก GP 20% อัตโนมัติ</li></ul></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div class="card card-warning">
+        <div class="ic ic-sm ic-yellow"><svg><use href="#ic-tool"/></svg></div>
+        <h4 style="margin-top:8px;color:#92400e;">Status: กำลังพัฒนา</h4>
+        <p>สร้าง Marketplace frontend เชื่อม marketplace_listings table</p>
+        <div style="margin-top:7px;"><span class="badge bd-wip"><svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.5"><use href="#ic-tool"/></svg> In Progress</span></div>
+      </div>
+      <div class="card">
+        <div class="ic ic-sm"><svg><use href="#ic-link"/></svg></div>
+        <h4 style="margin-top:8px;">Partner Shop URL</h4>
+        <ul class="fl">
+          <li>แต่ละร้านมี URL ของตนเอง</li>
+          <li>shop.foami.app/[shopId]</li>
+          <li>รองรับ LINE LIFF ของร้านนั้น</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════ S8 PLATFORM ADMIN ════════════════════════════ -->
+<div class="slide sl-bg" data-label="PLATFORM ADMIN">
+  <div class="sh">
+    <div class="overline">หน้าที่ 5 — Platform Admin (กำลังสร้าง)</div>
+    <h2>Platform Admin Dashboard &nbsp;<code style="font-size:12px;color:var(--text-m);background:var(--surface-2);padding:2px 7px;border-radius:6px;font-weight:400;">admin.foami.app</code></h2>
+  </div>
+  <div class="g4" style="max-width:1000px;">
+    <div class="card"><div class="ic ic-sm"><svg><use href="#ic-layers"/></svg></div><h4 style="margin-top:8px;">ภาพรวม Platform</h4><ul class="fl"><li>จำนวนร้านทั้งหมด</li><li>รายได้ Platform รวม</li><li>Platform Fee ที่เก็บได้</li><li>งาน Active ขณะนี้</li><li>ร้านรอ Verify</li></ul></div>
+    <div class="card"><div class="ic ic-sm"><svg><use href="#ic-building"/></svg></div><h4 style="margin-top:8px;">จัดการร้านพาร์ทเนอร์</h4><ul class="fl"><li>รายชื่อร้านทั้งหมด</li><li>Verify / Suspend ร้าน</li><li>เปลี่ยน Plan ของร้าน</li><li>Metrics รายร้าน</li><li>ปรับ % Fee ต่อร้าน</li></ul></div>
+    <div class="card"><div class="ic ic-sm"><svg><use href="#ic-key"/></svg></div><h4 style="margin-top:8px;">Invitation System</h4><ul class="fl"><li>Generate Invitation Code</li><li>กำหนด Email + Plan + หมดอายุ</li><li>ดูสถานะ used/unused</li><li>ร้านใช้ Code สมัครเข้าระบบ</li></ul></div>
+    <div class="card"><div class="ic ic-sm"><svg><use href="#ic-wallet"/></svg></div><h4 style="margin-top:8px;">Finance Platform</h4><ul class="fl"><li>Platform Wallet รวม</li><li>Withdrawal Request ของร้าน</li><li>Approve / Reject การถอน</li><li>Wallet Ledger ทุกร้าน</li></ul></div>
+    <div class="card"><div class="ic ic-sm"><svg><use href="#ic-trending"/></svg></div><h4 style="margin-top:8px;">Analytics</h4><ul class="fl"><li>รายได้แยกตามร้าน</li><li>Top Performing Shops</li><li>Platform Growth MoM</li><li>Commission vs SaaS</li></ul></div>
+    <div class="card"><div class="ic ic-sm"><svg><use href="#ic-settings"/></svg></div><h4 style="margin-top:8px;">Platform Settings</h4><ul class="fl"><li>Default Fee % (ปัจจุบัน 20%)</li><li>Plan Features Config</li><li>Global Announcement</li><li>Maintenance Mode</li></ul></div>
+    <div class="card"><div class="ic ic-sm"><svg><use href="#ic-log"/></svg></div><h4 style="margin-top:8px;">Audit Log</h4><ul class="fl"><li>ทุก Action ของทุกร้าน</li><li>กรองตาม Actor / Action</li><li>Old vs New Data</li></ul></div>
+    <div class="card card-warning"><div class="ic ic-sm ic-yellow"><svg><use href="#ic-tool"/></svg></div><h4 style="margin-top:8px;color:#92400e;">Status: กำลังสร้าง</h4><p>Admin Dashboard ทุก Section อยู่ระหว่างพัฒนา</p><div style="margin-top:7px;"><span class="badge bd-wip">In Progress</span></div></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════ S9 BUSINESS MODEL ════════════════════════════ -->
+<div class="slide sl-white" data-label="BUSINESS MODEL">
+  <div class="sh"><div class="overline">โมเดลธุรกิจ</div><h2>Revenue <span class="c-brand">3 ทาง</span> — Hybrid Marketplace</h2></div>
+  <div class="g3" style="margin-bottom:12px;">
+    <div class="card card-brand">
+      <div class="ic ic-sm"><svg><use href="#ic-store"/></svg></div>
+      <h4 class="c-brand" style="margin-top:8px;">1. Own-store Revenue</h4>
+      <p style="margin-bottom:7px;">บริการของร้าน Foami Official เอง</p>
+      <ul class="fl">
+        <li>ล้างรถ Package 129-189 บาท/คัน</li>
+        <li>ต่อ พ.ร.บ. +50-100 บาท (Manual)</li>
+        <li>Add-on เติมลม น้ำมัน เปลี่ยนน้ำมัน</li>
+        <li>รายได้ 100% ไม่หักส่วนแบ่ง</li>
+      </ul>
+    </div>
+    <div class="card card-pink">
+      <div class="ic ic-sm ic-pink"><svg><use href="#ic-trending"/></svg></div>
+      <h4 style="margin-top:8px;color:#9d174d;">2. GP Commission</h4>
+      <p style="margin-bottom:7px;">ร้านพาร์ทเนอร์รับงานผ่าน Platform</p>
+      <ul class="fl">
+        <li>หัก GP 15-20% ต่อ Order อัตโนมัติ</li>
+        <li>Stripe Connect จัดการ Split เงิน</li>
+        <li>80% เข้า Shop Wallet ร้านนั้น</li>
+        <li>ร้านขอ Withdraw ผ่าน Admin</li>
+      </ul>
+    </div>
+    <div class="card card-purple">
+      <div class="ic ic-sm ic-purple"><svg><use href="#ic-package"/></svg></div>
+      <h4 style="margin-top:8px;color:#6d28d9;">3. SaaS Subscription</h4>
+      <p style="margin-bottom:7px;">ระบบจัดการขั้นสูงสำหรับร้าน</p>
+      <ul class="fl">
+        <li>Starter: ฟรี (Booking พื้นฐาน)</li>
+        <li>Growth 299฿/เดือน: CRM + Push</li>
+        <li>Pro 790฿/เดือน: RFM + Audit</li>
+        <li>Enterprise 1,290฿/เดือน: API</li>
+      </ul>
+    </div>
+  </div>
+  <div class="note note-brand" style="max-width:620px;">
+    <svg><use href="#ic-zap"/></svg>
+    <span>Bootstrap ด้วยทุนเริ่มต้น <strong>10,000 บาท</strong> → Revenue-funded Growth → ไม่กู้ ไม่มีหนี้ → กำไรตั้งแต่ปีแรก</span>
+  </div>
+</div>
+
+<!-- ════════════════════════════ S10 PARTNER ONBOARDING ════════════════════════════ -->
+<div class="slide sl-bg" data-label="PARTNER ONBOARDING">
+  <div class="sh"><div class="overline">กระบวนการ — ร้านพาร์ทเนอร์</div><h2>Partner Onboarding Flow <span class="c-brand">3 ขั้นตอน</span></h2></div>
+  <div class="g3" style="margin-bottom:12px;">
+    <div class="card card-success">
+      <div class="ic ic-sm ic-green"><svg><use href="#ic-mail"/></svg></div>
+      <h4 style="margin-top:8px;color:#166534;">Step 1 — Admin ออก Invitation</h4>
+      <ul class="fl">
+        <li>เราติดต่อร้านล้างรถที่สนใจ</li>
+        <li>Admin สร้าง Code ใน Dashboard</li>
+        <li>ส่ง Code ให้ร้านทาง LINE / อีเมล</li>
+        <li>Code หมดอายุใน 7 วัน</li>
+      </ul>
+    </div>
+    <div class="card card-warning">
+      <div class="ic ic-sm ic-yellow"><svg><use href="#ic-settings"/></svg></div>
+      <h4 style="margin-top:8px;color:#92400e;">Step 2 — ร้าน Setup ตัวเอง</h4>
+      <ul class="fl">
+        <li>ใส่ Code → สมัคร Email + Password</li>
+        <li>กรอกข้อมูลร้าน ชื่อ ที่อยู่ โลโก้</li>
+        <li>วาด Zone บนแผนที่</li>
+        <li>เพิ่ม Services + ตั้งราคา S/M/L</li>
+        <li>เพิ่ม Staff + ตั้ง Schedule</li>
+      </ul>
+    </div>
+    <div class="card card-brand">
+      <div class="ic ic-sm"><svg><use href="#ic-rocket"/></svg></div>
+      <h4 class="c-brand" style="margin-top:8px;">Step 3 — ร้านพร้อม Live</h4>
+      <ul class="fl">
+        <li>ร้านมี URL ของตนเอง</li>
+        <li>ลูกค้าจองผ่าน Foami ได้เลย</li>
+        <li>Stripe Connect เชื่อม (รับเงินได้)</li>
+        <li>ขึ้น Marketplace ถ้า Plan = Growth+</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card" style="max-width:900px;width:100%;">
+    <div style="display:flex;align-items:flex-start;gap:12px;">
+      <div class="ic" style="flex-shrink:0;"><svg><use href="#ic-phone"/></svg></div>
+      <div>
+        <h4 style="margin-bottom:4px;">สถานะปัจจุบัน — เราเริ่มติดต่อร้านแล้ว!</h4>
+        <p style="font-size:11.5px;color:var(--text-2);line-height:1.6;">ทีมติดต่อร้านล้างรถหลายแห่งในขอนแก่นและ Demo ระบบการจองของ Foami ให้ดูแล้ว — เดินหน้า Onboarding ร้านแรกได้ทันทีหลัง Admin Dashboard พร้อม</p>
+        <div style="margin-top:7px;display:flex;gap:5px;flex-wrap:wrap;">
+          <span class="chip chip-success"><svg><use href="#ic-check"/></svg> Direct Outreach แล้ว</span>
+          <span class="chip chip-success"><svg><use href="#ic-check"/></svg> Demo ระบบให้ดูแล้ว</span>
+          <span class="chip chip-brand"><svg><use href="#ic-clock"/></svg> รอ Admin Dashboard เสร็จ</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════ S11 PRB SERVICE ════════════════════════════ -->
+<div class="slide sl-white" data-label="บริการต่อ พ.ร.บ.">
+  <div class="sh"><div class="overline">บริการใหม่ — เริ่มแล้ว!</div><h2>รับต่อ <span style="color:#db2777;">พ.ร.บ. รถจักรยานยนต์</span> <span class="c-brand">ถึงที่</span></h2></div>
+  <div class="g32" style="max-width:940px;">
+    <div>
+      <div class="g2" style="max-width:none;margin-bottom:10px;">
+        <div class="card"><div class="ic ic-sm"><svg><use href="#ic-file"/></svg></div><h4 style="margin-top:8px;">ทำไมบริการนี้จำเป็น?</h4><ul class="fl"><li>นักศึกษาไม่รู้ต่อ พ.ร.บ. ที่ไหน</li><li>ไม่มีเวลาออกไปต่อเอง</li><li>เดินทางไปสำนักงานไม่สะดวก</li><li>ลืมต่อ ขาดการคุ้มครอง</li></ul></div>
+        <div class="card"><div class="ic ic-sm ic-green"><svg><use href="#ic-check-circ"/></svg></div><h4 style="margin-top:8px;">Value ที่ลูกค้าได้รับ</h4><ul class="fl"><li>จองล้างรถ + ต่อ พ.ร.บ. ในทริปเดียว</li><li>ไม่ต้องออกจากหอพัก</li><li>ได้กรมธรรม์ใหม่พร้อมรถสะอาด</li><li>ค่าบริการแค่ ~50-100 บาท</li></ul></div>
+      </div>
+      <div class="card card-warning">
+        <h4 style="color:#92400e;margin-bottom:8px;display:flex;align-items:center;gap:6px;"><div class="ic ic-sm ic-yellow" style="margin-bottom:0;"><svg><use href="#ic-tool"/></svg></div> สถานะปัจจุบัน — Manual Flow</h4>
+        <div class="timeline" style="max-width:none;">
+          <div class="ti"><div class="ti-l"><div class="ti-dot done"></div><div class="ti-line"></div></div><div class="ti-body"><h4>ลูกค้าแจ้งผ่าน LINE</h4><p>ส่งข้อมูล + เล่มทะเบียน + แจ้งวันที่</p></div></div>
+          <div class="ti"><div class="ti-l"><div class="ti-dot done"></div><div class="ti-line"></div></div><div class="ti-body"><h4>Staff รับรถ + เอกสาร</h4><p>ไปดำเนินการต่อ พ.ร.บ. ณ สำนักงาน</p></div></div>
+          <div class="ti"><div class="ti-l"><div class="ti-dot done"></div></div><div class="ti-body"><h4>ส่งคืนรถสะอาด + กรมธรรม์ใหม่</h4><p>พร้อมกันในทริปเดียวกับล้างรถ</p></div></div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div class="card card-brand">
+        <div class="ic ic-sm"><svg><use href="#ic-rocket"/></svg></div>
+        <h4 class="c-brand" style="margin-top:8px;">แผน — รวมเข้าระบบ Auto</h4>
+        <ul class="fl">
+          <li>เพิ่ม Add-on "ต่อ พ.ร.บ." ในหน้าจองออนไลน์</li>
+          <li>ลูกค้าเลือกได้ตอนจองล้างรถ</li>
+          <li>ระบบแจ้งเตือน Staff อัตโนมัติ</li>
+          <li>Tracking สถานะ พ.ร.บ. แยกต่างหาก</li>
+          <li>ชำระเงินรวมในบิลเดียวกัน</li>
+        </ul>
+      </div>
+      <div class="card card-success">
+        <div class="ic ic-sm ic-green"><svg><use href="#ic-wallet"/></svg></div>
+        <h4 style="margin-top:8px;color:#166534;">ราคาบริการ</h4>
+        <ul class="fl">
+          <li>ค่า พ.ร.บ. ตามราคาประกาศ</li>
+          <li>ค่าบริการ Foami: ~50-100 บาท</li>
+          <li>รวมในบิลล้างรถได้เลย</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════ S12 ARCHITECTURE ════════════════════════════ -->
+<div class="slide sl-bg" data-label="ARCHITECTURE">
+  <div class="sh"><div class="overline">สถาปัตยกรรมระบบ</div><h2>Multi-Tenant Platform Architecture</h2></div>
+  <div class="arch-box">
+    <p style="font-size:11px;color:var(--text-m);margin-bottom:10px;">ทุกร้านพาร์ทเนอร์อยู่บน Platform เดียว — แต่ข้อมูลแยกจากกันสมบูรณ์ (Data Firewall)</p>
+    <div class="arch-row">
+      <div class="ac ab"><svg><use href="#ic-map"/></svg> Marketplace<small>foami.app</small></div>
+      <div class="ac ab"><svg><use href="#ic-store"/></svg> Foami Store<small>foami.app/store</small></div>
+      <div class="ac ab"><svg><use href="#ic-building"/></svg> Partner Shop<small>shop.foami.app/[id]</small></div>
+      <div class="ac ab"><svg><use href="#ic-crown"/></svg> Admin<small>admin.foami.app</small></div>
+    </div>
+    <div class="arch-arr"><svg><use href="#ic-arrow-down"/></svg></div>
+    <div class="arch-row">
+      <div class="ac" style="width:100%;max-width:500px;flex-direction:row;gap:6px;"><svg><use href="#ic-settings"/></svg> Next.js Middleware — Subdomain Router + JWT Validator + Rate Limiter</div>
+    </div>
+    <div class="arch-arr"><svg><use href="#ic-arrow-down"/></svg></div>
+    <div class="arch-row">
+      <div class="ac ag"><svg><use href="#ic-clipboard"/></svg>/api/bookings</div>
+      <div class="ac ag"><svg><use href="#ic-credit-card"/></svg>/api/stripe</div>
+      <div class="ac ag"><svg><use href="#ic-layers"/></svg>/api/platform</div>
+      <div class="ac ag"><svg><use href="#ic-user"/></svg>/api/auth</div>
+      <div class="ac ag"><svg><use href="#ic-message"/></svg>/api/chat</div>
+      <div class="ac ag"><svg><use href="#ic-clock"/></svg>/api/cron</div>
+    </div>
+    <div class="arch-arr"><svg><use href="#ic-arrow-down"/></svg></div>
+    <div class="arch-row">
+      <div class="ac ap"><svg><use href="#ic-shield"/></svg> Supabase PostgreSQL<small>Multi-tenant + RLS</small></div>
+      <div class="ac ap"><svg><use href="#ic-credit-card"/></svg> Stripe Connect<small>Platform Wallet 20%/80%</small></div>
+      <div class="ac ap"><svg><use href="#ic-bell"/></svg> LINE API + Web Push<small>All Status Notifications</small></div>
+    </div>
+  </div>
+  <div style="display:flex;gap:7px;margin-top:14px;flex-wrap:wrap;justify-content:center;">
+    <span class="chip chip-brand"><svg><use href="#ic-layers"/></svg> 20+ DB Tables</span>
+    <span class="chip chip-brand"><svg><use href="#ic-lock"/></svg> Row Level Security</span>
+    <span class="chip chip-brand"><svg><use href="#ic-wifi"/></svg> Realtime Status</span>
+    <span class="chip chip-brand"><svg><use href="#ic-clock"/></svg> Auto-assign ทุก 15 นาที</span>
+    <span class="chip chip-brand"><svg><use href="#ic-phone"/></svg> PWA Mobile-ready</span>
+    <span class="chip chip-brand"><svg><use href="#ic-globe"/></svg> Vercel Edge</span>
+  </div>
+</div>
+
+<!-- ════════════════════════════ S13 ROADMAP ════════════════════════════ -->
+<div class="slide sl-white" data-label="ROADMAP">
+  <div class="sh"><div class="overline">แผนต่อไป</div><h2>สิ่งที่จะทำ <span class="c-brand">หลังจากนี้</span></h2></div>
+  <div class="phase-row" style="margin-bottom:12px;">
+    <div class="pc wip">
+      <div class="pc-num"><span class="sdot sdot-yellow"></span>Phase 4 — กำลังทำ</div>
+      <div class="pc-ttl"><svg><use href="#ic-crown"/></svg> Marketplace Launch</div>
+      <div class="pc-desc">Admin Dashboard<br/>Partner Invitation + Onboarding<br/>Marketplace Map live<br/>Multi-wallet พาร์ทเนอร์<br/>Withdrawal Request Flow</div>
+    </div>
+    <div class="pc next">
+      <div class="pc-num"><span class="sdot sdot-purple"></span>Phase 5 — ต่อไป</div>
+      <div class="pc-ttl"><svg><use href="#ic-users"/></svg> Partner Growth</div>
+      <div class="pc-desc">นำร่อง 3-5 ร้านขอนแก่น<br/>เก็บ Feedback ปรับระบบ<br/>เริ่มเก็บ Commission จริง<br/>SaaS Subscription Plan<br/>ต่อ พ.ร.บ. เข้าระบบ Auto</div>
+    </div>
+    <div class="pc next">
+      <div class="pc-num"><span class="sdot sdot-purple"></span>Phase 6 — บริการเสริม</div>
+      <div class="pc-ttl"><svg><use href="#ic-plus"/></svg> More Add-ons</div>
+      <div class="pc-desc">เปลี่ยนน้ำมันเครื่อง<br/>ล้างรถยนต์<br/>ซ่อมเบื้องต้น<br/>CRM + RFM Analytics<br/>LINE Notify Advanced</div>
+    </div>
+    <div class="pc">
+      <div class="pc-num"><span class="sdot sdot-muted"></span>Phase 7 — อนาคต</div>
+      <div class="pc-ttl"><svg style="stroke:var(--text-m);"><use href="#ic-globe"/></svg> Scale Out</div>
+      <div class="pc-desc">ขยายสู่จังหวัดอื่น<br/>Mobile App iOS/Android<br/>API Enterprise Plan<br/>Multi-city Marketplace<br/>B2B Fleet Management</div>
+    </div>
+  </div>
+  <div class="note note-brand" style="max-width:840px;width:100%;justify-content:center;">
+    <svg><use href="#ic-zap"/></svg>
+    <span>เป้าหมาย: <strong>ขยายเครือข่ายพาร์ทเนอร์ในขอนแก่นให้มั่นคง</strong> ก่อนขยายสู่จังหวัดอื่น โดยใช้ Revenue-funded Growth</span>
+  </div>
+</div>
+
+<!-- ════════════════════════════ S14 CLOSING ════════════════════════════ -->
+<div class="slide sl-brand" data-label="CLOSING">
+  <div style="text-align:center;max-width:580px;">
+    <div style="display:flex;justify-content:center;margin-bottom:12px;">
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+    </div>
+    <div style="font-size:36px;font-weight:800;color:#fff;letter-spacing:-1px;margin-bottom:8px;">Foami</div>
+    <div class="overline" style="color:rgba(255,255,255,.6);margin-bottom:14px;">WASH &amp; DELIVERY PLATFORM</div>
+    <h2 style="color:#fff;font-size:clamp(15px,2.8vw,28px);margin-bottom:12px;">สะอาด สะดวก และล้ำสมัย</h2>
+    <p class="lead" style="color:rgba(255,255,255,.72);margin:0 auto 22px;">จาก 87 คันในการทดลอง สู่แพลตฟอร์มที่เชื่อมต่อร้านล้างรถทุกที่ในขอนแก่น — และไกลกว่านั้น</p>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <div class="on-dark-card"><div class="label">Platform</div><div class="value">foami-wash-and-delivery.vercel.app</div></div>
+      <div class="on-dark-card"><div class="label">GitHub</div><div class="value">washgokk/Foami-WashAndDelivery</div></div>
+    </div>
+    <div style="margin-top:20px;font-size:11px;color:rgba(255,255,255,.3);">ขอบคุณทุกท่านที่รับฟัง</div>
+  </div>
+</div>
+
+</div><!-- end #deck -->
+
+<nav id="nav">
+  <button id="btn-prev" onclick="prevSlide()">
+    <svg><use href="#ic-chevron-l"/></svg>
+  </button>
+  <div class="dots" id="dots"></div>
+  <span id="slide-counter">1 / 14</span>
+  <button id="btn-next" onclick="nextSlide()">
+    <svg><use href="#ic-chevron-r"/></svg>
+  </button>
+</nav>
+
+<script>
+  const slides  = document.querySelectorAll('.slide');
+  const dotsEl  = document.getElementById('dots');
+  const counter = document.getElementById('slide-counter');
+  const labelEl = document.getElementById('slide-label');
+  const bar     = document.getElementById('progress-bar');
+  let cur = 0;
+
+  slides.forEach((_,i) => {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i===0?' active':'');
+    d.onclick = () => goTo(i);
+    dotsEl.appendChild(d);
+  });
+
+  function updateUI() {
+    slides.forEach(s => s.classList.remove('active','exit'));
+    slides[cur].classList.add('active');
+    document.querySelectorAll('.dot').forEach((d,i) => d.classList.toggle('active',i===cur));
+    counter.textContent = (cur+1)+' / '+slides.length;
+    labelEl.textContent = slides[cur].dataset.label || 'SLIDE '+(cur+1);
+    bar.style.width = (((cur+1)/slides.length)*100)+'%';
+  }
+
+  function goTo(n) {
+    if(n<0||n>=slides.length) return;
+    slides[cur].classList.add('exit');
+    setTimeout(() => { if(slides[cur]) slides[cur].classList.remove('exit'); }, 400);
+    cur = n; updateUI();
+  }
+
+  function nextSlide(){ goTo(Math.min(cur+1,slides.length-1)); }
+  function prevSlide(){ goTo(Math.max(cur-1,0)); }
+
+  document.addEventListener('keydown', e => {
+    if(e.key==='ArrowRight'||e.key===' '){ e.preventDefault(); nextSlide(); }
+    if(e.key==='ArrowLeft'){ e.preventDefault(); prevSlide(); }
+    if(e.key==='Home') goTo(0);
+    if(e.key==='End') goTo(slides.length-1);
+  });
+
+  let tx = 0;
+  document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; });
+  document.addEventListener('touchend', e => {
+    const dx = tx - e.changedTouches[0].clientX;
+    if(Math.abs(dx)>45) dx>0 ? nextSlide() : prevSlide();
+  });
+
+  updateUI();
+</script>
+</body>
+</html>

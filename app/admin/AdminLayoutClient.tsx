@@ -19,7 +19,9 @@ import {
     Bell,
     X,
     MessageCircle,
-    CalendarPlus
+    CalendarPlus,
+    Wallet,
+    Shield
 } from 'lucide-react'
 import AuditLogModal from '@/components/Admin/AuditLogModal'
 import NotificationTesterModal from '@/components/Admin/NotificationTesterModal'
@@ -28,13 +30,14 @@ import ConfirmModal from '@/components/Global/ConfirmModal'
 import { supabase } from '@/lib/supabase'
 
 const NAV_ITEMS = [
-    { href: '/admin/dashboard', icon: LayoutDashboard, label: 'ภาพรวม' },
-    { href: '/admin/schedule', icon: Calendar, label: 'ตารางงาน' },
-    { href: '/admin/crm', icon: Users, label: 'CRM & ลูกค้า' },
-    { href: '/admin/branches', icon: Store, label: 'สาขา & โซน' },
-    { href: '/admin/staff', icon: UserCircle2, label: 'พนักงาน' },
+    { href: '/admin/dashboard', icon: LayoutDashboard, label: 'ภาพรวมแพลตฟอร์ม' },
+    { href: '/admin/shops', icon: Store, label: 'ร้านพาร์ทเนอร์' },
+    { href: '/admin/invitations', icon: Ticket, label: 'Invitation Codes' },
+    { href: '/admin/finance', icon: Wallet, label: 'อนุมัติการถอนเงิน' },
+    { href: '/admin/branches', icon: Store, label: 'จัดการสาขาในระบบ' },
     { href: '/admin/services', icon: Wrench, label: 'บริการ & ราคา' },
-    { href: '/admin/bookings', icon: ClipboardList, label: 'การจอง' },
+    { href: '/admin/bookings', icon: ClipboardList, label: 'การจองทั้งหมด' },
+    { href: '/admin/crm', icon: Users, label: 'CRM & ลูกค้า' },
     { href: '/admin/discounts', icon: Ticket, label: 'โค้ดส่วนลด' },
     { href: '/admin/promotions', icon: Bell, label: 'แจ้งโปรโมชั่น' },
 ]

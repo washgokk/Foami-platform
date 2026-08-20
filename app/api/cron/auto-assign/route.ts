@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 import { sendPushNotification } from '@/lib/push'
 import { findMatchingStaffForJob } from '@/lib/staff-matching'
@@ -26,6 +26,8 @@ export async function GET(req: NextRequest) {
         `)
         .eq('status', 'pending')
         .is('staff_id', null)
+        .gte('scheduled_date', new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })).toISOString().split('T')[0]) // BUG-12 FIX: skip past bookings
+        .gte('scheduled_date', new Date().toISOString().split('T')[0]) // BUG-12 FIX: skip past bookings
         .order('scheduled_date', { ascending: true })
         .order('scheduled_time', { ascending: true })
 

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import '../globals.css'
+import LiffWrapper from './LiffWrapper'
 
 export const viewport: Viewport = {
     width: 'device-width',
@@ -13,8 +14,8 @@ export const metadata: Metadata = {
 
 export default function LiffLayout({ children }: { children: React.ReactNode }) {
     return (
-        <div className="liff-root">
+        <LiffWrapper>
             {children}
-        </div>
+        </LiffWrapper>
     )
 }

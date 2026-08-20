@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { BOOKING_STATUS_LABEL, BOOKING_STATUS_CSS, BookingStatus } from '@/lib/types'
@@ -34,6 +35,17 @@ export default function StaffDashboard() {
     const [actionLoading, setActionLoading] = useState<string | null>(null)
     const [confirmingJob, setConfirmingJob] = useState<any>(null)
     const [staffId, setStaffId] = useState('')
+    const router = useRouter()
+
+    // E2 FIX: Auth guard
+    useEffect(() => {
+        const token = localStorage.getItem('staff_token')
+        if (!token) { router.replace('/staff/login'); return }
+        try {
+            const info = JSON.parse(localStorage.getItem('staff_info') || '{}')
+            if (info?.id) setStaffId(info.id)
+        } catch (e) {}
+    }, [router])
     const [staffZones, setStaffZones] = useState<string[]>([])
     const now = new Date()
     const thDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }))
@@ -164,13 +176,7 @@ export default function StaffDashboard() {
         }
     }, [staffId, today])
 
-    useEffect(() => {
-        const data = localStorage.getItem('staff_data')
-        if (data) {
-            const parsed = JSON.parse(data)
-            setStaffId(parsed.id)
-        }
-    }, [])
+    // BUG-16 FIX: removed duplicate staffId setter (race condition with auth guard)
 
     useEffect(() => {
         load()

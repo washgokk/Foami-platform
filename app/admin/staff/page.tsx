@@ -41,7 +41,8 @@ import ImageUpload from '@/components/ImageUpload'
 import ImageZoom from '@/components/Global/ImageZoom'
 import ConfirmModal from '@/components/Global/ConfirmModal'
 
-export default function StaffPage() {
+// B1 FIX: Accept optional branchId — when provided (shop admin), filter all staff to that branch only
+export default function StaffPage({ branchId: lockedBranchId }: { branchId?: string }) {
     const [staff, setStaff] = useState<Staff[]>([])
     const [branches, setBranches] = useState<Branch[]>([])
     const [showModal, setShowModal] = useState(false)
@@ -84,7 +85,10 @@ export default function StaffPage() {
 
     const load = useCallback(async () => {
         const [{ data: sData }, { data: bData }] = await Promise.all([
-            supabase.from('staff').select('*').order('full_name'),
+            // B1 FIX: Filter staff by branch when in shop admin context
+            lockedBranchId
+                ? supabase.from('staff').select('*').eq('branch_id', lockedBranchId).order('full_name')
+                : supabase.from('staff').select('*').order('full_name'),
             supabase.from('branches').select('id, name').eq('is_active', true),
         ])
 

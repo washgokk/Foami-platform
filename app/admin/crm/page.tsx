@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import styles from './crm.module.css'
@@ -49,7 +49,8 @@ This CRM Page groups customer data into 4 tabs:
 4. Segments (Custom segment builder for discounts)
 */
 
-export default function CRMPage() {
+// B3 FIX: Accept optional branchId
+export default function CRMPage({ branchId }: { branchId?: string }) {
     const [activeTab, setActiveTab] = useState<'profiles' | 'transactions' | 'analytics' | 'segments'>('profiles')
 
     // Data State
@@ -86,7 +87,7 @@ export default function CRMPage() {
         if (!confirm('ระบบจะค้นหาลูกค้าที่ถูกเพิ่มแบบแมนนวล (WALKIN) และนำเบอร์โทรไปเทียบกับฐานข้อมูลลูกค้าจริงที่มีอยู่ หากตรงกันระบบจะรวมข้อมูลและประวัติการจองทั้งหมดให้โดยอัตโนมัติ ยืนยันการดำเนินการ?')) return
         setIsMerging(true)
         try {
-            const adminToken = localStorage.getItem('admin_token') || ''
+            const adminToken = localStorage.getItem('shop_admin_token') || localStorage.getItem('shop_admin_token') || localStorage.getItem('admin_token') || ''
             const res = await fetch('/api/admin/merge-customers', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${adminToken}` }
@@ -145,15 +146,11 @@ export default function CRMPage() {
             setLoading(true)
             const [custRes, bookRes, svcRes, stfRes, znRes, brRes, addRes] = await Promise.all([
                 supabase.from('customers').select('*').order('created_at', { ascending: false }),
-                supabase.from('bookings').select(`
-                    *, 
-                    customers(*), 
-                    staff(full_name),
-                    services(name, price_s),
-                    zones(name, branches(name))
-                `).order('created_at', { ascending: false }),
+                // BUG-03 FIX: filter by branchId
+                (branchId ? supabase.from('bookings').select(`*, customers(*), staff(full_name), services(name, price_s), zones(name, branches(name))`).eq('branch_id', branchId).order('created_at', { ascending: false }) : supabase.from('bookings').select(`*, customers(*), staff(full_name), services(name, price_s), zones(name, branches(name))`).order('created_at', { ascending: false })),
                 supabase.from('services').select('*'),
-                supabase.from('staff').select('*'),
+                // BUG-03 FIX: filter staff by branchId
+                (branchId ? supabase.from('staff').select('*').eq('branch_id', branchId) : supabase.from('staff').select('*')),
                 supabase.from('zones').select('*'),
                 supabase.from('branches').select('*'),
                 supabase.from('service_addons').select('*')
@@ -450,6 +447,8 @@ export default function CRMPage() {
         setLoading(true)
         const idMap: Record<string, string> = {}
 
+        // BUG-06 FIX: block merge in shop admin context
+        if (branchId) { alert('Merge \u0e44\u0e21\u0e48\u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e43\u0e0a\u0e49\u0e43\u0e19 Shop Admin \u0e01\u0e23\u0e38\u0e13\u0e32\u0e43\u0e0a\u0e49\u0e1c\u0e48\u0e32\u0e19 Platform Admin'); setLoading(false); return }
         // 1. Migrate Customers
         const { data: rawCustomers } = await supabase.from('customers').select('*')
         const migratedCustomers = (rawCustomers || []).map(c => {

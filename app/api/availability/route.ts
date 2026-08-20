@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 
 // GET: Get availability for a zone and date range
@@ -53,9 +53,12 @@ export async function GET(req: NextRequest) {
     // Count capacity per slot
     const capacityCounts: Record<string, Record<string, number>> = {}
     for (const s of schedules || []) {
-        if (s.date === todayStr && s.time_slot <= currentHourMin) continue
+        // BUG-13 FIX: normalize time_slot to HH:MM before comparison
+        const normalizedSlot = (s.time_slot || '').substring(0, 5) // '09:00:00' -> '09:00'
+        if (s.date === todayStr && normalizedSlot <= currentHourMin) continue
         if (!capacityCounts[s.date]) capacityCounts[s.date] = {}
-        capacityCounts[s.date][s.time_slot] = (capacityCounts[s.date][s.time_slot] || 0) + 1
+        const slotKey = (s.time_slot || '').substring(0, 5) // BUG-13 FIX: normalize
+        capacityCounts[s.date][slotKey] = (capacityCounts[s.date][slotKey] || 0) + 1
     }
 
     // Count usage per slot

@@ -1,8 +1,14 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { redirect } from 'next/navigation'
+
+// F1: Block access in production
+if (process.env.NODE_ENV === 'production') redirect('/')
 
 export default function DebugDbPage() {
     const [db, setDb] = useState<any>({})
+
+
 
     useEffect(() => {
         const data: any = {}

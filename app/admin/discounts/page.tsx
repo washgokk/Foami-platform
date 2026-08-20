@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import styles from './discounts.module.css'
@@ -6,7 +6,8 @@ import { Ticket, Sparkles, Edit2, CheckCircle, AlertCircle, Trash2, Calendar, Cl
 import ConfirmModal from '@/components/Global/ConfirmModal'
 import { trackAuditLog } from '@/lib/audit'
 
-export default function AdvancedDiscountsPage() {
+// B6 FIX: Accept optional branchId
+export default function AdvancedDiscountsPage({ branchId }: { branchId?: string }) {
     const [codes, setCodes] = useState<any[]>([])
     const [segments, setSegments] = useState<any[]>([])
     const [branches, setBranches] = useState<any[]>([])
@@ -49,7 +50,9 @@ export default function AdvancedDiscountsPage() {
         setSegments(savedSegments)
 
         // Load discount codes
-        const { data } = await supabase.from('discount_codes').select('*').order('created_at', { ascending: false })
+        let q = supabase.from('discount_codes').select('*').order('created_at', { ascending: false })
+        if (branchId) q = q.eq('branch_id', branchId)
+        const { data } = await q
         if (data) setCodes(data)
 
         // Load branches and zones

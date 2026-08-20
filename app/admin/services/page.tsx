@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Service, ServiceAddon, Branch, VEHICLE_SIZE_LABEL, CCPriceGroup } from '@/lib/types'
@@ -10,7 +10,8 @@ import { trackAuditLog } from '@/lib/audit'
 
 type Tab = 'services' | 'addons' | 'groups'
 
-export default function ServicesPage() {
+// B4 FIX: Accept optional branchId
+export default function ServicesPage({ branchId }: { branchId?: string }) {
     const [tab, setTab] = useState<Tab>('services')
     const [services, setServices] = useState<Service[]>([])
     const [addons, setAddons] = useState<ServiceAddon[]>([])
@@ -56,6 +57,7 @@ export default function ServicesPage() {
     const load = useCallback(async () => {
         setLoading(true)
         const [{ data: svcs }, { data: ads }, { data: brs }, { data: pgs }] = await Promise.all([
+            // BUG-04 FIX: services are platform-wide; show all active, branch_settings controls per-branch config
             supabase.from('services').select('*').order('name'),
             supabase.from('service_addons').select('*').order('name'),
             supabase.from('branches').select('*').order('name'),
@@ -66,7 +68,7 @@ export default function ServicesPage() {
         setBranches(brs || [])
         setPriceGroups(pgs || [])
         setLoading(false)
-    }, [])
+    }, [branchId]) // BUG-08 FIX: branchId must be in deps so load() re-runs when it resolves
 
     useEffect(() => { load() }, [load])
 

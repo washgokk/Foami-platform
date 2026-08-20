@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 import { sendPushNotification } from '@/lib/push'
 
@@ -55,6 +55,12 @@ export async function POST(req: NextRequest) {
             }, { status: 400 })
         }
 
+        // BUG-07 FIX: resolve branch_id from zone if not provided
+        let resolved_branch_id = branch_id
+        if (!resolved_branch_id && zone_id) {
+            const { data: zoneForBranch } = await supabase.from('zones').select('branch_id').eq('id', zone_id).single()
+            resolved_branch_id = zoneForBranch?.branch_id || null
+        }
         // Insert using service client → bypasses all RLS policies
         const { data: bookingData, error: insertError } = await supabase
             .from('bookings')
