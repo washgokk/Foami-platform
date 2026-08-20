@@ -8,6 +8,8 @@ import {
   Sparkles, LineChart, FileSpreadsheet
 } from 'lucide-react'
 
+import { supabase } from '@/lib/supabase'
+
 type DimensionKey = 'branch' | 'category' | 'vehicle_type' | 'day_of_week' | 'status'
 type MetricKey = 'gross_revenue' | 'platform_fee' | 'net_payout' | 'job_count' | 'completed_count' | 'aov' | 'avg_rating'
 
@@ -51,20 +53,32 @@ export default function PlatformAnalyticsPage() {
     setLoading(true)
     try {
       const token = localStorage.getItem('platform_token') || ''
-      const [bksRes, brsRes] = await Promise.all([
+      const [bksRes, brsRes, supBrs] = await Promise.all([
         fetch('/api/bookings?limit=3000', { headers: { Authorization: `Bearer ${token}` } }),
-        fetch('/api/platform/shops', { headers: { Authorization: `Bearer ${token}` } })
+        fetch('/api/platform/shops', { headers: { Authorization: `Bearer ${token}` } }),
+        supabase.from('branches').select('id, name, slug')
       ])
 
       const [bksData, brsData] = await Promise.all([bksRes.json(), brsRes.json()])
       setBookings(bksData.bookings || [])
-      setBranches(brsData.shops || [])
+      
+      const combinedBranches = (brsData.shops && brsData.shops.length > 0) ? brsData.shops : (supBrs.data || [])
+      setBranches(combinedBranches)
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => { load() }, [])
+
+  // Fast Lookup Map for Branch Names
+  const branchNameMap = useMemo(() => {
+    const map = new Map<string, string>()
+    branches.forEach((b: any) => {
+      if (b.id) map.set(b.id, b.name || b.slug || 'สาขาหลัก')
+    })
+    return map
+  }, [branches])
 
   // Filter Bookings by Date Range and Branch
   const filteredBookings = useMemo(() => {
@@ -90,19 +104,20 @@ export default function PlatformAnalyticsPage() {
       }
 
       // Branch Filter
+      const bName = branchNameMap.get(b.branch_id) || b.branches?.name || b.branch_name
       const matchesBranch = selectedBranchFilter === 'all' ||
         b.branch_id === selectedBranchFilter ||
-        b.branches?.name === selectedBranchFilter ||
-        b.branch_name === selectedBranchFilter
+        bName === selectedBranchFilter ||
+        (branches.find(br => br.id === selectedBranchFilter)?.name === bName)
 
       return matchesDate && matchesBranch
     })
-  }, [bookings, dateRange, selectedBranchFilter])
+  }, [bookings, dateRange, selectedBranchFilter, branchNameMap, branches])
 
   // Helper to get dimension value for a booking
   const getDimensionValue = (b: any, dim: DimensionKey): string => {
     if (dim === 'branch') {
-      return b.branches?.name || b.branch_name || b.branch_id || 'สาขา Foami'
+      return branchNameMap.get(b.branch_id) || b.branches?.name || b.branch_name || (branches.length > 0 ? branches[0].name : 'สาขาหลัก')
     }
     if (dim === 'category') {
       const sName = (b.service_name || '').toLowerCase()
