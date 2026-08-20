@@ -7,9 +7,7 @@ import {
     Crown,
     ArrowRight,
     Sparkles,
-    Smartphone,
-    Layers,
-    BadgePercent
+    Smartphone
 } from 'lucide-react'
 
 import Logo from '@/components/Branding/Logo'
@@ -19,41 +17,41 @@ export default function PortalPage() {
         {
             title: 'Customer App',
             subtitle: 'Marketplace & Booking',
-            description: 'ระบบจองบริการล้างรถ ค้นหาร้านใกล้เคียง และติดตามสถานะ',
+            description: 'ระบบจองบริการล้างรถ ค้นหาร้านใกล้เคียง และติดตามสถานะเรียลไทม์',
             href: '/search',
             icon: Smartphone,
             badge: 'ผู้ใช้งาน',
-            badgeColor: '#10B981',
-            badgeBg: 'rgba(16, 185, 129, 0.1)',
-            themeColor: '#0ea5e9',
-            themeBg: 'rgba(14, 165, 233, 0.1)',
-            borderColor: 'rgba(14, 165, 233, 0.25)',
+            badgeColor: '#D946EF',
+            badgeBg: 'var(--accent-pink-ghost)',
+            themeColor: 'var(--accent-pink-dark)',
+            themeBg: 'var(--accent-pink-ghost)',
+            borderColor: 'var(--accent-pink)',
         },
         {
             title: 'Staff Dashboard',
             subtitle: 'Rider & Cleaner App',
-            description: 'สำหรับพนักงานและไรเดอร์ รับงาน อัปเดตรูปถ่าย และดูกะงาน',
+            description: 'สำหรับพนักงานและไรเดอร์ รับงาน อัปเดตรูปถ่าย และดูกะงานประจำวัน',
             href: '/staff/dashboard',
             icon: UserCircle,
             badge: 'ทีมงาน',
-            badgeColor: '#3B82F6',
-            badgeBg: 'rgba(59, 130, 246, 0.1)',
-            themeColor: '#3b82f6',
-            themeBg: 'rgba(59, 130, 246, 0.1)',
-            borderColor: 'rgba(59, 130, 246, 0.25)',
+            badgeColor: '#0284C7',
+            badgeBg: 'var(--accent-blue-ghost)',
+            themeColor: '#0284C7',
+            themeBg: 'var(--accent-blue-ghost)',
+            borderColor: 'var(--brand-subordinate)',
         },
         {
             title: 'Shop Admin',
             subtitle: 'Branch Management',
-            description: 'ระบบจัดการร้าน คิวงาน ทีมงาน ราคา ส่วนลด และยอดเงินร้าน',
+            description: 'ระบบจัดการร้าน คิวงาน ทีมงาน บริการ ราคา ส่วนลด และยอดเงินสาขา',
             href: '/admin/dashboard',
             icon: Store,
             badge: 'เจ้าของร้าน',
-            badgeColor: '#8B5CF6',
-            badgeBg: 'rgba(139, 92, 246, 0.1)',
-            themeColor: '#8b5cf6',
-            themeBg: 'rgba(139, 92, 246, 0.1)',
-            borderColor: 'rgba(139, 92, 246, 0.25)',
+            badgeColor: 'var(--brand-dominant)',
+            badgeBg: 'var(--primary-ghost)',
+            themeColor: 'var(--brand-dominant)',
+            themeBg: 'var(--primary-ghost)',
+            borderColor: 'var(--border)',
         },
         {
             title: 'Platform Admin',
@@ -62,53 +60,56 @@ export default function PortalPage() {
             href: '/admin/platform',
             icon: Crown,
             badge: 'Super Admin',
-            badgeColor: '#F59E0B',
-            badgeBg: 'rgba(245, 158, 11, 0.12)',
-            themeColor: '#f59e0b',
-            themeBg: 'rgba(245, 158, 11, 0.1)',
-            borderColor: 'rgba(245, 158, 11, 0.3)',
+            badgeColor: '#D97706',
+            badgeBg: '#FFFBEB',
+            themeColor: '#D97706',
+            themeBg: '#FFFBEB',
+            borderColor: '#FDE68A',
         },
     ]
 
     return (
         <div style={{ 
             minHeight: '100vh', 
-            background: 'radial-gradient(ellipse at top, #1e293b 0%, #0f172a 100%)',
-            color: '#f8fafc',
-            padding: '40px 20px',
+            background: 'linear-gradient(180deg, #F0F4FC 0%, var(--bg) 100%)',
+            padding: '48px 16px',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            fontFamily: 'Inter, system-ui, sans-serif'
+            fontFamily: 'var(--font-kanit, "Kanit", sans-serif)'
         }}>
-            <div style={{ maxWidth: 520, width: '100%' }}>
+            <div style={{ maxWidth: 500, width: '100%' }}>
                 {/* Header */}
                 <div style={{ textAlign: 'center', marginBottom: 32 }}>
                     <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'center' }}>
-                        <Logo width={160} />
+                        <Logo width={170} />
                     </div>
                     <div style={{
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: 6,
-                        background: 'rgba(56, 189, 248, 0.12)',
-                        border: '1px solid rgba(56, 189, 248, 0.25)',
-                        padding: '4px 12px',
+                        background: 'var(--primary-ghost)',
+                        border: '1px solid var(--border)',
+                        padding: '4px 14px',
                         borderRadius: 9999,
                         fontSize: 12,
-                        fontWeight: 700,
-                        color: '#38bdf8',
-                        marginBottom: 12,
-                        letterSpacing: '0.04em',
-                        textTransform: 'uppercase'
+                        fontWeight: 600,
+                        color: 'var(--brand-dominant)',
+                        marginBottom: 10
                     }}>
-                        <Sparkles size={13} /> Foami Platform 2.0
+                        <Sparkles size={13} color="var(--brand-dominant)" /> Foami Platform 2.0
                     </div>
-                    <h1 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.02em', margin: 0 }}>
+                    <h1 style={{ 
+                        fontSize: '1.85rem', 
+                        fontWeight: 800, 
+                        color: 'var(--text-primary)', 
+                        letterSpacing: '-0.02em', 
+                        margin: '0 0 6px 0' 
+                    }}>
                         Foami Operations Portal
                     </h1>
-                    <p style={{ color: '#94a3b8', marginTop: 8, fontSize: 14, fontWeight: 400 }}>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: 14, fontWeight: 400, margin: 0 }}>
                         เลือกพอร์ทัลเพื่อเข้าสู่ระบบตามบทบาทการทำงาน
                     </p>
                 </div>
@@ -121,38 +122,38 @@ export default function PortalPage() {
                             <Link 
                                 key={idx}
                                 href={item.href} 
+                                className="card"
                                 style={{ 
                                     padding: '18px 20px', 
                                     display: 'flex', 
                                     alignItems: 'center', 
                                     gap: 16,
-                                    background: 'rgba(30, 41, 59, 0.7)',
-                                    backdropFilter: 'blur(12px)',
-                                    border: `1px solid ${item.borderColor}`,
-                                    borderRadius: 16,
+                                    background: 'var(--surface)',
+                                    border: '1.5px solid var(--border)',
+                                    borderRadius: 18,
                                     textDecoration: 'none',
                                     color: 'inherit',
                                     transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                                     cursor: 'pointer',
-                                    boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.25)'
+                                    boxShadow: '0 4px 14px rgba(49, 94, 195, 0.05)'
                                 }} 
                                 onMouseOver={e => {
                                     e.currentTarget.style.transform = 'translateY(-3px)'
-                                    e.currentTarget.style.background = 'rgba(30, 41, 59, 0.95)'
-                                    e.currentTarget.style.boxShadow = `0 12px 28px -4px ${item.themeBg}`
+                                    e.currentTarget.style.borderColor = item.borderColor
+                                    e.currentTarget.style.boxShadow = '0 10px 24px rgba(49, 94, 195, 0.12)'
                                 }} 
                                 onMouseOut={e => {
                                     e.currentTarget.style.transform = 'translateY(0)'
-                                    e.currentTarget.style.background = 'rgba(30, 41, 59, 0.7)'
-                                    e.currentTarget.style.boxShadow = '0 4px 20px -2px rgba(0, 0, 0, 0.25)'
+                                    e.currentTarget.style.borderColor = 'var(--border)'
+                                    e.currentTarget.style.boxShadow = '0 4px 14px rgba(49, 94, 195, 0.05)'
                                 }}
                             >
                                 <div style={{ 
-                                    width: 48, 
-                                    height: 48, 
+                                    width: 50, 
+                                    height: 50, 
                                     background: item.themeBg, 
                                     color: item.themeColor, 
-                                    borderRadius: 12, 
+                                    borderRadius: 14, 
                                     display: 'flex', 
                                     alignItems: 'center', 
                                     justifyContent: 'center',
@@ -162,26 +163,26 @@ export default function PortalPage() {
                                 </div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                                        <span style={{ fontWeight: 800, fontSize: 16, color: '#f8fafc' }}>
+                                        <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)' }}>
                                             {item.title}
                                         </span>
                                         <span style={{ 
                                             fontSize: 11, 
-                                            fontWeight: 700, 
+                                            fontWeight: 600, 
                                             padding: '2px 8px', 
                                             borderRadius: 9999,
                                             background: item.badgeBg,
                                             color: item.badgeColor,
-                                            border: `1px solid ${item.badgeColor}33`
+                                            border: `1px solid ${item.badgeColor}25`
                                         }}>
                                             {item.badge}
                                         </span>
                                     </div>
-                                    <div style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.4 }}>
+                                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
                                         {item.description}
                                     </div>
                                 </div>
-                                <ArrowRight size={18} color="#64748b" style={{ flexShrink: 0 }} />
+                                <ArrowRight size={18} color="var(--border-dark)" style={{ flexShrink: 0 }} />
                             </Link>
                         )
                     })}
@@ -189,7 +190,7 @@ export default function PortalPage() {
 
                 {/* Footer */}
                 <div style={{ textAlign: 'center', marginTop: 32 }}>
-                    <p style={{ fontSize: 12, color: '#64748b' }}>
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                         Foami Multi-Tenant Platform &copy; 2026 &bull; All Rights Reserved
                     </p>
                 </div>
