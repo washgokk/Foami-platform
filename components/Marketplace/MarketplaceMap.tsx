@@ -151,12 +151,12 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, user
         : `<div style="width: 26px; height: 26px; border-radius: 50%; background: ${isSelected ? 'rgba(255,255,255,0.2)' : '#EFF3FD'}; border: 1.5px solid ${isSelected ? '#FFFFFF' : '#315EC3'}; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; color: ${isSelected ? '#FFFFFF' : '#315EC3'}; flex-shrink: 0;">${(shop.shop_name || 'F')[0]}</div>`
 
       const ratingBadge = (shop.avg_rating > 0 && shop.review_count > 0)
-        ? `<span style="font-size: 10.5px; font-weight: 800; color: ${isSelected ? '#FDE68A' : '#D97706'}; background: ${isSelected ? 'rgba(0,0,0,0.2)' : '#FEF3C7'}; padding: 2px 6px; border-radius: 6px; display: inline-flex; align-items: center; gap: 2px;">★ ${shop.avg_rating.toFixed(1)}</span>`
+        ? `<span style="font-size: 10.5px; font-weight: 800; color: ${isSelected ? '#FDE68A' : '#D97706'}; background: ${isSelected ? 'rgba(0,0,0,0.2)' : '#FEF3C7'}; padding: 2px 6px; border-radius: 6px; display: inline-flex; align-items: center; gap: 3px;"><svg width="10" height="10" viewBox="0 0 24 24" fill="${isSelected ? '#FDE68A' : '#F59E0B'}" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>${shop.avg_rating.toFixed(1)}</span>`
         : ''
 
       // Earliest Slot Pill on Map Marker (Foami Brand Themed)
       const slotBadge = shop.earliest_slot && !shop.earliest_slot.is_out_of_reach
-        ? `<span style="font-size: 9.5px; font-weight: 600; color: ${isSelected ? '#FFFFFF' : '#315EC3'}; background: ${isSelected ? 'rgba(255,255,255,0.2)' : '#EFF3FD'}; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; border: 0.5px solid ${isSelected ? 'rgba(255,255,255,0.3)' : '#D8E2F8'};">ว่าง ${shop.earliest_slot.short_text}</span>`
+        ? `<span style="font-size: 9.5px; font-weight: 600; color: ${isSelected ? '#FFFFFF' : '#315EC3'}; background: ${isSelected ? 'rgba(255,255,255,0.2)' : '#EFF3FD'}; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; border: 0.5px solid ${isSelected ? 'rgba(255,255,255,0.3)' : '#DDE3F5'};">ว่าง ${shop.earliest_slot.short_text}</span>`
         : (shop.earliest_slot?.is_out_of_reach
           ? `<span style="font-size: 9px; font-weight: 600; color: #94A3B8; background: #F8FAFC; padding: 1px 5px; border-radius: 4px;">นอกโซน</span>`
           : '')
@@ -178,7 +178,7 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, user
             <div style="
               background: ${isSelected ? '#315EC3' : '#FFFFFF'};
               color: ${isSelected ? '#FFFFFF' : '#1A2340'};
-              border: 2px solid ${isSelected ? '#214192' : '#315EC3'};
+              border: 2px solid ${isSelected ? '#1E3A8A' : '#315EC3'};
               border-radius: 999px;
               padding: 4px 12px 4px 5px;
               font-family: 'Kanit', sans-serif;

@@ -130,7 +130,7 @@ function ShopCard({
       style={{
         background: '#FFFFFF',
         borderRadius: 20,
-        border: isSelected ? '2px solid #315EC3' : '1.5px solid #E2E8F0',
+        border: isSelected ? '2px solid #315EC3' : '1.5px solid #DDE3F5',
         padding: '16px',
         cursor: 'pointer',
         transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -142,13 +142,13 @@ function ShopCard({
       }}
       onMouseEnter={e => {
         if (!isSelected) {
-          e.currentTarget.style.borderColor = '#93C5FD'
+          e.currentTarget.style.borderColor = '#315EC3'
           e.currentTarget.style.transform = 'translateY(-2px)'
         }
       }}
       onMouseLeave={e => {
         if (!isSelected) {
-          e.currentTarget.style.borderColor = '#E2E8F0'
+          e.currentTarget.style.borderColor = '#DDE3F5'
           e.currentTarget.style.transform = 'translateY(0)'
         }
       }}
@@ -204,7 +204,7 @@ function ShopCard({
             position: 'absolute',
             bottom: 10,
             left: 10,
-            background: 'rgba(15, 23, 42, 0.75)',
+            background: 'rgba(26, 35, 64, 0.75)',
             backdropFilter: 'blur(6px)',
             color: '#FFFFFF',
             fontSize: 11.5,
@@ -215,7 +215,7 @@ function ShopCard({
             alignItems: 'center',
             gap: 4
           }}>
-            <Navigation2 size={11} color="#60A5FA" />
+            <Navigation2 size={11} color="#A0D9F6" />
             <span>{shop.distance_km} กม.</span>
           </div>
         )}
@@ -227,7 +227,7 @@ function ShopCard({
           right: 10,
           background: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(6px)',
-          color: '#1E3A8A',
+          color: '#315EC3',
           fontSize: 12.5,
           fontWeight: 900,
           padding: '3px 10px',
@@ -242,18 +242,18 @@ function ShopCard({
       {shop.earliest_slot && (
         shop.earliest_slot.is_out_of_reach ? (
           <div style={{
-            background: '#F8FAFC',
-            border: '1px solid #E2E8F0',
+            background: '#EFF3FD',
+            border: '1px solid #DDE3F5',
             borderRadius: 10,
             padding: '6px 10px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             fontSize: 11.5,
-            color: '#64748B'
+            color: '#5A6589'
           }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#64748B' }}>
-              <AlertTriangle size={12} color="#94A3B8" />
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#5A6589', fontWeight: 600 }}>
+              <AlertTriangle size={12} color="#DC2626" />
               อยู่นอกพื้นที่บริการ ({shop.distance_km || 0} กม.)
             </span>
           </div>
@@ -1116,7 +1116,7 @@ export default function MarketplaceSearchPage() {
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(15, 23, 42, 0.55)',
+              background: 'rgba(26, 35, 64, 0.6)',
               zIndex: 1000,
               backdropFilter: 'blur(4px)',
               transition: 'opacity 0.2s'
@@ -1167,7 +1167,7 @@ export default function MarketplaceSearchPage() {
               <div style={{
                 width: 44,
                 height: 5,
-                background: isDraggingDrawer ? '#94A3B8' : '#CBD5E1',
+                background: isDraggingDrawer ? '#315EC3' : '#DDE3F5',
                 borderRadius: 999,
                 transition: 'background 0.15s, transform 0.15s',
                 transform: isDraggingDrawer ? 'scale(1.15)' : 'scale(1)'
@@ -1260,8 +1260,8 @@ export default function MarketplaceSearchPage() {
             {selectedShop.description && (
               <p style={{
                 fontSize: 13, color: '#475569', lineHeight: 1.5,
-                marginBottom: 16, background: '#FAFAFA', padding: '10px 14px',
-                borderRadius: 12, border: '1px solid #F1F5F9', wordBreak: 'break-word'
+                marginBottom: 16, background: '#F6F8FF', padding: '10px 14px',
+                borderRadius: 12, border: '1px solid #DDE3F5', wordBreak: 'break-word'
               }}>
                 {selectedShop.description}
               </p>
@@ -1271,8 +1271,8 @@ export default function MarketplaceSearchPage() {
             {selectedShop.earliest_slot && (
               <div style={{
                 marginBottom: 16,
-                background: selectedShop.earliest_slot.is_out_of_reach ? '#F8FAFC' : '#F0F4FC',
-                border: `1px solid ${selectedShop.earliest_slot.is_out_of_reach ? '#E2E8F0' : '#D8E2F8'}`,
+                background: selectedShop.earliest_slot.is_out_of_reach ? '#EFF3FD' : '#F0F4FC',
+                border: `1.5px solid ${selectedShop.earliest_slot.is_out_of_reach ? '#DDE3F5' : '#D8E2F8'}`,
                 borderRadius: 14,
                 padding: '12px 16px',
                 display: 'flex',
@@ -1286,7 +1286,7 @@ export default function MarketplaceSearchPage() {
                     height: 34,
                     borderRadius: 10,
                     background: '#FFFFFF',
-                    border: `1px solid ${selectedShop.earliest_slot.is_out_of_reach ? '#E2E8F0' : '#D8E2F8'}`,
+                    border: `1px solid ${selectedShop.earliest_slot.is_out_of_reach ? '#DDE3F5' : '#D8E2F8'}`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1380,7 +1380,7 @@ export default function MarketplaceSearchPage() {
                         onClick={() => router.push(`/${selectedShop.shop_slug}/book?service=${srv.id}`)}
                         style={{
                           background: '#FFFFFF',
-                          border: '1.5px solid #E2E8F0',
+                          border: '1.5px solid #DDE3F5',
                           borderRadius: 16,
                           padding: '12px 14px',
                           display: 'flex',
@@ -1393,10 +1393,10 @@ export default function MarketplaceSearchPage() {
                         }}
                         onMouseEnter={e => {
                           e.currentTarget.style.borderColor = '#315EC3'
-                          e.currentTarget.style.background = '#FBFDFF'
+                          e.currentTarget.style.background = '#F6F8FF'
                         }}
                         onMouseLeave={e => {
-                          e.currentTarget.style.borderColor = '#E2E8F0'
+                          e.currentTarget.style.borderColor = '#DDE3F5'
                           e.currentTarget.style.background = '#FFFFFF'
                         }}
                       >
@@ -1472,7 +1472,7 @@ export default function MarketplaceSearchPage() {
                   })}
                 </div>
               ) : (
-                <div style={{ textAlign: 'center', padding: '20px', background: '#F8FAFC', borderRadius: 14 }}>
+                <div style={{ textAlign: 'center', padding: '20px', background: '#F6F8FF', border: '1px solid #DDE3F5', borderRadius: 14 }}>
                   <Link
                     href={`/${selectedShop.shop_slug}/book`}
                     style={{
