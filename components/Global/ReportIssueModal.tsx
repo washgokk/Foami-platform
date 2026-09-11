@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useEffect } from 'react'
 import {
-  X, AlertTriangle, ShieldAlert, CheckCircle2, MessageSquare,
+  X, AlertTriangle, ShieldAlert, CheckCircle2, MessageSquare, Store, Package,
   Building2, ShoppingBag, Phone, User, Send, ChevronRight, Copy, Check
 } from 'lucide-react'
 
@@ -195,11 +195,11 @@ export default function ReportIssueModal({
         {/* Header */}
         <div style={{
           padding: '20px 24px',
-          borderBottom: '1px solid #E2E8F0',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: 'linear-gradient(135deg, #FFF1F2 0%, #FFFFFF 100%)',
+          background: '#FEF2F2',
+          borderBottom: '1px solid #FEE2E2',
           borderTopLeftRadius: 24,
           borderTopRightRadius: 24
         }}>
@@ -270,8 +270,8 @@ export default function ReportIssueModal({
               </p>
 
               <div style={{
-                background: '#F8FAFC',
-                border: '1.5px dashed #CBD5E1',
+                background: '#F6F8FF',
+                border: '1.5px dashed #315EC3',
                 borderRadius: 16,
                 padding: '14px 18px',
                 display: 'inline-flex',
@@ -281,7 +281,7 @@ export default function ReportIssueModal({
               }}>
                 <div>
                   <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>หมายเลขติดตามเคส (Case Ticket)</div>
-                  <div style={{ fontSize: 18, fontWeight: 900, color: '#2563EB', letterSpacing: '.05em' }}>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: '#315EC3', letterSpacing: '.05em' }}>
                     {createdCaseNumber}
                   </div>
                 </div>
@@ -313,7 +313,7 @@ export default function ReportIssueModal({
                     width: '100%',
                     padding: '12px 20px',
                     borderRadius: 14,
-                    background: '#0F172A',
+                    background: '#315EC3',
                     color: '#FFF',
                     border: 'none',
                     fontSize: 14,
@@ -346,60 +346,78 @@ export default function ReportIssueModal({
               )}
 
               {/* Type Switcher if not locked */}
-              <div style={{ display: 'flex', gap: 8, background: '#F1F5F9', padding: 4, borderRadius: 14 }}>
+              <div style={{ display: 'flex', gap: 8, background: '#EFF3FD', padding: 4, borderRadius: 14, border: '1px solid #DDE3F5' }}>
                 <button
                   type="button"
                   onClick={() => setReportType('shop')}
                   style={{
                     flex: 1,
-                    padding: '8px 12px',
+                    padding: '9px 12px',
                     borderRadius: 10,
                     border: 'none',
                     background: reportType === 'shop' ? '#FFFFFF' : 'transparent',
-                    color: reportType === 'shop' ? '#0F172A' : '#64748B',
+                    color: reportType === 'shop' ? '#1A2340' : '#4B5E86',
                     fontWeight: 700,
                     fontSize: 12.5,
                     cursor: 'pointer',
-                    boxShadow: reportType === 'shop' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    boxShadow: reportType === 'shop' ? '0 1px 4px rgba(49, 94, 195, 0.12)' : 'none',
+                    transition: 'all 0.15s ease'
                   }}
                 >
-                  🏪 ปัญหาร้านค้า
+                  <Store size={15} style={{ color: reportType === 'shop' ? '#315EC3' : '#64748B' }} />
+                  <span>ปัญหาร้านค้า</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setReportType('order')}
                   style={{
                     flex: 1,
-                    padding: '8px 12px',
+                    padding: '9px 12px',
                     borderRadius: 10,
                     border: 'none',
                     background: reportType === 'order' ? '#FFFFFF' : 'transparent',
-                    color: reportType === 'order' ? '#0F172A' : '#64748B',
+                    color: reportType === 'order' ? '#1A2340' : '#4B5E86',
                     fontWeight: 700,
                     fontSize: 12.5,
                     cursor: 'pointer',
-                    boxShadow: reportType === 'order' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    boxShadow: reportType === 'order' ? '0 1px 4px rgba(49, 94, 195, 0.12)' : 'none',
+                    transition: 'all 0.15s ease'
                   }}
                 >
-                  📦 ปัญหาออเดอร์
+                  <Package size={15} style={{ color: reportType === 'order' ? '#315EC3' : '#64748B' }} />
+                  <span>ปัญหาออเดอร์</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setReportType('customer_issue')}
                   style={{
                     flex: 1,
-                    padding: '8px 12px',
+                    padding: '9px 12px',
                     borderRadius: 10,
                     border: 'none',
                     background: reportType === 'customer_issue' ? '#FFFFFF' : 'transparent',
-                    color: reportType === 'customer_issue' ? '#0F172A' : '#64748B',
+                    color: reportType === 'customer_issue' ? '#1A2340' : '#4B5E86',
                     fontWeight: 700,
                     fontSize: 12.5,
                     cursor: 'pointer',
-                    boxShadow: reportType === 'customer_issue' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    boxShadow: reportType === 'customer_issue' ? '0 1px 4px rgba(49, 94, 195, 0.12)' : 'none',
+                    transition: 'all 0.15s ease'
                   }}
                 >
-                  💬 ปัญหาทั่วไป
+                  <MessageSquare size={15} style={{ color: reportType === 'customer_issue' ? '#315EC3' : '#64748B' }} />
+                  <span>ปัญหาทั่วไป</span>
                 </button>
               </div>
 
@@ -408,8 +426,8 @@ export default function ReportIssueModal({
                 <div style={{
                   padding: '10px 14px',
                   borderRadius: 12,
-                  background: '#F8FAFC',
-                  border: '1px solid #E2E8F0',
+                  background: '#F6F8FF',
+                  border: '1px solid #DDE3F5',
                   fontSize: 12.5,
                   display: 'flex',
                   alignItems: 'center',
@@ -442,7 +460,7 @@ export default function ReportIssueModal({
                     width: '100%',
                     padding: '10px 14px',
                     borderRadius: 12,
-                    border: '1.5px solid #CBD5E1',
+                    border: '1.5px solid #DDE3F5',
                     fontSize: 13,
                     fontFamily: 'inherit',
                     outline: 'none',
@@ -470,7 +488,7 @@ export default function ReportIssueModal({
                     width: '100%',
                     padding: '10px 14px',
                     borderRadius: 12,
-                    border: '1.5px solid #CBD5E1',
+                    border: '1.5px solid #DDE3F5',
                     fontSize: 13,
                     fontFamily: 'inherit',
                     outline: 'none',
@@ -494,7 +512,7 @@ export default function ReportIssueModal({
                     width: '100%',
                     padding: '10px 14px',
                     borderRadius: 12,
-                    border: '1.5px solid #CBD5E1',
+                    border: '1.5px solid #DDE3F5',
                     fontSize: 13,
                     fontFamily: 'inherit',
                     outline: 'none',
@@ -513,7 +531,7 @@ export default function ReportIssueModal({
                 <div style={{ display: 'flex', gap: 8 }}>
                   {[
                     { id: 'low', label: 'เล็กน้อย', color: '#64748B' },
-                    { id: 'normal', label: 'ปกติ', color: '#2563EB' },
+                    { id: 'normal', label: 'ปกติ', color: '#315EC3' },
                     { id: 'high', label: 'เร่งด่วน', color: '#D97706' },
                     { id: 'critical', label: 'วิกฤต / เสียหายหนัก', color: '#DC2626' }
                   ].map(s => (
@@ -540,7 +558,7 @@ export default function ReportIssueModal({
               </div>
 
               {/* Customer Contact */}
-              <div style={{ background: '#F8FAFC', padding: 14, borderRadius: 14, border: '1px solid #E2E8F0' }}>
+              <div style={{ background: '#F6F8FF', padding: 14, borderRadius: 14, border: '1px solid #DDE3F5' }}>
                 <div style={{ fontSize: 12, fontWeight: 800, color: '#1E293B', marginBottom: 8 }}>
                   ข้อมูลผู้แจ้ง (สำหรับเจ้าหน้าที่ติดต่อประสานงาน)
                 </div>
@@ -556,7 +574,7 @@ export default function ReportIssueModal({
                       onChange={e => setCustomerName(e.target.value)}
                       style={{
                         width: '100%', padding: '8px 12px', borderRadius: 10,
-                        border: '1px solid #CBD5E1', fontSize: 12.5, fontFamily: 'inherit',
+                        border: '1px solid #DDE3F5', fontSize: 12.5, fontFamily: 'inherit',
                         boxSizing: 'border-box'
                       }}
                     />
@@ -572,7 +590,7 @@ export default function ReportIssueModal({
                       onChange={e => setCustomerPhone(e.target.value)}
                       style={{
                         width: '100%', padding: '8px 12px', borderRadius: 10,
-                        border: '1px solid #CBD5E1', fontSize: 12.5, fontFamily: 'inherit',
+                        border: '1px solid #DDE3F5', fontSize: 12.5, fontFamily: 'inherit',
                         boxSizing: 'border-box'
                       }}
                     />
@@ -589,7 +607,7 @@ export default function ReportIssueModal({
                     onChange={e => setCustomerLineId(e.target.value)}
                     style={{
                       width: '100%', padding: '8px 12px', borderRadius: 10,
-                      border: '1px solid #CBD5E1', fontSize: 12.5, fontFamily: 'inherit',
+                      border: '1px solid #DDE3F5', fontSize: 12.5, fontFamily: 'inherit',
                       boxSizing: 'border-box'
                     }}
                   />
@@ -606,7 +624,7 @@ export default function ReportIssueModal({
                     flex: 1,
                     padding: '12px 16px',
                     borderRadius: 14,
-                    border: '1.5px solid #CBD5E1',
+                    border: '1.5px solid #DDE3F5',
                     background: '#FFF',
                     color: '#64748B',
                     fontSize: 13.5,
@@ -624,7 +642,7 @@ export default function ReportIssueModal({
                     padding: '12px 16px',
                     borderRadius: 14,
                     border: 'none',
-                    background: 'linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)',
+                    background: '#DC2626',
                     color: '#FFF',
                     fontSize: 13.5,
                     fontWeight: 800,
