@@ -12,10 +12,7 @@ import {
   ArrowRight,
   Search,
   CheckCircle2,
-  Wrench,
-  Droplets,
   Layers,
-  Wind,
   Store,
   ChevronRight,
   LogIn,
@@ -43,33 +40,6 @@ const C = {
   textSecondary: '#5A6589',
   textMuted: '#8A96B2',
 }
-
-const SERVICES = [
-  {
-    icon: Droplets,
-    title: 'ล้างทำความสะอาดมาตรฐาน',
-    subtitle: 'Standard Wash & Foam',
-    desc: 'ล้างโฟมสลายคราบฝังแน่น ล้างทำความสะอาดซุ้มล้อ และเป่าแห้งด้วยลมสะอาดรอบคัน',
-  },
-  {
-    icon: Sparkles,
-    title: 'ขัดเคลือบสี & แว็กซ์',
-    subtitle: 'Wax & Paint Protection',
-    desc: 'เคลือบเงาและปกป้องผิวสีรถจากรังสี UV คราบน้ำ และสิ่งสกปรกบนท้องถนน',
-  },
-  {
-    icon: Wrench,
-    title: 'ล้างโซ่และระบบขับเคลื่อน',
-    subtitle: 'Chain & Drivetrain Care',
-    desc: 'ล้างคราบน้ำมันและสิ่งสะสมที่โซ่ สเตอร์ พร้อมหล่อลื่นด้วยน้ำยามาตรฐานอุตสาหกรรม',
-  },
-  {
-    icon: Wind,
-    title: 'อบโอโซน & สุขอนามัยภายใน',
-    subtitle: 'Sanitization & Helmets',
-    desc: 'ทำความสะอาดเบาะ ที่เก็บของ และบริการอบโอโซนฆ่าเชื้อโรคหมวกกันน็อก',
-  },
-]
 
 const STEPS = [
   {
@@ -186,9 +156,6 @@ export default function LandingPage() {
             alignItems: 'center',
             gap: 24,
           }} className="desktop-nav">
-            <a href="#services" style={{ color: C.textSecondary, textDecoration: 'none', fontSize: 14, fontWeight: 500, transition: 'color 0.2s' }}>
-              บริการ
-            </a>
             <a href="#how-it-works" style={{ color: C.textSecondary, textDecoration: 'none', fontSize: 14, fontWeight: 500, transition: 'color 0.2s' }}>
               ขั้นตอนการใช้งาน
             </a>
@@ -199,6 +166,10 @@ export default function LandingPage() {
               <GraduationCap size={16} />
               <span>โปรเจกต์นักศึกษา KKU</span>
             </a>
+            <Link href="/partner" style={{ color: C.textSecondary, textDecoration: 'none', fontSize: 14, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Store size={15} style={{ color: C.primary }} />
+              <span>ติดต่อสนใจเป็น Partner</span>
+            </Link>
           </nav>
 
           {/* Action CTAs */}
@@ -328,7 +299,7 @@ export default function LandingPage() {
               </Link>
 
               <Link
-                href="/login"
+                href="/partner"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -346,8 +317,8 @@ export default function LandingPage() {
                   transition: 'all 0.15s'
                 }}
               >
-                <LogIn size={18} style={{ color: C.primary }} />
-                <span>เข้าสู่ระบบสมาชิก</span>
+                <Store size={18} style={{ color: C.primary }} />
+                <span>ติดต่อสนใจเป็น Partner</span>
               </Link>
             </div>
 
@@ -585,102 +556,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── CORE SERVICES ─── */}
-      <section id="services" style={{ padding: '64px 20px', maxWidth: 1200, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', maxWidth: 640, margin: '0 auto 48px' }}>
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '4px 12px',
-            borderRadius: 20,
-            background: C.primaryLight,
-            color: C.primary,
-            fontSize: 12,
-            fontWeight: 600,
-            marginBottom: 12
-          }}>
-            ขอบเขตบริการ
-          </div>
-          <h2 style={{ fontSize: 'clamp(24px, 3.2vw, 34px)', fontWeight: 700, color: C.textPrimary, margin: '0 0 12px' }}>
-            บริการดูแลยานยนต์มาตรฐาน
-          </h2>
-          <p style={{ fontSize: 15, color: C.textSecondary, margin: 0, lineHeight: 1.6 }}>
-            ครอบคลุมทุกความต้องการตั้งแต่การทำความสะอาดพื้นฐานไปจนถึงการดูแลสภาพรถเฉพาะทาง
-          </p>
-        </div>
-
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: 20
-        }}>
-          {SERVICES.map((s, idx) => {
-            const IconComponent = s.icon
-            return (
-              <div
-                key={idx}
-                style={{
-                  background: C.surface,
-                  borderRadius: 16,
-                  border: `1.5px solid ${C.border}`,
-                  padding: 24,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  boxShadow: '0 4px 12px rgba(49, 94, 195, 0.03)'
-                }}
-              >
-                <div style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 12,
-                  background: C.primaryLight,
-                  border: `1px solid ${C.subordinate}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: C.primary,
-                  marginBottom: 16
-                }}>
-                  <IconComponent size={22} />
-                </div>
-                <h3 style={{ fontSize: 17, fontWeight: 700, color: C.textPrimary, margin: '0 0 2px' }}>
-                  {s.title}
-                </h3>
-                <span style={{ fontSize: 12, fontWeight: 600, color: C.primary, marginBottom: 10 }}>
-                  {s.subtitle}
-                </span>
-                <p style={{ fontSize: 14, color: C.textSecondary, lineHeight: 1.6, margin: 0 }}>
-                  {s.desc}
-                </p>
-              </div>
-            )
-          })}
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: 36 }}>
-          <Link
-            href="/search"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '12px 24px',
-              borderRadius: 10,
-              background: C.surface,
-              border: `1.5px solid ${C.primary}`,
-              color: C.primary,
-              fontSize: 15,
-              fontWeight: 600,
-              textDecoration: 'none'
-            }}
-          >
-            <span>ค้นหาร้านเพื่อดูรายการบริการและอัตราค่าบริการจริง</span>
-            <ArrowRight size={16} />
-          </Link>
-        </div>
-      </section>
-
       {/* ─── FOAMI QUALITY STANDARDS ─── */}
       <section id="standards" style={{
         background: C.surface,
@@ -915,7 +790,7 @@ export default function LandingPage() {
                 </Link>
                 
                 <Link
-                  href="/portal"
+                  href="/partner"
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -931,7 +806,7 @@ export default function LandingPage() {
                   }}
                 >
                   <Store size={16} style={{ color: C.primary }} />
-                  <span>สำหรับร้านค้าพาร์ทเนอร์</span>
+                  <span>ติดต่อสนใจเป็น Partner</span>
                 </Link>
               </div>
             </div>
@@ -1012,7 +887,7 @@ export default function LandingPage() {
               พร้อมสัมผัสประสบการณ์การดูแลรถที่สะดวกกว่าเดิมหรือยัง?
             </h2>
             <p style={{ fontSize: 16, color: C.subordinateLight, margin: '0 0 32px', lineHeight: 1.6, opacity: 0.95 }}>
-              ค้นหาศูนย์บริการใกล้คุณ ตรวจสอบเวลาว่าง และทำการนัดหมายได้ทันทีผ่านระบบออนไลน์
+              ค้นหาศูนย์บริการใกล้คุณ ตรวจสอบเวลาว่าง หรือติดต่อร่วมเป็นร้านค้าพาร์ทเนอร์ได้ทันที
             </p>
 
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 14 }}>
@@ -1038,7 +913,7 @@ export default function LandingPage() {
               </Link>
 
               <Link
-                href="/login"
+                href="/partner"
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -1053,8 +928,8 @@ export default function LandingPage() {
                   textDecoration: 'none'
                 }}
               >
-                <LogIn size={18} />
-                <span>เข้าสู่ระบบสมาชิก</span>
+                <Store size={18} />
+                <span>ติดต่อสนใจเป็น Partner</span>
               </Link>
             </div>
           </div>
@@ -1088,6 +963,9 @@ export default function LandingPage() {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, fontSize: 14 }}>
             <Link href="/search" style={{ color: C.textSecondary, textDecoration: 'none' }}>
               ค้นหาร้านค้า
+            </Link>
+            <Link href="/partner" style={{ color: C.primary, textDecoration: 'none', fontWeight: 600 }}>
+              ติดต่อสนใจเป็น Partner
             </Link>
             <Link href="/portal" style={{ color: C.textSecondary, textDecoration: 'none' }}>
               เข้าสู่ระบบร้านค้า
