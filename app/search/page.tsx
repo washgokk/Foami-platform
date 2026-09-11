@@ -1257,7 +1257,11 @@ export default function MarketplaceSearchPage() {
 
               {selectedShop.services && selectedShop.services.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {selectedShop.services.map(srv => {
+                  {[...selectedShop.services].sort((a, b) => {
+                    const pA = a.price_s || a.price_m || a.price_l || 0
+                    const pB = b.price_s || b.price_m || b.price_l || 0
+                    return pA - pB
+                  }).map(srv => {
                     const priceDisplay = srv.price_s ? `฿${srv.price_s}` : '฿--'
                     const { mainText, addons } = parseServiceDescription(srv.description)
 

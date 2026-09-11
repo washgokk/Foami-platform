@@ -94,6 +94,11 @@ export async function GET(req: NextRequest) {
             is_addon_required: Boolean(s.is_addon_required)
           }
         })
+        .sort((a, b) => {
+          const pA = a.price_s || a.price_m || a.price_l || 0
+          const pB = b.price_s || b.price_m || b.price_l || 0
+          return pA - pB
+        })
 
       // Calculate lowest price
       let branchLowestPrice = 0
