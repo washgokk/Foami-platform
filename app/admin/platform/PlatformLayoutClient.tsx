@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Store, Ticket, Wallet, BarChart3, Users,
-  Settings, LogOut, ChevronLeft, ChevronRight, Shield, Menu, X, Crown, ExternalLink
+  Settings, LogOut, ChevronLeft, ChevronRight, Shield, Menu, X, Crown, ExternalLink, ShieldAlert
 } from 'lucide-react'
 import Logo from '@/components/Branding/Logo'
 import ConfirmModal from '@/components/Global/ConfirmModal'
@@ -13,6 +13,7 @@ const NAV = [
   { href: '/admin/platform', icon: LayoutDashboard, label: 'ภาพรวมระบบ' },
   { href: '/admin/platform/shops', icon: Store, label: 'ร้านพาร์ทเนอร์' },
   { href: '/admin/platform/crm', icon: Users, label: 'CRM ลูกค้าทั้งระบบ' },
+  { href: '/admin/platform/reports', icon: ShieldAlert, label: 'รายงาน & เรื่องร้องเรียน' },
   { href: '/admin/platform/analytics', icon: BarChart3, label: 'Analytics & รายงาน' },
   { href: '/admin/platform/finance', icon: Wallet, label: 'การเงิน & ถอนเงิน' },
   { href: '/admin/platform/invitations', icon: Ticket, label: 'Invitation Codes' },

@@ -742,9 +742,20 @@ export default function JobDetailPage() {
                                 <BadgeDollarSign size={24} color="var(--brand-dominant)" /> ค่าใช้จ่ายเพิ่มเติมหน้างาน
                             </span>
                             {Number(job.additional_price) > 0 && (
+                                <>
                                 <span className={`badge ${job.is_additional_paid ? 'badge-completed' : 'badge-pending'}`} style={{ fontSize: '0.8rem', padding: '6px 12px', borderRadius: '10px' }}>
                                     {job.is_additional_paid ? 'ชำระแล้ว' : 'รอชำระ'}
                                 </span>
+                                {!job.is_additional_paid && (
+                                    <button onClick={async () => {
+                                        if (!confirm('ยืนยันว่าลูกค้าชำระเงินส่วนเพิ่มแล้ว?')) return
+                                        await supabase.from('bookings').update({ is_additional_paid: true, additional_history: [...(job.additional_history||[]),{confirmed_by:'staff_manual',amount:job.additional_price,at:new Date().toISOString()}]}).eq('id',id)
+                                        load()
+                                    }} style={{ marginTop:6, display:'inline-flex', alignItems:'center', gap:6, padding:'6px 14px', borderRadius:10, background:'rgba(16,185,129,0.1)', color:'#059669', border:'1.5px solid rgba(16,185,129,0.3)', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                                        ✅ ยืนยันรับเงินแล้ว
+                                    </button>
+                                )}
+                                </>
                             )}
                         </div>
 

@@ -1,5 +1,6 @@
-'use client'
+﻿'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Staff, Payout, THAI_BANKS } from '@/lib/types'
 import styles from './settings.module.css'
@@ -12,6 +13,7 @@ import { Bell, BellOff, Send } from 'lucide-react'
 import SuccessModal from '@/components/Global/SuccessModal'
 
 export default function StaffSettingsPage() {
+    const router = useRouter()
     const [staff, setStaff] = useState<Staff | null>(null)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -42,6 +44,13 @@ export default function StaffSettingsPage() {
         image_url: ''
     })
 
+
+    // Auth guard — redirect if no token
+    useEffect(() => {
+        if (!localStorage.getItem('staff_token')) {
+            router.replace('/staff/login')
+        }
+    }, [router])
 
     useEffect(() => {
         const loadStaff = async () => {

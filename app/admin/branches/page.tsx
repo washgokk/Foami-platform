@@ -260,9 +260,9 @@ export default function BranchesPage() {
                             <MapIcon size={16} /> แผนที่โซน
                         </button>
                     </div>
-                    <button className="btn btn-primary" style={{ borderRadius: '12px', gap: 8 }} onClick={openAdd}>
-                        <Plus size={20} /> เพิ่มสาขา
-                    </button>
+                    <Link href="/kku/admin/zones" className="btn btn-primary" style={{ borderRadius: '12px', gap: 8, textDecoration: 'none' }}>
+                        <MapPin size={18} /> ???????????????
+                    </Link>
                 </div>
             </div>
 

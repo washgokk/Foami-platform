@@ -21,7 +21,10 @@ import {
     CalendarPlus,
     Wallet,
     Star,
-    Settings
+    Settings,
+    Shield,
+    ShieldAlert,
+    MapPin
 } from 'lucide-react'
 import Logo from '@/components/Branding/Logo'
 import ConfirmModal from '@/components/Global/ConfirmModal'
@@ -37,12 +40,34 @@ export default function ShopAdminLayoutClient({ children }: { children: React.Re
     const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
     const [toasts, setToasts] = useState<any[]>([])
     const [unreadCount, setUnreadCount] = useState(0)
+    const [branchFeatures, setBranchFeatures] = useState<any>(null)
+
+    // HQ Chat unread count
+    const [hqUnreadCount, setHqUnreadCount] = useState(0)
+    const [branchId, setBranchId] = useState<string | null>(null)
+
+    useEffect(() => {
+        if (!branchSlug) return
+        supabase.from('branches').select('id').eq('slug', branchSlug).maybeSingle().then(res => {
+            if (res.data?.id) {
+                setBranchId(res.data.id)
+                fetch(`/api/platform/chat?type=shop_unread&branchId=${res.data.id}`)
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.unreadCount !== undefined) setHqUnreadCount(d.unreadCount)
+                    })
+                    .catch(() => {})
+            }
+        })
+    }, [branchSlug])
+
 
     const NAV_ITEMS = [
         { href: `/${branchSlug}/admin/dashboard`, icon: LayoutDashboard, label: 'ภาพรวม' },
         { href: `/${branchSlug}/admin/schedule`, icon: Calendar, label: 'ตารางงาน' },
         { href: `/${branchSlug}/admin/crm`, icon: Users, label: 'CRM & ลูกค้า' },
-        { href: `/${branchSlug}/admin/branches`, icon: Store, label: 'ข้อมูลสาขา & โซน' },
+        { href: `/${branchSlug}/admin/reports`, icon: ShieldAlert, label: 'รายงาน & ข้อร้องเรียน' },
+        { href: `/${branchSlug}/admin/zones`, icon: MapPin, label: 'โซนบริการ' },
         { href: `/${branchSlug}/admin/staff`, icon: UserCircle2, label: 'พนักงาน' },
         { href: `/${branchSlug}/admin/services`, icon: Wrench, label: 'บริการ & ราคา' },
         { href: `/${branchSlug}/admin/bookings`, icon: ClipboardList, label: 'การจอง' },
@@ -50,6 +75,8 @@ export default function ShopAdminLayoutClient({ children }: { children: React.Re
         { href: `/${branchSlug}/admin/discounts`, icon: Ticket, label: 'โค้ดส่วนลด' },
         { href: `/${branchSlug}/admin/finance`, icon: Wallet, label: 'กระเป๋าเงิน' },
         { href: `/${branchSlug}/admin/settings`, icon: Settings, label: 'ตั้งค่าร้าน' },
+        { href: `/${branchSlug}/admin/chat?tab=hq`, icon: MessageCircle, label: 'แชทกับ Platform HQ', badge: hqUnreadCount },
+        ...(branchFeatures?.insurance_renewal ? [{ href: `/${branchSlug}/admin/insurance`, icon: Shield, label: 'ต่อพรบ/ประกัน' }] : []),
     ]
 
     const addToast = useCallback((toast: any) => {

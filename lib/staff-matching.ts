@@ -62,9 +62,20 @@ export function findMatchingStaffForJob({
         const baseZone = zones.find(zn => zn.id === anchor.zone_id)
         if (!baseZone) return
 
-        const isO = !localPickupMatched || (showDelivery && !localDeliveryMatched)
-        const isC = (localPickupMatched && localPickupMatched.id !== baseZone.id) || 
-                   (showDelivery && localDeliveryMatched && localDeliveryMatched.id !== baseZone.id)
+        // BUG-Z1 FIX: isO = pickup is outside ALL zones (delivery alone doesn't make isO)
+        // isC = pickup or delivery is inside a DIFFERENT zone than staff base zone
+        const isPickupOutOfAllZones = !localPickupMatched
+        const isDeliveryOutOfAllZones = showDelivery && !!deliveryLat && !localDeliveryMatched
+
+        const isO = isPickupOutOfAllZones  // Only pickup-out-of-zone triggers "out_of_zone" staff requirement
+        const isC = !isO && (
+            // pickup is in a different zone than staff base
+            (localPickupMatched && localPickupMatched.id !== baseZone.id) ||
+            // delivery is in a different zone than staff base
+            (showDelivery && localDeliveryMatched && localDeliveryMatched.id !== baseZone.id) ||
+            // delivery is outside all zones but pickup is inside (cross_zone staff can handle)
+            isDeliveryOutOfAllZones
+        )
 
         // Check compatibility based on work_type
         let canServe = false
@@ -107,7 +118,10 @@ export function findMatchingStaffForJob({
             if (maxDist > (branch.max_out_of_zone_km || 2)) return
 
             // Fee: always based on actual distance from base zone (cross_zone still earns travel surcharge)
-            let fee = Math.ceil(dPickup * 2 * (branch.out_of_zone_fee || 10))
+            // BUG-Z2 FIX: road distance = haversine * 1.35 (road factor), x2 for round trip (staff goes out and returns)
+            // Uses out_of_zone_fee as per-km rate for staff travel surcharge
+            const dPickupRoad = dPickup * 1.35  // straight-line -> road distance estimate
+            let fee = Math.ceil(dPickupRoad * 2 * (branch.out_of_zone_fee || 10))
             
             matchingStaff.push({
                 staff_id: sId,

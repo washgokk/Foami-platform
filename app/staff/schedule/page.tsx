@@ -1,5 +1,6 @@
-'use client'
+﻿'use client'
 import React, { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { TIME_SLOTS } from '@/lib/types'
 import { addDays, format, startOfWeek } from 'date-fns'
@@ -25,6 +26,7 @@ import {
 import styles from './schedule.module.css'
 
 export default function StaffSchedulePage() {
+    const router = useRouter()
     const [staffId, setStaffId] = useState('')
     const [zones, setZones] = useState<any[]>([])
     const [schedules, setSchedules] = useState<any[]>([])
@@ -33,10 +35,15 @@ export default function StaffSchedulePage() {
     const [saving, setSaving] = useState(false)
     const [pendingSlots, setPendingSlots] = useState<Record<string, Record<string, string>>>({}) // { "date_slot": { "zone_id": "work_type" } }
 
+    // Auth guard — redirect to login if no staff_token
     useEffect(() => {
+        const token = localStorage.getItem('staff_token')
+        if (!token) { router.replace('/staff/login'); return }
+        const info = JSON.parse(localStorage.getItem('staff_info') || '{}')
         const data = JSON.parse(localStorage.getItem('staff_data') || '{}')
-        setStaffId(data.id || '')
-    }, [])
+        const id = info?.id || data?.id || ''
+        if (id) setStaffId(id)
+    }, [router])
 
     useEffect(() => {
         if (!staffId) return

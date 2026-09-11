@@ -69,3 +69,33 @@ export function minDistanceToPolygon(lat: number, lng: number, polygon: [number,
     }
     return minD
 }
+
+/**
+ * Road distance using OSRM API (server-side) or Haversine fallback (client-side)
+ * NOTE: This is async — use with await
+ * Falls back to Haversine × 1.35 if OSRM is unavailable
+ */
+export async function roadDistanceKm(
+    lat1: number, lng1: number,
+    lat2: number, lng2: number,
+    appUrl?: string
+): Promise<{ distance_km: number; duration_min: number; source: 'osrm' | 'haversine' }> {
+    try {
+        const base = appUrl || (typeof window !== 'undefined' ? window.location.origin : '')
+        const res = await fetch(`${base}/api/distance`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lat1, lng1, lat2, lng2 }),
+            signal: AbortSignal.timeout(5000)
+        })
+        if (res.ok) {
+            const data = await res.json()
+            if (data.distance_km) return data
+        }
+    } catch (e) {
+        // silently fall through to haversine
+    }
+    // Fallback
+    const km = haversine(lat1, lng1, lat2, lng2) * 1.35
+    return { distance_km: km, duration_min: (km / 30) * 60, source: 'haversine' }
+}

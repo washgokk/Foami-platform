@@ -21,7 +21,8 @@ import {
     MessageCircle,
     CalendarPlus,
     Wallet,
-    Shield
+    Shield,
+    ShieldAlert
 } from 'lucide-react'
 import AuditLogModal from '@/components/Admin/AuditLogModal'
 import NotificationTesterModal from '@/components/Admin/NotificationTesterModal'
@@ -37,9 +38,9 @@ const NAV_ITEMS = [
     { href: '/admin/staff', icon: UserCircle2, label: 'จัดการทีมงาน' },
     { href: '/admin/branches', icon: Store, label: 'สาขา & โซนบริการ' },
     { href: '/admin/crm', icon: Users, label: 'ลูกค้า (CRM)' },
+    { href: '/admin/reports', icon: ShieldAlert, label: 'รายงาน & ข้อร้องเรียน' },
     { href: '/admin/discounts', icon: Ticket, label: 'โค้ดส่วนลด' },
     { href: '/admin/finance', icon: Wallet, label: 'กระเป๋าเงิน & ถอนเงิน' },
-    { href: '/admin/promotions', icon: Bell, label: 'แจ้งโปรโมชั่น LINE' },
 ]
 
 interface AdminToast {

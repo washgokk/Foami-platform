@@ -43,6 +43,7 @@ import { isPointInPolygon } from '@/lib/geo-utils'
 import { usePushNotifications } from '@/lib/hooks/usePushNotifications'
 import SuccessModal from '@/components/Global/SuccessModal'
 import BookingChat from '@/components/Chat/BookingChat'
+import ReportIssueModal from '@/components/Global/ReportIssueModal'
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '')
 
@@ -70,6 +71,9 @@ export default function MyBookingsPage() {
     const [selectedBooking, setSelectedBooking] = useState<any>(null)
     const [rating, setRating] = useState(0)
     const [comment, setComment] = useState('')
+    const [reviewPhotos, setReviewPhotos] = useState<string[]>([])
+    const [rewardCode, setRewardCode] = useState<string | null>(null)
+    const [uploadingReviewPhotos, setUploadingReviewPhotos] = useState(false)
     const [customer, setCustomer] = useState<any>(null)
 
     const {
@@ -92,6 +96,7 @@ export default function MyBookingsPage() {
     const [rescheduleLoading, setRescheduleLoading] = useState(false)
     const [dateRange] = useState<Date[]>(() => Array.from({ length: 7 }, (_, i) => addDays(new Date(), i)))
     const [showChat, setShowChat] = useState(false)
+    const [reportingBooking, setReportingBooking] = useState<any>(null)
 
     useEffect(() => {
         const c = localStorage.getItem('liff_customer')

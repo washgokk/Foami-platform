@@ -1,11 +1,12 @@
 'use client'
-import { useState, useEffect } from 'react'
+import PlatformShopChatModal from '@/components/Chat/PlatformShopChatModal'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
   Store, Search, CheckCircle, XCircle, RefreshCw,
   ChevronDown, ExternalLink, Wallet, ClipboardList,
   Key, Mail, Lock, Eye, EyeOff, X, AlertCircle, CheckCircle2,
-  TrendingUp, ArrowUpRight
+  TrendingUp, ArrowUpRight, MessageCircle, Calendar
 } from 'lucide-react'
 
 interface Shop {
@@ -244,12 +245,45 @@ function CredentialModal({ shop, token, onClose }: CredentialModalProps) {
   )
 }
 
+
+function formatThaiDate(dateStr?: string) {
+  if (!dateStr) return '-'
+  try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return '-'
+    return d.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })
+  } catch {
+    return '-'
+  }
+}
+
 export default function PlatformShopsPage() {
   const [shops, setShops] = useState<Shop[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [expandedFee, setExpandedFee] = useState<string | null>(null)
+  // Chat with Shop state & Unread counts
+  const [activeChatShop, setActiveChatShop] = useState<Shop | null>(null)
+  const [chatUnreadMap, setChatUnreadMap] = useState<Record<string, number>>({})
+
+  // Fetch unread summary for Platform Admin
+  const loadChatUnread = useCallback(async () => {
+    try {
+      const res = await fetch('/api/platform/chat?type=unread_summary')
+      const data = await res.json()
+      if (data.counts) setChatUnreadMap(data.counts)
+    } catch (e) {
+      console.warn('Failed to load chat unread summary:', e)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadChatUnread()
+    const interval = setInterval(loadChatUnread, 15000)
+    return () => clearInterval(interval)
+  }, [loadChatUnread])
+
   const [feeInput, setFeeInput] = useState<Record<string, string>>({})
   const [credModal, setCredModal] = useState<Shop | null>(null)
   const [token, setToken] = useState('')
@@ -393,7 +427,7 @@ export default function PlatformShopsPage() {
             ยอดรายได้รวมทุกร้าน
           </div>
           <div style={{ fontSize: 26, fontWeight: 900, color: '#16A34A', marginTop: 4 }}>
-            ฿{totalPlatformRevenue.toLocaleString('th', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
+            ฿{totalPlatformRevenue.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
         </div>
       </div>
@@ -460,7 +494,25 @@ export default function PlatformShopsPage() {
                         </div>
                         <div>
                           <div style={{ fontSize: 14.5, fontWeight: 800, color: 'var(--text-primary)' }}>{shop.name}</div>
-                          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>/{shop.slug}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>/{shop.slug}</span>
+                            {shop.created_at && (
+                              <span style={{
+                                fontSize: 11,
+                                color: '#2563EB',
+                                background: '#EFF6FF',
+                                border: '1px solid #DBEAFE',
+                                padding: '1px 7px',
+                                borderRadius: 6,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 3,
+                                fontWeight: 700
+                              }}>
+                                <Calendar size={11} /> ตั้งสาขาเมื่อ {formatThaiDate(shop.created_at)}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -479,10 +531,10 @@ export default function PlatformShopsPage() {
                     {/* Revenue */}
                     <td style={{ padding: '16px 16px' }}>
                       <div style={{ fontSize: 15, fontWeight: 800, color: '#16A34A' }}>
-                        ฿{(shop.total_revenue || 0).toLocaleString('th', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
+                        ฿{(shop.total_revenue || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--brand-dominant, #315EC3)', fontWeight: 600 }}>
-                        Fee {((shop.platform_fee_pct || 0.2) * 100).toFixed(0)}%: ฿{((shop.total_revenue || 0) * (shop.platform_fee_pct || 0.2)).toLocaleString('th', { maximumFractionDigits: 1 })}
+                        Fee {((shop.platform_fee_pct || 0.2) * 100).toFixed(0)}%: ฿{((shop.total_revenue || 0) * (shop.platform_fee_pct || 0.2)).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </td>
 
@@ -557,6 +609,46 @@ export default function PlatformShopsPage() {
                     {/* Actions */}
                     <td style={{ padding: '16px 20px', textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                        {/* Chat with Shop Button */}
+                        <button
+                          onClick={() => {
+                            setActiveChatShop(shop)
+                            setChatUnreadMap(prev => ({ ...prev, [shop.id]: 0 }))
+                          }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 5,
+                            padding: '7px 13px',
+                            borderRadius: 10,
+                            background: chatUnreadMap[shop.id] > 0 ? '#EFF6FF' : '#F0F3FC',
+                            color: chatUnreadMap[shop.id] > 0 ? '#1D4ED8' : '#315EC3',
+                            border: `1.5px solid ${chatUnreadMap[shop.id] > 0 ? '#93C5FD' : '#DDE3F5'}`,
+                            cursor: 'pointer',
+                            fontSize: 12,
+                            fontWeight: 800,
+                            fontFamily: 'inherit',
+                            position: 'relative'
+                          }}
+                        >
+                          <MessageCircle size={14} color="#315EC3" />
+                          <span>แชทกับร้าน</span>
+                          {chatUnreadMap[shop.id] > 0 && (
+                            <span style={{
+                              background: '#EF4444',
+                              color: '#FFFFFF',
+                              borderRadius: 999,
+                              padding: '1px 6px',
+                              fontSize: 10,
+                              fontWeight: 900,
+                              marginLeft: 2,
+                              boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)'
+                            }}>
+                              {chatUnreadMap[shop.id]}
+                            </span>
+                          )}
+                        </button>
+
                         <Link
                           href={`/${shop.slug}`}
                           target="_blank"
@@ -593,6 +685,20 @@ export default function PlatformShopsPage() {
         )}
       </div>
 
+      {/* Platform HQ <-> Shop Chat Modal */}
+      {activeChatShop && (
+        <PlatformShopChatModal
+          branchId={activeChatShop.id}
+          branchName={activeChatShop.name}
+          branchSlug={activeChatShop.slug}
+          currentUserRole="platform_admin"
+          currentUserName="Platform HQ (Super Admin)"
+          onClose={() => {
+            setActiveChatShop(null)
+            loadChatUnread()
+          }}
+        />
+      )}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )

@@ -97,6 +97,13 @@ export async function POST(req: NextRequest) {
                 capital_cost: capital_cost || 0,
                 rental_cost: rental_cost || 0,
                 fuel_cost: fuel_cost || 0,
+                // === Financial Snapshot ณ เวลาจอง ===
+                // บันทึกราคาและ fee ณ เวลาที่จอง เพื่อให้ยอดไม่เปลี่ยนถ้า admin แก้ราคาทีหลัง
+                snapshot_base_price: base_price || 0,
+                snapshot_service_price: base_price || 0,
+                snapshot_platform_fee_pct: 0.20,   // TODO: ดึงจาก branch.platform_fee_pct
+                snapshot_platform_fee_thb: Math.max(0, (gross_total || 0) - (discount_amount || 0)) * 0.20,
+                snapshot_net_to_shop_thb: Math.max(0, (gross_total || 0) - (discount_amount || 0)) * 0.80,
             })
             .select()
             .single()

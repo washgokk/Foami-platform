@@ -18,6 +18,7 @@ export interface Shop {
   logo_url?: string
   price_from: number
   distance_km?: number
+  services?: any[]
 }
 
 interface Props {
@@ -41,7 +42,7 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, user
     import('leaflet').then(L => {
       if (!mapRef.current) return
 
-      // Load Leaflet CSS
+      // Load Leaflet CSS if not already present
       if (!document.querySelector('link[href*="leaflet.css"]')) {
         const link = document.createElement('link')
         link.rel = 'stylesheet'
@@ -62,16 +63,15 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, user
 
       L.control.zoom({ position: 'bottomright' }).addTo(map)
 
-      // Light, clean map tiles
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      // Clean OpenStreetMap tiles (100% free, no API KEY REQUIRED watermark)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        subdomains: 'abcd',
+        attribution: '© OpenStreetMap'
       }).addTo(map)
 
       markersGroupRef.current = L.featureGroup().addTo(map)
       mapInstanceRef.current = map
 
-      // Render markers
       renderMarkers(L, map)
     })
 
@@ -83,7 +83,7 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, user
     }
   }, [])
 
-  // 2. Re-render markers when shops or selectedShop changes
+  // 2. Re-render markers when shops, selectedShop, or userLocation changes
   useEffect(() => {
     if (!mapInstanceRef.current || !markersGroupRef.current) return
     import('leaflet').then(L => {
@@ -101,22 +101,22 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, user
         className: 'user-gps-marker',
         html: `
           <div style="
-            width: 20px;
-            height: 20px;
+            width: 22px;
+            height: 22px;
             background: #22C55E;
-            border: 3px solid #FFFFFF;
+            border: 3.5px solid #FFFFFF;
             border-radius: 50%;
-            box-shadow: 0 0 16px rgba(34, 197, 94, 0.8), 0 2px 6px rgba(0,0,0,0.3);
+            box-shadow: 0 0 16px rgba(34, 197, 94, 0.8), 0 2px 8px rgba(0,0,0,0.25);
             animation: pulse-gps 2s infinite;
           "></div>
         `,
-        iconSize: [20, 20],
-        iconAnchor: [10, 10]
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
       })
 
       L.marker([userLocation.lat, userLocation.lng], { icon: userIcon, zIndexOffset: 1000 })
         .addTo(markersGroupRef.current)
-        .bindTooltip('ตำแหน่งของคุณ', { permanent: false, direction: 'top' })
+        .bindTooltip('ตำแหน่งปัจจุบันของคุณ', { permanent: false, direction: 'top' })
     }
 
     const bounds = L.latLngBounds([])
@@ -127,37 +127,69 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, user
       const isSelected = selectedShop?.id === shop.id
       const priceText = shop.price_from > 0 ? `฿${shop.price_from}` : 'ดูร้าน'
 
-      // Agoda / Airbnb Style Price Pin Icon
+      // Avatar or Shop Logo
+      const logoHtml = shop.logo_url 
+        ? `<img src="${shop.logo_url}" alt="${shop.shop_name}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; border: 1.5px solid ${isSelected ? '#FFFFFF' : '#315EC3'}; flex-shrink: 0; background: #FFF;" />`
+        : `<div style="width: 26px; height: 26px; border-radius: 50%; background: ${isSelected ? 'rgba(255,255,255,0.2)' : '#EFF3FD'}; border: 1.5px solid ${isSelected ? '#FFFFFF' : '#315EC3'}; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; color: ${isSelected ? '#FFFFFF' : '#315EC3'}; flex-shrink: 0;">${(shop.shop_name || 'F')[0]}</div>`
+
+      const ratingBadge = (shop.avg_rating > 0 && shop.review_count > 0)
+        ? `<span style="font-size: 10.5px; font-weight: 800; color: ${isSelected ? '#FDE68A' : '#D97706'}; background: ${isSelected ? 'rgba(0,0,0,0.2)' : '#FEF3C7'}; padding: 2px 6px; border-radius: 6px; display: inline-flex; align-items: center; gap: 2px;">★ ${shop.avg_rating.toFixed(1)}</span>`
+        : ''
+
+      // Marker Pin with Shop Logo, Shop Name, Starting Price, and pointer tip
       const pricePinIcon = L.divIcon({
-        className: 'agoda-price-marker',
+        className: 'foami-shop-marker',
         html: `
           <div style="
-            background: ${isSelected ? '#315EC3' : '#FFFFFF'};
-            color: ${isSelected ? '#FFFFFF' : '#1A2340'};
-            border: 2px solid ${isSelected ? '#214192' : '#DDE3F5'};
-            border-radius: 999px;
-            padding: 5px 12px;
-            font-size: 13px;
-            font-weight: 800;
-            font-family: 'Kanit', sans-serif;
+            position: relative;
             display: inline-flex;
+            flex-direction: column;
             align-items: center;
-            gap: 4px;
-            box-shadow: ${isSelected ? '0 8px 24px rgba(49, 94, 195, 0.4)' : '0 4px 14px rgba(0, 0, 0, 0.12)'};
-            transform: ${isSelected ? 'scale(1.15)' : 'scale(1)'};
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            white-space: nowrap;
+            transform: translate(-50%, -100%);
             cursor: pointer;
+            filter: drop-shadow(0 6px 14px rgba(0, 0, 0, ${isSelected ? '0.3' : '0.15'}));
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
           ">
-            <span>${priceText}</span>
-            ${shop.avg_rating > 0 ? `<span style="font-size: 10.5px; opacity: 0.9; color: ${isSelected ? '#FDE68A' : '#D97706'};">★${shop.avg_rating.toFixed(1)}</span>` : ''}
+            <div style="
+              background: ${isSelected ? 'linear-gradient(135deg, #1E3A8A, #315EC3)' : '#FFFFFF'};
+              color: ${isSelected ? '#FFFFFF' : '#1A2340'};
+              border: 2px solid ${isSelected ? '#214192' : '#315EC3'};
+              border-radius: 999px;
+              padding: 4px 12px 4px 5px;
+              font-family: 'Kanit', sans-serif;
+              display: inline-flex;
+              align-items: center;
+              gap: 8px;
+              white-space: nowrap;
+              user-select: none;
+            ">
+              ${logoHtml}
+              <div style="display: flex; flex-direction: column; text-align: left; line-height: 1.15;">
+                <span style="font-size: 11.5px; font-weight: 900; color: ${isSelected ? '#FFFFFF' : '#0F172A'}; max-width: 140px; overflow: hidden; text-overflow: ellipsis;">
+                  ${shop.shop_name}
+                </span>
+                <span style="font-size: 12px; font-weight: 800; color: ${isSelected ? '#93C5FD' : '#2563EB'};">
+                  เริ่มต้น ${priceText}
+                </span>
+              </div>
+              ${ratingBadge}
+            </div>
+            
+            <div style="
+              width: 0;
+              height: 0;
+              border-left: 6px solid transparent;
+              border-right: 6px solid transparent;
+              border-top: 7px solid ${isSelected ? '#1E3A8A' : '#315EC3'};
+              margin-top: -1px;
+            "></div>
           </div>
         `,
-        iconSize: [80, 32],
-        iconAnchor: [40, 16]
+        iconSize: [0, 0],
+        iconAnchor: [0, 0]
       })
 
-      const marker = L.marker([shop.lat, shop.lng], { icon: pricePinIcon })
+      L.marker([shop.lat, shop.lng], { icon: pricePinIcon })
         .addTo(markersGroupRef.current)
         .on('click', () => {
           onSelectShop(shop)
@@ -171,7 +203,7 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, user
     }
 
     if (bounds.isValid() && shops.length > 0) {
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 })
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 })
     }
   }
 

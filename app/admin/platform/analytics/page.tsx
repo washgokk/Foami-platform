@@ -22,13 +22,13 @@ const DIMENSIONS: { key: DimensionKey; label: string }[] = [
 ]
 
 const METRICS: { key: MetricKey; label: string; format: (v: number) => string }[] = [
-  { key: 'gross_revenue', label: 'ยอดขายรวม (Gross ฿)', format: v => `฿${v.toLocaleString('th', { maximumFractionDigits: 0 })}` },
-  { key: 'platform_fee', label: 'Platform Fee 20% (฿)', format: v => `฿${v.toLocaleString('th', { maximumFractionDigits: 0 })}` },
-  { key: 'net_payout', label: 'ยอดสุทธิร้านค้า (฿)', format: v => `฿${v.toLocaleString('th', { maximumFractionDigits: 0 })}` },
-  { key: 'job_count', label: 'จำนวนงานทั้งหมด', format: v => `${v} งาน` },
-  { key: 'completed_count', label: 'งานที่สำเร็จ', format: v => `${v} งาน` },
-  { key: 'aov', label: 'ยอดเฉลี่ย / บิล (AOV)', format: v => `฿${Math.round(v).toLocaleString('th')}` },
-  { key: 'avg_rating', label: 'คะแนนรีวิวเฉลี่ย', format: v => `${v.toFixed(1)} ★` },
+  { key: 'gross_revenue', label: 'ยอดขายรวม (Gross ฿)', format: v => `฿${v.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+  { key: 'platform_fee', label: 'Platform Fee 20% (฿)', format: v => `฿${v.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+  { key: 'net_payout', label: 'ยอดสุทธิร้านค้า (฿)', format: v => `฿${v.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+  { key: 'job_count', label: 'จำนวนงานทั้งหมด', format: v => `${v.toLocaleString('th-TH')} งาน` },
+  { key: 'completed_count', label: 'งานที่สำเร็จ', format: v => `${v.toLocaleString('th-TH')} งาน` },
+  { key: 'aov', label: 'ยอดเฉลี่ย / บิล (AOV)', format: v => `฿${v.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+  { key: 'avg_rating', label: 'คะแนนรีวิวเฉลี่ย', format: (v: number) => v > 0 ? `${v.toFixed(2)} ★` : '—' },
 ]
 
 const DAYS_TH = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์']
@@ -161,11 +161,22 @@ export default function PlatformAnalyticsPage() {
     filteredBookings.forEach(b => {
       const dimVal = getDimensionValue(b, activeDimension)
       const isCompleted = b.status === 'completed'
-      const price = Number(b.total_price) || 0
-      const additional = Number(b.additional_price) || 0
-      const rev = isCompleted ? (price + additional) : 0
-      const fee = rev * 0.2
-      const net = rev * 0.8
+
+      // ✅ สูตรมาตรฐานเดียวกับ shops API — ใช้ snapshot ราคา ณ เวลาจอง ถ้ามี
+      const calcRev = () => {
+        if (!isCompleted) return 0
+        const isRebooking = b.discount_code && /rebook|refund/i.test(b.discount_code)
+        const snapshotGross = Number(b.snapshot_base_price) > 0 ? Number(b.snapshot_base_price) : null
+        const gross = snapshotGross ?? (Number(b.total_price) > 0 ? Number(b.total_price) : Number(b.base_price) || 0)
+        const additional = Number(b.additional_price) || 0
+        const discount = Number(b.discount_amount) || 0
+        return isRebooking ? (gross + additional) : Math.max(0, gross - discount + additional)
+      }
+      // platform_fee_pct ที่บันทึก snapshot ไว้ ถ้าไม่มีใช้ 20% เป็น default
+      const feePct = Number(b.snapshot_platform_fee_pct) > 0 ? Number(b.snapshot_platform_fee_pct) : 0.2
+      const rev = calcRev()
+      const fee = rev * feePct
+      const net = rev * (1 - feePct)
       const rating = Number(b.rating) || 0
 
       if (!groups.has(dimVal)) {
@@ -198,7 +209,7 @@ export default function PlatformAnalyticsPage() {
     // Calculate AOV and Avg Rating for each group
     const rows = Array.from(groups.values()).map(g => {
       g.aov = g.completed_count > 0 ? g.gross_revenue / g.completed_count : 0
-      g.avg_rating = g.ratingsCount > 0 ? g.ratingsSum / g.ratingsCount : 5.0
+      g.avg_rating = g.ratingsCount > 0 ? g.ratingsSum / g.ratingsCount : 0  // 0 = no reviews yet
       return g
     })
 
@@ -220,7 +231,7 @@ export default function PlatformAnalyticsPage() {
     const totalAOV = totalCompleted > 0 ? totalGross / totalCompleted : 0
     const ratingsCount = reportData.reduce((s, r) => s + r.ratingsCount, 0)
     const ratingsSum = reportData.reduce((s, r) => s + r.ratingsSum, 0)
-    const totalRating = ratingsCount > 0 ? ratingsSum / ratingsCount : 5.0
+    const totalRating = ratingsCount > 0 ? ratingsSum / ratingsCount : 0
 
     return {
       dimension: 'รวมทั้งหมด (Grand Total)',
@@ -243,12 +254,26 @@ export default function PlatformAnalyticsPage() {
 
     const rows = reportData.map(r => [
       `"${r.dimension}"`,
-      ...selectedMetrics.map(m => r[m])
+      ...selectedMetrics.map(m => {
+        const val = r[m]
+        if (typeof val === 'number') {
+          if (m === 'job_count' || m === 'completed_count') return val
+          return Number(val.toFixed(2))
+        }
+        return val
+      })
     ])
 
     rows.push([
       `"รวมทั้งหมด"`,
-      ...selectedMetrics.map(m => grandTotal[m])
+      ...selectedMetrics.map(m => {
+        const val = grandTotal[m]
+        if (typeof val === 'number') {
+          if (m === 'job_count' || m === 'completed_count') return val
+          return Number(val.toFixed(2))
+        }
+        return val
+      })
     ])
 
     const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' +
@@ -598,7 +623,7 @@ export default function PlatformAnalyticsPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
             {reportData.map((row, idx) => {
               const totalVal = grandTotal[sortByMetric] || 1
-              const pct = Math.round(((row[sortByMetric] || 0) / totalVal) * 100)
+              const pct = totalVal > 0 ? Number((((row[sortByMetric] || 0) / totalVal) * 100).toFixed(1)) : 0
               const met = METRICS.find(m => m.key === sortByMetric)!
 
               return (

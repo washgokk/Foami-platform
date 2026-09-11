@@ -12,7 +12,7 @@ import {
 } from '@/lib/types'
 import { format, addDays } from 'date-fns'
 import { th } from 'date-fns/locale'
-import { haversine, isPointInPolygon, minDistanceToPolygon } from '@/lib/geo-utils'
+import { haversine, isPointInPolygon, minDistanceToPolygon, roadDistanceKm } from '@/lib/geo-utils'
 import { findMatchingStaffForJob } from '@/lib/staff-matching'
 import {
     ChevronLeft,
@@ -120,6 +120,7 @@ export default function BookPage() {
     const [differentSpotFee, setDifferentSpotFee] = useState(0)
     const [travelSurchargeState, setTravelSurchargeState] = useState(0)
     const [baseZoneExtraFee, setBaseZoneExtraFee] = useState(0)
+    const [roadDiffDistKm, setRoadDiffDistKm] = useState(0)  // OSRM road distance pickup→delivery
 
     // Step 4 — Summary
     const [discountCode, setDiscountCode] = useState('')
@@ -436,6 +437,31 @@ export default function BookPage() {
     }, [customer?.id])
 
     // ─── Zone detection & Extra Fee ──────────────────────────────
+
+    // 🛣️ OSRM Road Distance — Debounced (1s) to avoid too many requests
+    // Updates roadDiffDistKm state used by the zone/fee calculation below
+    useEffect(() => {
+        if (!showDelivery || !deliveryLat || !deliveryLng || !pickupLat || !pickupLng) {
+            setRoadDiffDistKm(0)
+            return
+        }
+        if (pickupLat === deliveryLat && pickupLng === deliveryLng) {
+            setRoadDiffDistKm(0)
+            return
+        }
+        const timer = setTimeout(async () => {
+            try {
+                const result = await roadDistanceKm(pickupLat, pickupLng, deliveryLat, deliveryLng)
+                setRoadDiffDistKm(result.distance_km)
+                console.log(`[OSRM] Road dist pickup→delivery: ${result.distance_km.toFixed(2)} km (${result.source})`)
+            } catch (e) {
+                // silently use haversine fallback (already handled in fee calc)
+                setRoadDiffDistKm(0)
+            }
+        }, 1000)  // 1s debounce
+        return () => clearTimeout(timer)
+    }, [pickupLat, pickupLng, deliveryLat, deliveryLng, showDelivery])
+
     useEffect(() => {
         if (!zones.length || !branches.length) return
 
@@ -466,12 +492,16 @@ export default function BookPage() {
         })
         if (minD > maxKm && minD !== Infinity) tooFar = true
 
-        // 2. Different spot fee (Pickup -> Delivery)
+        // 2. Different spot fee (Pickup -> Delivery, Round-trip x2 because staff goes there and returns)
+        // Uses roadDiffDistKm (from OSRM, updated async via debounced useEffect below)
         if (showDelivery && (pickupLat !== deliveryLat || pickupLng !== deliveryLng)) {
-            const distBetween = haversine(pickupLat, pickupLng, deliveryLat, deliveryLng)
-            const rate = branches[0]?.out_of_zone_fee || 10
-            // 2x Multiplier for Round-trip (Pickup -> Delivery -> Pickup)
-            diffFee = Math.round(distBetween * 2) * Number(rate)
+            // Use OSRM road distance if available, otherwise fall back to haversine * 1.35
+            const distBetweenRoad = roadDiffDistKm > 0
+                ? roadDiffDistKm
+                : haversine(pickupLat, pickupLng, deliveryLat, deliveryLng) * 1.35
+            // Use delivery_rate_per_km if set, otherwise fall back to out_of_zone_fee
+            const rate = branches[0]?.delivery_rate_per_km || branches[0]?.out_of_zone_fee || 10
+            diffFee = Math.ceil(distBetweenRoad * Number(rate)) * 2  // x2 round trip
         }
 
         // 3. Travel surcharge (Base -> Pickup) from pre-calculated slot data
@@ -1033,8 +1063,6 @@ export default function BookPage() {
                                                     src={pkg.image_url} 
                                                     alt={pkg.name} 
                                                     className={styles.packageImg} 
-                                                    style={{ cursor: 'zoom-in' }}
-                                                    onClick={(e) => { e.stopPropagation(); setPreviewImg(pkg.image_url) }}
                                                 />
                                             ) : (
                                                 <div className={styles.packageIconOverlay}>
@@ -1101,8 +1129,8 @@ export default function BookPage() {
                                 <div style={{ fontWeight: 700, marginBottom: 'var(--space-4)' }}>บริการเสริม</div>
                                 <div className="addon-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 'var(--space-3)' }}>
                                     {selectedPkg.availableAddons.map((addon: string) => {
-                                        const label = ADDON_LABELS[addon] || addon
-                                        const dbA = dbAddons.find(a => a.name === label)
+                                        const dbA = dbAddons.find(a => a.id === addon || a.name === addon || a.name === (ADDON_LABELS[addon] || addon))
+                                        const label = dbA?.name || ADDON_LABELS[addon] || addon
                                         const desc = dbA?.description || ''
 
                                         const pricingType = dbA?.pricing_type || (desc.includes('[Pricing: Free]') ? 'free' : desc.includes('[Pricing: Variable]') ? 'notify_later' : 'fixed')
@@ -1226,10 +1254,7 @@ export default function BookPage() {
                                                                 >
                                                                     {opt.image_url && (
                                                                         <div
-                                                                            style={{ width: '100%', aspectRatio: '1/1', borderRadius: 8, overflow: 'hidden', cursor: 'zoom-in', transition: 'transform 0.2s' }}
-                                                                            onClick={(e) => { e.stopPropagation(); setPreviewImg(opt.image_url) }}
-                                                                            onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05)'}
-                                                                            onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
+                                                                            style={{ width: '100%', aspectRatio: '1/1', borderRadius: 8, overflow: 'hidden' }}
                                                                         >
                                                                             <img src={opt.image_url} alt={opt.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                                                         </div>
@@ -1695,9 +1720,9 @@ export default function BookPage() {
                                 }] : []),
                                 ...Object.entries(addons).map(([name, isSelected]) => {
                                     if (!isSelected) return null
-                                    const dbA = dbAddons.find(a => a.name === name)
+                                    const dbA = dbAddons.find(a => a.id === name || a.name === name || a.name === (ADDON_LABELS[name] || name))
                                     if (!dbA) return null
-                                    const label = ADDON_LABELS[name] || name
+                                    const label = dbA?.name || ADDON_LABELS[name] || name
                                     const isFree = dbA.description.includes('[Pricing: Free]')
                                     if (isFree) return { label, val: 0, note: 'ฟรี' }
                                     return null // All paid/variable addons go to the Pay Later section
@@ -1725,7 +1750,7 @@ export default function BookPage() {
                         {/* Pay Later Section */}
                         {Object.entries(addons).some(([name, isSelected]) => {
                             if (!isSelected) return false
-                            const dbA = dbAddons.find(a => a.name === name)
+                            const dbA = dbAddons.find(a => a.id === name || a.name === name || a.name === (ADDON_LABELS[name] || name))
                             return dbA && !dbA.description.includes('[Pricing: Free]')
                         }) && (
                             <div style={{ background: '#F8FAFC', borderRadius: 'var(--radius-xl)', padding: 'var(--space-5)', border: '1px solid var(--border)', marginBottom: 'var(--space-4)', borderLeft: '4px solid var(--warning)' }}>
@@ -1734,10 +1759,10 @@ export default function BookPage() {
                                 </div>
                                 {Object.entries(addons).map(([name, isSelected]) => {
                                     if (!isSelected) return null
-                                    const dbA = dbAddons.find(a => a.name === name)
+                                    const dbA = dbAddons.find(a => a.id === name || a.name === name || a.name === (ADDON_LABELS[name] || name))
                                     if (!dbA || dbA.description.includes('[Pricing: Free]')) return null
                                     
-                                    const label = ADDON_LABELS[name] || name
+                                    const label = dbA?.name || ADDON_LABELS[name] || name
                                     const isVariable = dbA.description.includes('[Pricing: Variable]')
                                     const vState = addonVariableStates[name]
                                     

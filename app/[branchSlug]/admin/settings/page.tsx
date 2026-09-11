@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import {
   Settings, Palette, Globe, Image as ImageIcon,
-  Save, CheckCircle2, AlertCircle, RefreshCw, Store, Phone, MapPin
+  Save, CheckCircle2, AlertCircle, RefreshCw, Store, Phone, MapPin, FileText
 } from 'lucide-react'
 
 import ImageUpload from '@/components/ImageUpload'
@@ -17,6 +17,9 @@ export default function ShopSettingsPage() {
     name: '',
     browser_title: '',
     logo_url: '',
+    cover_photo_url: '',       // F-03: รูปหน้าปกร้าน (แสดงใน search card)
+    shop_photos: [] as string[], // F-03: รูปร้าน gallery
+    shop_description: '',      // F-03: คำอธิบายร้าน
     primary_color: '#315EC3',
     accent_color: '#A0D9F6',
     phone: '',
@@ -44,6 +47,9 @@ export default function ShopSettingsPage() {
           name: name,
           browser_title: loadedTitle,
           logo_url: s.logo_url ?? branch?.logo_url ?? '',
+          cover_photo_url: s.cover_photo_url ?? branch?.cover_photo_url ?? '',
+          shop_photos: s.shop_photos ?? branch?.shop_photos ?? [],
+          shop_description: s.shop_description ?? branch?.shop_description ?? '',
           primary_color: s.primary_color ?? branch?.primary_color ?? '#315EC3',
           accent_color: s.accent_color ?? branch?.accent_color ?? '#A0D9F6',
           phone: s.phone ?? branch?.phone ?? '',
@@ -60,6 +66,10 @@ export default function ShopSettingsPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!form.cover_photo_url && (!form.shop_photos || form.shop_photos.length === 0)) {
+      setError('??????????????????????????????????????????????? 1 ???')
+      return
+    }
     setSaving(true)
     setError('')
     setSavedSuccess(false)
@@ -70,6 +80,9 @@ export default function ShopSettingsPage() {
         name: form.name,
         browser_title: form.browser_title,
         logo_url: form.logo_url,
+        cover_photo_url: form.cover_photo_url,
+        shop_photos: form.shop_photos,
+        shop_description: form.shop_description,
         primary_color: form.primary_color,
         accent_color: form.accent_color,
         phone: form.phone,
@@ -89,7 +102,11 @@ export default function ShopSettingsPage() {
         .from('branches')
         .update({
           name: form.name,
-          address: form.address
+          address: form.address,
+          logo_url: form.logo_url,
+          cover_photo_url: form.cover_photo_url,
+          shop_photos: form.shop_photos,
+          shop_description: form.shop_description
         })
         .eq('slug', branchSlug)
 
@@ -182,6 +199,28 @@ export default function ShopSettingsPage() {
               />
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
                 จะถูกนำไปแสดงเป็น &lt;title&gt; ประจำสาขานี้บนแท็บเบราว์เซอร์ทันที
+              </div>
+            </div>
+
+            {/* F-03: Shop Description for Search & Marketplace Modal */}
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+                คำอธิบายร้านค้า (Shop Description)
+              </label>
+              <textarea
+                rows={3}
+                placeholder="เช่น บริการล้างรถและเดลิเวอรี่ระดับพรีเมียม รับ-ส่งรถถึงที่ ขัดเคลือบสีด้วยน้ำยามาตรฐานญี่ปุ่น"
+                value={form.shop_description}
+                onChange={e => setForm(f => ({ ...f, shop_description: e.target.value }))}
+                style={{
+                  width: '100%', padding: '12px 14px', borderRadius: 14,
+                  border: '1.5px solid var(--border)', fontSize: 13.5, fontFamily: 'Kanit, sans-serif',
+                  outline: 'none', color: 'var(--text-primary)', boxSizing: 'border-box',
+                  resize: 'vertical', lineHeight: 1.5
+                }}
+              />
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                ข้อความนี้จะแสดงในหน้าต่างรายละเอียดร้านค้าบนหน้าค้นหา Marketplace ให้ลูกค้าอ่าน
               </div>
             </div>
           </div>
