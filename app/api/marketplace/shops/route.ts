@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase'
 import { generateAICategories } from '@/lib/gemini-filter'
+import { calculateEarliestSlot, getBangkokNow, formatDateStr } from '@/lib/earliest-slot'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,13 +15,21 @@ export async function GET(req: NextRequest) {
   const search = url.searchParams.get('search') || ''
 
   try {
-    // 1. Fetch active branches, app_settings, marketplace listings, services, bookings
-    const [branchesRes, settingsRes, listingsRes, servicesRes, bookingsRes] = await Promise.all([
+    // Determine date range for schedules (today to 3 days ahead in Bangkok time)
+    const bangkokNow = getBangkokNow()
+    const todayStr = formatDateStr(bangkokNow)
+    const dayAfter = new Date(bangkokNow.getTime() + 72 * 60 * 60 * 1000)
+    const endStr = formatDateStr(dayAfter)
+
+    // 1. Fetch active branches, app_settings, marketplace listings, services, bookings, zones, schedules
+    const [branchesRes, settingsRes, listingsRes, servicesRes, bookingsRes, zonesRes, schedulesRes] = await Promise.all([
       supabase.from('branches').select('*').eq('is_active', true).order('created_at', { ascending: false }),
       supabase.from('app_settings').select('key, value').like('key', 'shop_settings:%'),
       supabase.from('marketplace_listings').select('*').eq('is_active', true),
       supabase.from('services').select('*').eq('is_active', true),
-      supabase.from('bookings').select('branch_id, rating, status')
+      supabase.from('bookings').select('id, branch_id, scheduled_date, scheduled_time, rating, status'),
+      supabase.from('zones').select('*').eq('is_active', true),
+      supabase.from('staff_schedules').select('*').gte('date', todayStr).lte('date', endStr)
     ])
 
     if (branchesRes.error) {
@@ -32,6 +41,8 @@ export async function GET(req: NextRequest) {
     const listingsMap = new Map((listingsRes.data || []).map(l => [l.shop_slug, l]))
     const allServices = servicesRes.data || []
     const allBookings = bookingsRes.data || []
+    const allZones = zonesRes.data || []
+    const allSchedules = schedulesRes.data || []
 
     // 2. Generate Filter Categories directly from real active packages
     const filterCategories = await generateAICategories(
@@ -97,6 +108,16 @@ export async function GET(req: NextRequest) {
         b.browser_title ||
         'บริการล้างรถและเดลิเวอรี่ระดับพรีเมียม รับรถถึงที่'
 
+      // Calculate Earliest Available Service Time Slot based on location
+      const earliestSlot = calculateEarliestSlot({
+        userLat: lat || undefined,
+        userLng: lng || undefined,
+        branch: b,
+        zones: allZones,
+        schedules: allSchedules,
+        bookings: allBookings
+      })
+
       return {
         id: b.id,
         shop_slug: slug,
@@ -117,8 +138,9 @@ export async function GET(req: NextRequest) {
         address: shopSetting.address || b.address || 'ขอนแก่น',
         logo_url: shopSetting.logo_url || b.logo_url || '',
         price_from: branchLowestPrice || listing?.price_from || 120,
-        distance_km: undefined as number | undefined,
-        services: branchServices
+        distance_km: earliestSlot.distance_km,
+        services: branchServices,
+        earliest_slot: earliestSlot
       }
     })
 
@@ -133,19 +155,14 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    // Compute distance if user lat/lng provided
+    // Sort by distance if user lat/lng provided
     if (lat && lng) {
-      shops = shops.map(s => {
-        if (s.lat && s.lng) {
-          const R = 6371
-          const dLat = (s.lat - lat) * Math.PI / 180
-          const dLng = (s.lng - lng) * Math.PI / 180
-          const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat * Math.PI / 180) * Math.cos(s.lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2
-          const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-          return { ...s, distance_km: Math.round(dist * 10) / 10 }
-        }
-        return s
-      }).sort((a, b) => (a.distance_km || 999) - (b.distance_km || 999))
+      shops.sort((a, b) => {
+        // Put serviceable shops first, out of reach at the end
+        if (a.earliest_slot?.is_out_of_reach && !b.earliest_slot?.is_out_of_reach) return 1
+        if (!a.earliest_slot?.is_out_of_reach && b.earliest_slot?.is_out_of_reach) return -1
+        return (a.distance_km || 999) - (b.distance_km || 999)
+      })
     }
 
     return NextResponse.json({ shops, categories: filterCategories })

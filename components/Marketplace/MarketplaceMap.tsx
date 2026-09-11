@@ -1,6 +1,23 @@
 'use client'
 import { useEffect, useRef } from 'react'
 
+export interface EarliestSlotInfo {
+  datetime: string
+  date: string
+  time: string
+  display_text: string
+  short_text: string
+  is_today: boolean
+  is_tomorrow: boolean
+  is_out_of_reach: boolean
+  is_in_zone: boolean
+  zone_name?: string
+  distance_km?: number
+  travel_minutes: number
+  badge_color: 'emerald' | 'blue' | 'amber' | 'slate'
+  status_message?: string
+}
+
 export interface Shop {
   id: string
   shop_slug: string
@@ -19,6 +36,7 @@ export interface Shop {
   price_from: number
   distance_km?: number
   services?: any[]
+  earliest_slot?: EarliestSlotInfo
 }
 
 interface Props {
@@ -116,7 +134,7 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, user
 
       L.marker([userLocation.lat, userLocation.lng], { icon: userIcon, zIndexOffset: 1000 })
         .addTo(markersGroupRef.current)
-        .bindTooltip('ตำแหน่งปัจจุบันของคุณ', { permanent: false, direction: 'top' })
+        .bindTooltip('ตำแหน่งปัจจุบันของคุณ (อิงเวลาพร้อมบริการ)', { permanent: false, direction: 'top' })
     }
 
     const bounds = L.latLngBounds([])
@@ -136,7 +154,14 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, user
         ? `<span style="font-size: 10.5px; font-weight: 800; color: ${isSelected ? '#FDE68A' : '#D97706'}; background: ${isSelected ? 'rgba(0,0,0,0.2)' : '#FEF3C7'}; padding: 2px 6px; border-radius: 6px; display: inline-flex; align-items: center; gap: 2px;">★ ${shop.avg_rating.toFixed(1)}</span>`
         : ''
 
-      // Marker Pin with Shop Logo, Shop Name, Starting Price, and pointer tip
+      // Earliest Slot Pill on Map Marker
+      const slotBadge = shop.earliest_slot && !shop.earliest_slot.is_out_of_reach
+        ? `<span style="font-size: 9.5px; font-weight: 800; color: ${isSelected ? '#A7F3D0' : (shop.earliest_slot.is_today ? '#047857' : '#1D4ED8')}; background: ${isSelected ? 'rgba(0,0,0,0.25)' : (shop.earliest_slot.is_today ? '#ECFDF5' : '#EFF6FF')}; padding: 1px 6px; border-radius: 5px; display: inline-flex; align-items: center; gap: 2px; border: 0.5px solid ${isSelected ? 'rgba(255,255,255,0.3)' : (shop.earliest_slot.is_today ? '#A7F3D0' : '#BFDBFE')};">⚡ ${shop.earliest_slot.short_text}</span>`
+        : (shop.earliest_slot?.is_out_of_reach
+          ? `<span style="font-size: 9px; font-weight: 700; color: #94A3B8; background: #F1F5F9; padding: 1px 5px; border-radius: 5px;">นอกโซน</span>`
+          : '')
+
+      // Marker Pin with Shop Logo, Shop Name, Starting Price, Earliest Slot, and pointer tip
       const pricePinIcon = L.divIcon({
         className: 'foami-shop-marker',
         html: `
@@ -164,15 +189,20 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, user
               user-select: none;
             ">
               ${logoHtml}
-              <div style="display: flex; flex-direction: column; text-align: left; line-height: 1.15;">
-                <span style="font-size: 11.5px; font-weight: 900; color: ${isSelected ? '#FFFFFF' : '#0F172A'}; max-width: 140px; overflow: hidden; text-overflow: ellipsis;">
-                  ${shop.shop_name}
-                </span>
-                <span style="font-size: 12px; font-weight: 800; color: ${isSelected ? '#93C5FD' : '#2563EB'};">
-                  เริ่มต้น ${priceText}
-                </span>
+              <div style="display: flex; flex-direction: column; text-align: left; line-height: 1.2;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span style="font-size: 11.5px; font-weight: 900; color: ${isSelected ? '#FFFFFF' : '#0F172A'}; max-width: 130px; overflow: hidden; text-overflow: ellipsis;">
+                    ${shop.shop_name}
+                  </span>
+                  ${ratingBadge}
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px; margin-top: 1px;">
+                  <span style="font-size: 11.5px; font-weight: 800; color: ${isSelected ? '#93C5FD' : '#2563EB'};">
+                    เริ่มต้น ${priceText}
+                  </span>
+                  ${slotBadge}
+                </div>
               </div>
-              ${ratingBadge}
             </div>
             
             <div style="
@@ -198,30 +228,29 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, user
       bounds.extend([shop.lat, shop.lng])
     })
 
-    if (userLocation) {
+    if (userLocation && userLocation.lat && userLocation.lng) {
       bounds.extend([userLocation.lat, userLocation.lng])
     }
 
-    if (bounds.isValid() && shops.length > 0) {
+    // Fit map bounds if shops exist and not yet centered
+    if (bounds.isValid() && !mapInstanceRef.current._hasInitialFit) {
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 })
+      mapInstanceRef.current._hasInitialFit = true
     }
   }
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <div ref={mapRef} style={{ width: '100%', height: '100%', borderRadius: 'inherit' }} />
-
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <div ref={mapRef} style={{ width: '100%', height: '100%', zIndex: 1 }} />
       <style jsx global>{`
         @keyframes pulse-gps {
-          0% {
-            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
-          }
-          70% {
-            box-shadow: 0 0 0 14px rgba(34, 197, 94, 0);
-          }
-          100% {
-            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
-          }
+          0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+          70% { box-shadow: 0 0 0 14px rgba(34, 197, 94, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        .foami-shop-marker:hover {
+          transform: translate(-50%, -105%) scale(1.05) !important;
+          z-index: 999 !important;
         }
       `}</style>
     </div>
