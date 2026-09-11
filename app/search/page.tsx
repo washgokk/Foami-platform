@@ -7,7 +7,7 @@ import {
   MapPin, Search as SearchIcon, Navigation2, Star, Clock,
   ChevronRight, Bike, Droplets, Wrench, Zap, Filter, X, RefreshCw,
   Map as MapIcon, List as ListIcon, Shield, SlidersHorizontal, ArrowUpDown,
-  Award, Columns, Check, Sparkles, CheckCircle2, Package, Tag
+  Award, Columns, Check, Sparkles, CheckCircle2, Package, Tag, Layers
 } from 'lucide-react'
 import Logo from '@/components/Branding/Logo'
 import ReportIssueModal from '@/components/Global/ReportIssueModal'
@@ -111,174 +111,214 @@ function ShopCard({
       onClick={onSelect}
       style={{
         background: '#FFFFFF',
-        border: `2px solid ${isSelected ? '#315EC3' : '#DDE3F5'}`,
         borderRadius: 20,
-        overflow: 'hidden',
+        border: isSelected ? '2px solid #315EC3' : '1.5px solid #E2E8F0',
+        padding: '16px',
         cursor: 'pointer',
-        transition: 'all .2s cubic-bezier(0.4, 0, 0.2, 1)',
-        boxShadow: isSelected ? '0 12px 30px rgba(49, 94, 195, 0.16)' : '0 4px 14px rgba(26, 35, 64, 0.04)',
+        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+        boxShadow: isSelected ? '0 8px 24px rgba(49, 94, 195, 0.16)' : '0 2px 8px rgba(0,0,0,0.04)',
+        position: 'relative',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        gap: 12
       }}
       onMouseEnter={e => {
         if (!isSelected) {
+          e.currentTarget.style.borderColor = '#93C5FD'
           e.currentTarget.style.transform = 'translateY(-2px)'
-          e.currentTarget.style.borderColor = '#A0D9F6'
-          e.currentTarget.style.boxShadow = '0 8px 24px rgba(49, 94, 195, 0.1)'
         }
       }}
       onMouseLeave={e => {
         if (!isSelected) {
+          e.currentTarget.style.borderColor = '#E2E8F0'
           e.currentTarget.style.transform = 'translateY(0)'
-          e.currentTarget.style.borderColor = '#DDE3F5'
-          e.currentTarget.style.boxShadow = '0 4px 14px rgba(26, 35, 64, 0.04)'
         }
       }}
     >
-      {/* Cover image & badges */}
-      <div style={{
-        height: 140,
-        background: photos[0]
-          ? `url(${photos[0]}) center/cover`
-          : 'linear-gradient(135deg, #EFF3FD 0%, #DDE6FB 100%)',
-        position: 'relative'
-      }}>
+      {/* Photo carousel or fallback cover */}
+      <div style={{ position: 'relative', width: '100%', height: 160, borderRadius: 14, overflow: 'hidden', background: '#EFF3FD' }}>
+        {photos.length > 0 ? (
+          <img
+            src={photos[0]}
+            alt={shop.shop_name}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : (
+          <div style={{
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'linear-gradient(135deg, #1E3A8A 0%, #315EC3 100%)',
+            color: '#FFFFFF'
+          }}>
+            <Droplets size={36} style={{ marginBottom: 4, opacity: 0.8 }} />
+            <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.9 }}>{shop.shop_name}</span>
+          </div>
+        )}
+
+        {/* Featured Badge */}
         {shop.is_featured && (
           <div style={{
-            position: 'absolute', top: 10, left: 10,
-            background: 'linear-gradient(135deg, #F59E0B, #EF4444)',
-            color: '#fff', borderRadius: 8, padding: '3px 8px',
-            fontSize: 10.5, fontWeight: 800, letterSpacing: '.04em',
-            boxShadow: '0 2px 8px rgba(245, 158, 11, 0.4)',
-            display: 'flex', alignItems: 'center', gap: 4
+            position: 'absolute',
+            top: 10,
+            left: 10,
+            background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+            color: '#FFFFFF',
+            fontSize: 11,
+            fontWeight: 800,
+            padding: '3px 10px',
+            borderRadius: 999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
           }}>
-            <Award size={12} /> แนะนำพิเศษ
+            <Sparkles size={11} /> แนะนำ
           </div>
         )}
 
+        {/* Distance Badge */}
         {shop.distance_km !== undefined && (
           <div style={{
-            position: 'absolute', top: 10, right: 10,
-            background: 'rgba(255,255,255,0.95)', borderRadius: 999,
-            padding: '4px 10px', fontSize: 11, fontWeight: 800,
-            color: '#315EC3', boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-            display: 'flex', alignItems: 'center', gap: 4
+            position: 'absolute',
+            bottom: 10,
+            left: 10,
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(6px)',
+            color: '#FFFFFF',
+            fontSize: 11.5,
+            fontWeight: 700,
+            padding: '3px 9px',
+            borderRadius: 8,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4
           }}>
-            <Navigation2 size={12} /> {shop.distance_km} กม.
+            <Navigation2 size={11} color="#60A5FA" />
+            <span>{shop.distance_km} กม.</span>
           </div>
         )}
 
-        {/* Shop Logo Avatar */}
+        {/* Price Tag Pill */}
         <div style={{
-          position: 'absolute', bottom: -18, left: 16,
-          width: 48, height: 48, borderRadius: 14,
-          background: '#fff', padding: 2,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.12)'
+          position: 'absolute',
+          bottom: 10,
+          right: 10,
+          background: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(6px)',
+          color: '#1E3A8A',
+          fontSize: 12.5,
+          fontWeight: 900,
+          padding: '3px 10px',
+          borderRadius: 8,
+          boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
         }}>
-          {shop.logo_url ? (
-            <img
-              src={shop.logo_url}
-              alt={shop.shop_name}
-              style={{ width: '100%', height: '100%', borderRadius: 12, objectFit: 'cover' }}
-            />
-          ) : (
-            <div style={{
-              width: '100%', height: '100%', borderRadius: 12,
-              background: '#EFF3FD', display: 'flex', alignItems: 'center',
-              justifyContent: 'center', fontWeight: 900, color: '#315EC3', fontSize: 18
-            }}>
-              {(shop.shop_name || 'F')[0]}
-            </div>
-          )}
+          เริ่มต้น ฿{shop.price_from}
         </div>
       </div>
 
-      {/* Card Info */}
-      <div style={{ padding: '24px 16px 16px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-          <h3 style={{
-            fontSize: 16, fontWeight: 800, color: '#1A2340',
-            margin: 0, lineHeight: 1.3
-          }}>
-            {shop.shop_name}
-          </h3>
-          {shop.avg_rating > 0 && shop.review_count > 0 ? (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 3,
-              background: '#FEF3C7', color: '#D97706', padding: '2px 6px',
-              borderRadius: 6, fontSize: 11, fontWeight: 800, flexShrink: 0
-            }}>
-              <Star size={12} fill="#F59E0B" color="#F59E0B" />
-              {shop.avg_rating.toFixed(1)}
-              <span style={{ color: '#92400E', fontWeight: 500 }}>({shop.review_count})</span>
-            </div>
-          ) : (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 2,
-              color: '#94A3B8', fontSize: 11, fontWeight: 600, flexShrink: 0
-            }}>
-              <Star size={12} color="#CBD5E1" /> ยังไม่มีรีวิว
-            </div>
-          )}
+      {/* Info Content */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {shop.logo_url ? (
+              <img
+                src={shop.logo_url}
+                alt={shop.shop_name}
+                style={{ width: 28, height: 28, borderRadius: 8, objectFit: 'cover', border: '1px solid #DDE3F5' }}
+              />
+            ) : (
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: '#EFF3FD', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900, color: '#315EC3' }}>
+                {(shop.shop_name || 'F')[0]}
+              </div>
+            )}
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#1A2340' }}>
+              {shop.shop_name}
+            </h3>
+          </div>
+
+          {/* Rating */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+            {shop.avg_rating > 0 && shop.review_count > 0 ? (
+              <>
+                <Star size={13} fill="#F59E0B" color="#F59E0B" />
+                <span style={{ fontSize: 12.5, fontWeight: 800, color: '#D97706' }}>
+                  {shop.avg_rating.toFixed(1)}
+                </span>
+                <span style={{ fontSize: 11, color: '#9AA5C4' }}>
+                  ({shop.review_count})
+                </span>
+              </>
+            ) : (
+              <span style={{ fontSize: 11, color: '#9AA5C4', display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Star size={11} color="#CBD5E1" /> ยังไม่มีรีวิว
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Address */}
-        <p style={{
-          fontSize: 12, color: '#5A6589', margin: '6px 0 10px',
-          display: 'flex', alignItems: 'center', gap: 4,
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-        }}>
-          <MapPin size={13} color="#9AA5C4" style={{ flexShrink: 0 }} />
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{shop.address}</span>
-        </p>
-
-        {/* Available Packages tags */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 12 }}>
-          {(shop.services && shop.services.length > 0 ? shop.services : (shop.categories || []).map(c => ({ name: c })))
-            .slice(0, 3)
-            .map((srv: any, idx: number) => (
-              <span key={idx} style={{
-                fontSize: 11, background: '#F0F3FC', color: '#315EC3',
-                padding: '2px 8px', borderRadius: 6, fontWeight: 600
-              }}>
-                {srv.name}
-              </span>
-            ))}
-          {shop.services && shop.services.length > 3 && (
-            <span style={{ fontSize: 11, background: '#EFF3FD', color: '#5A6589', padding: '2px 6px', borderRadius: 6 }}>
-              +{shop.services.length - 3}
-            </span>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#5A6589' }}>
+          <MapPin size={12} color="#9AA5C4" style={{ flexShrink: 0 }} />
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {shop.address || 'ไม่ระบุที่อยู่'}
+          </span>
         </div>
 
-        {/* Price & Action */}
-        <div style={{
-          marginTop: 'auto', paddingTop: 10,
-          borderTop: '1px solid #F0F3FC',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-        }}>
-          <div>
-            <div style={{ fontSize: 10.5, color: '#9AA5C4', fontWeight: 600 }}>ราคาเริ่มต้น</div>
-            <div style={{ fontSize: 16, fontWeight: 900, color: '#315EC3' }}>
-              ฿{shop.price_from}
-            </div>
+        {/* Service Badges */}
+        {shop.categories && shop.categories.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+            {shop.categories.slice(0, 3).map((cat, idx) => (
+              <span
+                key={idx}
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: 6,
+                  background: '#F0F3FC',
+                  color: '#315EC3'
+                }}
+              >
+                {cat}
+              </span>
+            ))}
+            {shop.categories.length > 3 && (
+              <span style={{ fontSize: 10.5, color: '#9AA5C4', padding: '2px 4px' }}>
+                +{shop.categories.length - 3}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Action Button */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, paddingTop: 10, borderTop: '1px solid #F0F3FC' }}>
+          <div style={{ fontSize: 11.5, color: '#64748B' }}>
+            {shop.services ? `${shop.services.length} แพ็กเกจพร้อมให้บริการ` : 'เปิดรับจองออนไลน์'}
           </div>
           <button
+            onClick={e => {
+              e.stopPropagation()
+              onSelect()
+            }}
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '7px 14px',
+              padding: '6px 14px',
               borderRadius: 10,
-              background: '#315EC3',
-              color: '#FFFFFF',
+              background: '#EFF3FD',
+              color: '#315EC3',
               border: 'none',
-              fontSize: 12.5,
-              fontWeight: 700,
-              cursor: 'pointer'
+              fontSize: 12,
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
             }}
           >
-            เลือกดู <ChevronRight size={14} />
+            เลือกดู <ChevronRight size={13} />
           </button>
         </div>
       </div>
@@ -291,23 +331,72 @@ export default function MarketplaceSearchPage() {
   const [shops, setShops] = useState<Shop[]>([])
   const [categories, setCategories] = useState<AICategory[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Filters & Search
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [sortBy, setSortBy] = useState<'distance' | 'rating' | 'price'>('distance')
+
+  // Layout View Mode: 'split' | 'list' | 'map'
   const [viewMode, setViewMode] = useState<'split' | 'list' | 'map'>('split')
+  const [isMobile, setIsMobile] = useState(false)
+
+  // User Geolocation
   const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null)
   const [locLoading, setLocLoading] = useState(false)
+
+  // Selected Shop Drawer & Report Modal
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null)
   const [reportModalOpen, setReportModalOpen] = useState(false)
 
-  // 1. Fetch Shops & Categories
-  const load = useCallback(async () => {
+  // Responsive Screen Detection
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 1024
+      setIsMobile(mobile)
+      if (mobile) {
+        setViewMode(current => (current === 'split' ? 'list' : current))
+      }
+    }
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  // Auto detect user location once on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        },
+        () => {
+          // Default to Khon Kaen
+          setUserLoc({ lat: 16.4419, lng: 102.8360 })
+        },
+        { timeout: 8000 }
+      )
+    }
+  }, [])
+
+  // Fetch shops & categories from API
+  const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/marketplace/shops`)
+      const latParam = userLoc ? `lat=${userLoc.lat}&lng=${userLoc.lng}` : ''
+      const res = await fetch(`/api/marketplace/shops?${latParam}`)
       const data = await res.json()
-      setShops(data.shops || [])
-      if (data.categories && Array.isArray(data.categories)) {
+      if (data.shops) {
+        let list: Shop[] = data.shops
+        if (userLoc) {
+          list = list.map(s => ({
+            ...s,
+            distance_km: s.lat && s.lng ? calculateDistanceKm(userLoc.lat, userLoc.lng, s.lat, s.lng) : undefined
+          }))
+        }
+        setShops(list)
+      }
+      if (data.categories) {
         setCategories(data.categories)
       }
     } catch (err) {
@@ -315,112 +404,112 @@ export default function MarketplaceSearchPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [userLoc])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
-  // 2. Geolocation Request
+  // Get current location manually
   const getLocation = () => {
-    setLocLoading(true)
     if (!navigator.geolocation) {
-      alert('อุปกรณ์ของคุณไม่รองรับการระบุตำแหน่ง GPS')
-      setLocLoading(false)
+      alert('เบราว์เซอร์ของคุณไม่รองรับการระบุตำแหน่ง GPS')
       return
     }
+    setLocLoading(true)
     navigator.geolocation.getCurrentPosition(
       pos => {
         setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude })
         setLocLoading(false)
       },
       err => {
-        console.warn('Geolocation error:', err)
+        alert('ไม่สามารถดึงตำแหน่งปัจจุบันได้ กรุณาเปิดอนุญาต Location: ' + err.message)
         setLocLoading(false)
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { timeout: 10000 }
     )
   }
 
-  // 3. Enrich and Filter shops
-  const enrichedShops = useMemo(() => {
-    return shops.map(s => {
-      let dist: number | undefined = undefined
-      if (userLoc && s.lat && s.lng) {
-        dist = calculateDistanceKm(userLoc.lat, userLoc.lng, s.lat, s.lng)
-      }
-      return { ...s, distance_km: dist }
-    })
-  }, [shops, userLoc])
-
+  // Filter & Sort shops
   const filteredShops = useMemo(() => {
-    return enrichedShops
-      .filter(s => {
-        const q = search.toLowerCase().trim()
-        const matchesSearch = !q || 
-          s.shop_name?.toLowerCase().includes(q) || 
-          s.address?.toLowerCase().includes(q) ||
-          s.shop_slug?.toLowerCase().includes(q) ||
-          (s.services || []).some(srv => srv.name?.toLowerCase().includes(q) || srv.description?.toLowerCase().includes(q))
+    let result = [...shops]
 
-        let matchesCat = true
-        if (selectedCategory !== 'all') {
-          const catObj = categories.find(c => c.id === selectedCategory)
-          if (catObj && catObj.service_ids && catObj.service_ids.length > 0) {
-            const shopServiceIds = (s.services || []).map(srv => srv.id)
-            const shopServiceNames = (s.services || []).map(srv => srv.name)
-            matchesCat = shopServiceIds.some(id => catObj.service_ids.includes(id)) ||
-              shopServiceNames.some(name => (catObj.service_names || []).includes(name))
-          } else {
-            matchesCat = (s.categories || []).some(c => c.includes(selectedCategory))
-          }
-        }
+    // Search query filter
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      result = result.filter(s =>
+        s.shop_name.toLowerCase().includes(q) ||
+        s.address.toLowerCase().includes(q) ||
+        (s.categories && s.categories.some(c => c.toLowerCase().includes(q))) ||
+        (s.services && s.services.some(srv => srv.name.toLowerCase().includes(q) || (srv.description && srv.description.toLowerCase().includes(q))))
+      )
+    }
 
-        return matchesSearch && matchesCat
-      })
-      .sort((a, b) => {
-        if (sortBy === 'distance') {
-          if (a.distance_km === undefined && b.distance_km === undefined) return 0
-          if (a.distance_km === undefined) return 1
-          if (b.distance_km === undefined) return -1
-          return a.distance_km - b.distance_km
-        }
-        if (sortBy === 'rating') {
-          return (b.avg_rating || 0) - (a.avg_rating || 0)
-        }
-        if (sortBy === 'price') {
-          return (a.price_from || 0) - (b.price_from || 0)
-        }
-        return 0
-      })
-  }, [enrichedShops, search, selectedCategory, categories, sortBy])
+    // Category filter
+    if (selectedCategory !== 'all') {
+      const activeCat = categories.find(c => c.id === selectedCategory)
+      if (activeCat) {
+        result = result.filter(s => {
+          if (!s.services || s.services.length === 0) return false
+          return s.services.some(srv =>
+            activeCat.service_ids.includes(srv.id) ||
+            activeCat.service_names.includes(srv.name) ||
+            srv.name.toLowerCase().includes(activeCat.label.toLowerCase())
+          )
+        })
+      }
+    }
+
+    // Sorting
+    result.sort((a, b) => {
+      if (sortBy === 'distance') {
+        const da = a.distance_km ?? 99999
+        const db = b.distance_km ?? 99999
+        return da - db
+      }
+      if (sortBy === 'rating') {
+        return (b.avg_rating || 0) - (a.avg_rating || 0)
+      }
+      if (sortBy === 'price') {
+        return (a.price_from || 0) - (b.price_from || 0)
+      }
+      return 0
+    })
+
+    return result
+  }, [shops, search, selectedCategory, sortBy, categories])
 
   return (
     <div style={{
-      minHeight: '100vh',
-      background: 'var(--bg, #F6F8FF)',
+      width: '100vw',
+      height: '100vh',
+      overflow: 'hidden',
+      background: '#F6F8FF',
       fontFamily: 'var(--font-kanit, "Kanit", sans-serif)',
       display: 'flex',
       flexDirection: 'column'
     }}>
-      {/* Top Header Navigation */}
+      {/* ── Top Header ── */}
       <header style={{
         background: '#FFFFFF',
         borderBottom: '1.5px solid #DDE3F5',
-        padding: '0 20px',
-        height: 64,
+        padding: '0 16px',
+        height: 60,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         position: 'sticky',
         top: 0,
         zIndex: 30,
-        boxShadow: '0 2px 10px rgba(49, 94, 195, 0.04)'
+        boxShadow: '0 2px 10px rgba(49, 94, 195, 0.04)',
+        flexShrink: 0
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <Logo width={130} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Logo width={115} />
         </div>
 
-        {/* View Mode Toggle */}
-        <div className="view-mode-toggle" style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F0F3FC', padding: 4, borderRadius: 12 }}>
+        {/* Desktop View Mode Segmented Controls (Split / List / Map) */}
+        <div className="desktop-view-toggle" style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#F0F3FC', padding: 4, borderRadius: 12 }}>
           <button
             onClick={() => setViewMode('split')}
             style={{
@@ -432,7 +521,7 @@ export default function MarketplaceSearchPage() {
               boxShadow: viewMode === 'split' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none'
             }}
           >
-            <Columns size={13} /> แยกหน้าต่าง
+            <Columns size={13} /> หน้าจอคู่
           </button>
           <button
             onClick={() => setViewMode('list')}
@@ -445,7 +534,7 @@ export default function MarketplaceSearchPage() {
               boxShadow: viewMode === 'list' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none'
             }}
           >
-            <ListIcon size={13} /> รายการ
+            <ListIcon size={13} /> รายการ ({filteredShops.length})
           </button>
           <button
             onClick={() => setViewMode('map')}
@@ -461,44 +550,86 @@ export default function MarketplaceSearchPage() {
             <MapIcon size={13} /> แผนที่
           </button>
         </div>
+
+        {/* Mobile View Toggle Pill in Topbar */}
+        <div className="mobile-view-toggle" style={{ display: 'none', alignItems: 'center', gap: 4, background: '#EFF3FD', padding: 3, borderRadius: 10 }}>
+          <button
+            onClick={() => setViewMode('list')}
+            style={{
+              padding: '6px 10px',
+              borderRadius: 8,
+              border: 'none',
+              background: viewMode === 'list' ? '#315EC3' : 'transparent',
+              color: viewMode === 'list' ? '#FFFFFF' : '#5A6589',
+              fontSize: 11.5,
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
+            }}
+          >
+            <ListIcon size={12} /> รายการ
+          </button>
+          <button
+            onClick={() => setViewMode('map')}
+            style={{
+              padding: '6px 10px',
+              borderRadius: 8,
+              border: 'none',
+              background: viewMode === 'map' ? '#315EC3' : 'transparent',
+              color: viewMode === 'map' ? '#FFFFFF' : '#5A6589',
+              fontSize: 11.5,
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
+            }}
+          >
+            <MapIcon size={12} /> แผนที่
+          </button>
+        </div>
       </header>
 
-      {/* Filter & Search Bar Area */}
+      {/* ── Filter & Search Bar Area ── */}
       <div style={{
         background: '#FFFFFF',
         borderBottom: '1px solid #DDE3F5',
-        padding: '12px 20px',
+        padding: '10px 16px',
         display: 'flex',
         flexWrap: 'wrap',
-        gap: 12,
+        gap: 10,
         alignItems: 'center',
-        justifyContent: 'space-between'
+        justifyContent: 'space-between',
+        flexShrink: 0
       }}>
         {/* Search Input & GPS */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 260 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 280px', width: '100%' }}>
           <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
-            <SearchIcon size={16} color="#9AA5C4" style={{ position: 'absolute', left: 14 }} />
+            <SearchIcon size={15} color="#9AA5C4" style={{ position: 'absolute', left: 12 }} />
             <input
               type="text"
-              placeholder="ค้นหาชื่อร้าน หรือแพ็กเกจบริการ..."
+              placeholder="ค้นหาชื่อร้าน หรือแพ็กเกจ..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{
                 width: '100%',
-                padding: '10px 36px 10px 38px',
-                borderRadius: 14,
+                padding: '8px 32px 8px 34px',
+                borderRadius: 12,
                 border: '1.5px solid #DDE3F5',
-                fontSize: 13.5,
+                fontSize: 13,
                 outline: 'none',
                 fontFamily: 'inherit',
                 color: '#1A2340',
-                background: '#F6F8FF'
+                background: '#F6F8FF',
+                boxSizing: 'border-box'
               }}
             />
             {search && (
               <button
                 onClick={() => setSearch('')}
-                style={{ position: 'absolute', right: 12, background: 'none', border: 'none', cursor: 'pointer', color: '#9AA5C4' }}
+                style={{ position: 'absolute', right: 10, background: 'none', border: 'none', cursor: 'pointer', color: '#9AA5C4' }}
               >
                 <X size={14} />
               </button>
@@ -509,107 +640,127 @@ export default function MarketplaceSearchPage() {
             onClick={getLocation}
             disabled={locLoading}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 14px',
-              borderRadius: 14, border: 'none',
+              display: 'inline-flex', alignItems: 'center', gap: 5, padding: '8px 12px',
+              borderRadius: 12, border: 'none',
               background: userLoc ? '#DCFCE7' : '#EFF3FD',
               color: userLoc ? '#15803D' : '#315EC3',
-              fontSize: 13, fontWeight: 700,
+              fontSize: 12.5, fontWeight: 700,
               cursor: locLoading ? 'wait' : 'pointer',
-              whiteSpace: 'nowrap', fontFamily: 'inherit'
+              whiteSpace: 'nowrap', fontFamily: 'inherit',
+              flexShrink: 0
             }}
           >
-            <Navigation2 size={14} />
-            {locLoading ? 'กำลังหาพิกัด...' : userLoc ? 'พิกัดของฉัน' : 'ตำแหน่งใกล้ฉัน'}
+            <Navigation2 size={13} />
+            <span className="loc-btn-text">
+              {locLoading ? 'กำลังค้นหา...' : userLoc ? 'พิกัดของฉัน' : 'ใกล้ฉัน'}
+            </span>
           </button>
         </div>
 
-        {/* Exact Package Category Chips (Zero Hallucinated Words) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
-          <button
-            onClick={() => setSelectedCategory('all')}
-            style={{
-              padding: '7px 15px',
-              borderRadius: 999,
-              border: `1.5px solid ${selectedCategory === 'all' ? '#315EC3' : '#DDE3F5'}`,
-              background: selectedCategory === 'all' ? '#EFF3FD' : '#FFFFFF',
-              color: selectedCategory === 'all' ? '#315EC3' : '#5A6589',
-              fontSize: 13,
-              fontWeight: selectedCategory === 'all' ? 800 : 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              fontFamily: 'inherit',
-              transition: 'all 0.15s'
-            }}
-          >
-            ทั้งหมด
-          </button>
+        {/* Category Chips Bar & Sort */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', overflow: 'hidden' }}>
+          {/* Scrollable category chips */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            overflowX: 'auto',
+            paddingBottom: 2,
+            flex: 1,
+            scrollbarWidth: 'none',
+            WebkitOverflowScrolling: 'touch'
+          }}>
+            <button
+              onClick={() => setSelectedCategory('all')}
+              style={{
+                padding: '5px 12px',
+                borderRadius: 999,
+                border: `1.5px solid ${selectedCategory === 'all' ? '#315EC3' : '#DDE3F5'}`,
+                background: selectedCategory === 'all' ? '#EFF3FD' : '#FFFFFF',
+                color: selectedCategory === 'all' ? '#315EC3' : '#5A6589',
+                fontSize: 12,
+                fontWeight: selectedCategory === 'all' ? 800 : 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                fontFamily: 'inherit',
+                transition: 'all 0.15s',
+                flexShrink: 0
+              }}
+            >
+              ทั้งหมด
+            </button>
 
-          {categories.map(cat => {
-            const active = selectedCategory === cat.id
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '7px 15px',
-                  borderRadius: 999,
-                  border: `1.5px solid ${active ? '#315EC3' : '#DDE3F5'}`,
-                  background: active ? '#EFF3FD' : '#FFFFFF',
-                  color: active ? '#315EC3' : '#475569',
-                  fontSize: 13,
-                  fontWeight: active ? 800 : 600,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  fontFamily: 'inherit',
-                  transition: 'all 0.15s'
-                }}
-              >
-                <span>{cat.label}</span>
-              </button>
-            )
-          })}
-        </div>
+            {categories.map(cat => {
+              const active = selectedCategory === cat.id
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    padding: '5px 12px',
+                    borderRadius: 999,
+                    border: `1.5px solid ${active ? '#315EC3' : '#DDE3F5'}`,
+                    background: active ? '#EFF3FD' : '#FFFFFF',
+                    color: active ? '#315EC3' : '#475569',
+                    fontSize: 12,
+                    fontWeight: active ? 800 : 600,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    fontFamily: 'inherit',
+                    transition: 'all 0.15s',
+                    flexShrink: 0
+                  }}
+                >
+                  <span>{cat.label}</span>
+                </button>
+              )
+            })}
+          </div>
 
-        {/* Sort by dropdown */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <ArrowUpDown size={14} color="#5A6589" />
-          <select
-            value={sortBy}
-            onChange={e => setSortBy(e.target.value as any)}
-            style={{
-              padding: '7px 10px', borderRadius: 10, border: '1.5px solid #DDE3F5',
-              background: '#FFFFFF', color: '#1A2340', fontSize: 12.5, fontWeight: 600,
-              outline: 'none', fontFamily: 'inherit', cursor: 'pointer'
-            }}
-          >
-            <option value="distance">เรียงตาม: ใกล้ที่สุด</option>
-            <option value="rating">เรียงตาม: คะแนนรีวิว</option>
-            <option value="price">เรียงตาม: ราคาเริ่มต้น</option>
-          </select>
+          {/* Sort Dropdown */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            <ArrowUpDown size={13} color="#5A6589" />
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as any)}
+              style={{
+                padding: '5px 8px', borderRadius: 8, border: '1.5px solid #DDE3F5',
+                background: '#FFFFFF', color: '#1A2340', fontSize: 11.5, fontWeight: 600,
+                outline: 'none', fontFamily: 'inherit', cursor: 'pointer'
+              }}
+            >
+              <option value="distance">ใกล้ที่สุด</option>
+              <option value="rating">คะแนนรีวิว</option>
+              <option value="price">ราคาเริ่มต้น</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* Main Content Layout */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
-        {/* Left Column: Shop Cards List */}
+      {/* ── Main Responsive Content ── */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative', width: '100%', height: 'calc(100vh - 120px)' }}>
+        {/* ── Shop Cards Column ── */}
         {(viewMode === 'split' || viewMode === 'list') && (
           <div
-            className="shop-list-container"
+            className="responsive-shop-list"
             style={{
-              flex: viewMode === 'list' ? '1 1 100%' : '0 0 460px',
-              maxWidth: viewMode === 'list' ? 900 : 460,
+              flex: viewMode === 'list' ? '1 1 100%' : '0 0 440px',
+              width: viewMode === 'list' ? '100%' : 440,
+              maxWidth: viewMode === 'list' ? 1100 : 440,
               margin: viewMode === 'list' ? '0 auto' : '0',
-              width: '100%',
-              height: 'calc(100vh - 130px)',
+              height: '100%',
               overflowY: 'auto',
-              padding: '16px 20px 40px',
-              boxSizing: 'border-box'
+              padding: '16px 16px 60px',
+              boxSizing: 'border-box',
+              background: '#FFFFFF',
+              borderRight: viewMode === 'split' ? '1.5px solid #DDE3F5' : 'none',
+              zIndex: 10
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#5A6589' }}>
                 พบร้านล้างรถทั้งหมด <span style={{ color: '#315EC3', fontWeight: 900 }}>{filteredShops.length}</span> ร้าน
               </div>
@@ -629,13 +780,17 @@ export default function MarketplaceSearchPage() {
                 <div>กำลังค้นหาร้านล้างรถ...</div>
               </div>
             ) : filteredShops.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px 20px', background: '#FFFFFF', borderRadius: 20, border: '1.5px dashed #DDE3F5' }}>
-                <Droplets size={36} color="#9AA5C4" style={{ margin: '0 auto 12px' }} />
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#1A2340', marginBottom: 6 }}>ไม่พบร้านล้างรถที่ตรงกับเงื่อนไข</div>
-                <div style={{ fontSize: 13, color: '#5A6589' }}>ลองเปลี่ยนคำค้นหา หรือเลือกตัวกรองหมวดหมู่อื่น</div>
+              <div style={{ textAlign: 'center', padding: '60px 20px', background: '#F8FAFC', borderRadius: 20, border: '1.5px dashed #CBD5E1' }}>
+                <Droplets size={36} color="#94A3B8" style={{ margin: '0 auto 12px' }} />
+                <div style={{ fontSize: 15, fontWeight: 800, color: '#1A2340', marginBottom: 4 }}>ไม่พบร้านล้างรถที่ตรงกับเงื่อนไข</div>
+                <div style={{ fontSize: 12.5, color: '#64748B' }}>ลองเปลี่ยนคำค้นหา หรือเลือกตัวกรองหมวดหมู่อื่น</div>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: viewMode === 'list' ? 'repeat(auto-fill, minmax(280px, 1fr))' : '1fr', gap: 16 }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: viewMode === 'list' ? 'repeat(auto-fill, minmax(290px, 1fr))' : '1fr',
+                gap: 14
+              }}>
                 {filteredShops.map(shop => (
                   <ShopCard
                     key={shop.id}
@@ -649,13 +804,14 @@ export default function MarketplaceSearchPage() {
           </div>
         )}
 
-        {/* Right Column: Leaflet Map */}
+        {/* ── Leaflet Map Column ── */}
         {(viewMode === 'split' || viewMode === 'map') && (
           <div
-            className="map-container"
+            className="responsive-map-container"
             style={{
               flex: 1,
-              height: 'calc(100vh - 130px)',
+              width: '100%',
+              height: '100%',
               position: 'relative'
             }}
           >
@@ -665,34 +821,143 @@ export default function MarketplaceSearchPage() {
               onSelectShop={setSelectedShop}
               userLocation={userLoc}
             />
+
+            {/* Mobile floating map card preview when a shop pin is selected */}
+            {isMobile && selectedShop && viewMode === 'map' && (
+              <div style={{
+                position: 'absolute',
+                bottom: 74,
+                left: 14,
+                right: 14,
+                zIndex: 400,
+                background: '#FFFFFF',
+                borderRadius: 18,
+                padding: '12px 14px',
+                boxShadow: '0 12px 32px rgba(0,0,0,0.22)',
+                border: '1.5px solid #315EC3',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12
+              }}>
+                {selectedShop.logo_url ? (
+                  <img
+                    src={selectedShop.logo_url}
+                    alt={selectedShop.shop_name}
+                    style={{ width: 48, height: 48, borderRadius: 12, objectFit: 'cover', flexShrink: 0 }}
+                  />
+                ) : (
+                  <div style={{ width: 48, height: 48, borderRadius: 12, background: '#EFF3FD', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#315EC3', flexShrink: 0 }}>
+                    {(selectedShop.shop_name || 'F')[0]}
+                  </div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {selectedShop.shop_name}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#2563EB', fontWeight: 800, marginTop: 2 }}>
+                    เริ่มต้น ฿{selectedShop.price_from}
+                    {selectedShop.distance_km !== undefined && (
+                      <span style={{ color: '#64748B', fontWeight: 500, marginLeft: 6 }}>
+                        · {selectedShop.distance_km} กม.
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedShop(selectedShop)}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 10,
+                    background: '#2563EB',
+                    color: '#FFF',
+                    border: 'none',
+                    fontSize: 12,
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    flexShrink: 0
+                  }}
+                >
+                  จองคิว
+                </button>
+              </div>
+            )}
           </div>
         )}
+
+        {/* ── Mobile Floating Bottom Switcher (Airbnb-Style FAB) ── */}
+        <div className="mobile-floating-fab" style={{
+          position: 'fixed',
+          bottom: 20,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 500,
+          display: 'none'
+        }}>
+          <button
+            onClick={() => setViewMode(viewMode === 'map' ? 'list' : 'map')}
+            style={{
+              padding: '10px 20px',
+              borderRadius: 999,
+              background: '#0F172A',
+              color: '#FFFFFF',
+              border: '1.5px solid rgba(255,255,255,0.2)',
+              fontSize: 13,
+              fontWeight: 800,
+              boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              cursor: 'pointer'
+            }}
+          >
+            {viewMode === 'map' ? (
+              <>
+                <ListIcon size={15} /> ดูรายการร้าน ({filteredShops.length})
+              </>
+            ) : (
+              <>
+                <MapIcon size={15} /> ดูบนแผนที่
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* Floating Bottom Modal/Drawer for Selected Shop */}
+      {/* ── Responsive Slide-Up Drawer / Bottom Sheet for Selected Shop ── */}
       {selectedShop && (
         <>
           <div
             onClick={() => setSelectedShop(null)}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.45)', zIndex: 100, backdropFilter: 'blur(3px)' }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15, 23, 42, 0.55)',
+              zIndex: 1000,
+              backdropFilter: 'blur(4px)',
+              transition: 'opacity 0.2s'
+            }}
           />
-          <div style={{
-            position: 'fixed',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            zIndex: 101,
-            background: '#FFFFFF',
-            borderRadius: '24px 24px 0 0',
-            padding: '24px 24px 30px',
-            maxHeight: '85vh',
-            maxWidth: 620,
-            margin: '0 auto',
-            overflowY: 'auto',
-            boxShadow: '0 -16px 40px rgba(0,0,0,0.2)'
-          }}>
-            {/* Handle bar */}
-            <div style={{ width: 44, height: 5, background: '#DDE3F5', borderRadius: 999, margin: '0 auto 16px' }} />
+          <div
+            className="shop-drawer-modal"
+            style={{
+              position: 'fixed',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              zIndex: 1001,
+              background: '#FFFFFF',
+              borderRadius: '28px 28px 0 0',
+              padding: '20px 20px 32px',
+              maxHeight: '88vh',
+              maxWidth: 640,
+              margin: '0 auto',
+              overflowY: 'auto',
+              boxShadow: '0 -16px 40px rgba(0,0,0,0.25)',
+              boxSizing: 'border-box'
+            }}
+          >
+            {/* Pull Handle bar */}
+            <div style={{ width: 44, height: 5, background: '#CBD5E1', borderRadius: 999, margin: '0 auto 16px' }} />
 
             {/* Shop Header Info */}
             <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', marginBottom: 14 }}>
@@ -700,23 +965,23 @@ export default function MarketplaceSearchPage() {
                 <img
                   src={selectedShop.logo_url}
                   alt={selectedShop.shop_name}
-                  style={{ width: 60, height: 60, borderRadius: 16, objectFit: 'cover', border: '2px solid #DDE3F5', flexShrink: 0 }}
+                  style={{ width: 56, height: 56, borderRadius: 16, objectFit: 'cover', border: '2px solid #DDE3F5', flexShrink: 0 }}
                 />
               ) : (
                 <div style={{
-                  width: 60, height: 60, borderRadius: 16, background: '#EFF3FD',
+                  width: 56, height: 56, borderRadius: 16, background: '#EFF3FD',
                   border: '2px solid #DDE3F5', display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', fontSize: 24, fontWeight: 900, color: '#315EC3', flexShrink: 0
+                  justifyContent: 'center', fontSize: 22, fontWeight: 900, color: '#315EC3', flexShrink: 0
                 }}>
                   {(selectedShop.shop_name || 'F')[0]}
                 </div>
               )}
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <h2 style={{ fontSize: 20, fontWeight: 900, color: '#1A2340', margin: 0 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <h2 style={{ fontSize: 18, fontWeight: 900, color: '#1A2340', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {selectedShop.shop_name}
                   </h2>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); setReportModalOpen(true); }}
@@ -731,34 +996,34 @@ export default function MarketplaceSearchPage() {
                         fontWeight: 700,
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: 4
+                        gap: 3
                       }}
-                      title="แจ้งปัญหาหรือรายงานร้านค้านี้"
+                      title="รายงานปัญหาร้านค้านี้"
                     >
-                      <Shield size={12} /> รายงานร้านนี้
+                      <Shield size={11} /> รายงานร้าน
                     </button>
                     <button
                       onClick={() => setSelectedShop(null)}
-                      style={{ background: '#F0F3FC', border: 'none', borderRadius: 999, padding: 8, cursor: 'pointer', color: '#5A6589' }}
+                      style={{ background: '#F0F3FC', border: 'none', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#5A6589' }}
                     >
-                      <X size={18} />
+                      <X size={16} />
                     </button>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, fontSize: 13 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4, fontSize: 12.5 }}>
                   {selectedShop.avg_rating > 0 && selectedShop.review_count > 0 ? (
                     <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: '#D97706', fontWeight: 700 }}>
-                      <Star size={14} fill="#F59E0B" color="#F59E0B" /> {selectedShop.avg_rating.toFixed(1)} ({selectedShop.review_count} รีวิว)
+                      <Star size={13} fill="#F59E0B" color="#F59E0B" /> {selectedShop.avg_rating.toFixed(1)} ({selectedShop.review_count} รีวิว)
                     </span>
                   ) : (
                     <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: '#94A3B8', fontWeight: 600 }}>
-                      <Star size={14} color="#CBD5E1" /> ยังไม่มีรีวิว
+                      <Star size={13} color="#CBD5E1" /> ยังไม่มีรีวิว
                     </span>
                   )}
                   {selectedShop.distance_km !== undefined && (
                     <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: '#315EC3', fontWeight: 700 }}>
-                      <Navigation2 size={13} /> {selectedShop.distance_km} กม.
+                      <Navigation2 size={12} /> {selectedShop.distance_km} กม.
                     </span>
                   )}
                 </div>
@@ -768,30 +1033,30 @@ export default function MarketplaceSearchPage() {
             {/* Address */}
             {selectedShop.address && (
               <div style={{
-                display: 'flex', gap: 8, fontSize: 13, color: '#5A6589',
-                marginBottom: 12, background: '#F6F8FF', padding: '10px 14px', borderRadius: 12
+                display: 'flex', gap: 8, fontSize: 12.5, color: '#5A6589',
+                marginBottom: 12, background: '#F6F8FF', padding: '9px 12px', borderRadius: 12
               }}>
-                <MapPin size={16} color="#315EC3" style={{ flexShrink: 0, marginTop: 2 }} />
-                <span>{selectedShop.address}</span>
+                <MapPin size={15} color="#315EC3" style={{ flexShrink: 0, marginTop: 2 }} />
+                <span style={{ wordBreak: 'break-word' }}>{selectedShop.address}</span>
               </div>
             )}
 
-            {/* Shop Description (editable by shop in admin settings) */}
+            {/* Shop Description */}
             {selectedShop.description && (
               <p style={{
-                fontSize: 13.5, color: '#475569', lineHeight: 1.6,
-                marginBottom: 18, background: '#FAFAFA', padding: '10px 14px',
-                borderRadius: 12, border: '1px solid #F1F5F9'
+                fontSize: 13, color: '#475569', lineHeight: 1.5,
+                marginBottom: 16, background: '#FAFAFA', padding: '10px 14px',
+                borderRadius: 12, border: '1px solid #F1F5F9', wordBreak: 'break-word'
               }}>
                 {selectedShop.description}
               </p>
             )}
 
-            {/* Packages & Services (Actionable Cards - No duplicate bottom button) */}
+            {/* Packages & Services (Zero duplicate buttons) */}
             <div style={{ marginBottom: 12 }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                fontSize: 14.5, fontWeight: 800, color: '#1A2340', marginBottom: 12
+                fontSize: 14, fontWeight: 800, color: '#1A2340', marginBottom: 10
               }}>
                 <Package size={16} color="#315EC3" />
                 เลือกแพ็กเกจเพื่อจองคิว
@@ -811,57 +1076,56 @@ export default function MarketplaceSearchPage() {
                           background: '#FFFFFF',
                           border: '1.5px solid #E2E8F0',
                           borderRadius: 16,
-                          padding: '14px 16px',
+                          padding: '12px 14px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          gap: 14,
+                          gap: 12,
                           cursor: 'pointer',
                           transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
                           boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
                         }}
                         onMouseEnter={e => {
                           e.currentTarget.style.borderColor = '#315EC3'
-                          e.currentTarget.style.background = '#F8FAFC'
-                          e.currentTarget.style.transform = 'translateY(-1px)'
+                          e.currentTarget.style.background = '#FBFDFF'
                         }}
                         onMouseLeave={e => {
                           e.currentTarget.style.borderColor = '#E2E8F0'
                           e.currentTarget.style.background = '#FFFFFF'
-                          e.currentTarget.style.transform = 'translateY(0)'
                         }}
                       >
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 15, fontWeight: 800, color: '#1E293B' }}>
+                        {/* Service Details */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 800, fontSize: 14.5, color: '#0F172A', marginBottom: 2 }}>
                             {srv.name}
                           </div>
 
                           {mainText && (
-                            <div style={{ fontSize: 12.5, color: '#64748B', marginTop: 3 }}>
+                            <div style={{ fontSize: 12, color: '#64748B', lineHeight: 1.4, marginBottom: 4 }}>
                               {mainText}
                             </div>
                           )}
 
-                          {/* Addons rendered as clean visual badges (no raw [Addons: ...] text) */}
+                          {/* Addon Badges */}
                           {addons.length > 0 && (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
-                              {addons.map((ad, idx) => (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                              {addons.map((ad, i) => (
                                 <span
-                                  key={idx}
+                                  key={i}
                                   style={{
-                                    fontSize: 11,
-                                    fontWeight: 600,
+                                    fontSize: 10.5,
+                                    fontWeight: 700,
                                     background: '#EFF6FF',
                                     color: '#2563EB',
                                     border: '1px solid #DBEAFE',
-                                    padding: '2px 8px',
+                                    padding: '2px 7px',
                                     borderRadius: 999,
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: 3
                                   }}
                                 >
-                                  <Tag size={10} /> {ad}
+                                  <Tag size={9} /> {ad}
                                 </span>
                               ))}
                             </div>
@@ -870,7 +1134,7 @@ export default function MarketplaceSearchPage() {
 
                         {/* Price & Action Button */}
                         <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                          <div style={{ fontSize: 18, fontWeight: 900, color: '#2563EB', lineHeight: 1 }}>
+                          <div style={{ fontSize: 17, fontWeight: 900, color: '#2563EB', lineHeight: 1 }}>
                             {priceDisplay}
                           </div>
                           <button
@@ -879,22 +1143,22 @@ export default function MarketplaceSearchPage() {
                               router.push(`/${selectedShop.shop_slug}/book?service=${srv.id}`)
                             }}
                             style={{
-                              marginTop: 8,
+                              marginTop: 6,
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: 4,
-                              padding: '6px 14px',
+                              gap: 3,
+                              padding: '6px 12px',
                               borderRadius: 10,
                               background: 'linear-gradient(135deg, #1E3A8A, #315EC3)',
                               color: '#FFFFFF',
                               border: 'none',
-                              fontSize: 12,
+                              fontSize: 11.5,
                               fontWeight: 800,
                               cursor: 'pointer',
                               boxShadow: '0 2px 6px rgba(49, 94, 195, 0.25)'
                             }}
                           >
-                            จองแพ็กนี้ <ChevronRight size={13} />
+                            จองแพ็กนี้ <ChevronRight size={12} />
                           </button>
                         </div>
                       </div>
@@ -909,15 +1173,16 @@ export default function MarketplaceSearchPage() {
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 6,
-                      padding: '12px 24px',
-                      borderRadius: 14,
+                      padding: '10px 20px',
+                      borderRadius: 12,
                       background: '#315EC3',
                       color: '#fff',
                       textDecoration: 'none',
-                      fontWeight: 800
+                      fontWeight: 800,
+                      fontSize: 13
                     }}
                   >
-                    จองคิวออนไลน์ทันที <ChevronRight size={16} />
+                    จองคิวออนไลน์ทันที <ChevronRight size={15} />
                   </Link>
                 </div>
               )}
@@ -940,19 +1205,39 @@ export default function MarketplaceSearchPage() {
       <style jsx global>{`
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        @media (max-width: 1024px) {
-          .view-mode-toggle {
+        /* Tablet & Mobile Breakpoint */
+        @media (max-width: 1023px) {
+          .desktop-view-toggle {
             display: none !important;
           }
-          .mobile-view-fab {
+          .mobile-view-toggle {
+            display: flex !important;
+          }
+          .mobile-floating-fab {
             display: block !important;
           }
-          .shop-list-container {
+          .responsive-shop-list {
             flex: 1 1 100% !important;
-            height: calc(100vh - 180px) !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            border-right: none !important;
+            padding-bottom: 90px !important;
           }
-          .map-container {
-            height: calc(100vh - 180px) !important;
+          .responsive-map-container {
+            flex: 1 1 100% !important;
+            width: 100% !important;
+            height: 100% !important;
+          }
+          .shop-drawer-modal {
+            max-width: 100% !important;
+            border-radius: 28px 28px 0 0 !important;
+            padding: 16px 14px 28px !important;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .loc-btn-text {
+            display: none;
           }
         }
       `}</style>

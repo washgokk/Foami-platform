@@ -138,28 +138,57 @@
 
 @media (max-width: 600px) {
     .packageGrid {
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-        gap: var(--space-3);
+        grid-template-columns: 1fr;
+        gap: 12px;
     }
     .packageCard {
-        border-radius: 16px;
-    }
-    .packageName {
-        font-size: 0.95rem;
-    }
-    .packageDesc {
-        font-size: 0.75rem;
-        -webkit-line-clamp: 1;
-        line-clamp: 1;
-    }
-    .packageAmount {
-        font-size: 1.1rem;
-    }
-    .packagePriceLabel {
-        font-size: 0.55rem;
+        border-radius: 18px;
+        flex-direction: row;
+        align-items: stretch;
     }
     .packageImageContainer {
-        aspect-ratio: 1 / 1;
+        width: 110px;
+        min-width: 110px;
+        max-width: 110px;
+        aspect-ratio: auto;
+        height: auto;
+    }
+    .packageInfo {
+        padding: 12px 14px;
+    }
+    .packageName {
+        font-size: 1rem;
+        margin-bottom: 2px;
+    }
+    .packageDesc {
+        font-size: 0.78rem;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        margin-bottom: 8px;
+    }
+    .packageAmount {
+        font-size: 1.25rem;
+    }
+    .packagePriceLabel {
+        font-size: 0.6rem;
+    }
+    .stepBar {
+        padding: 10px 12px 0;
+    }
+    .stepDot {
+        width: 26px;
+        height: 26px;
+        font-size: 0.75rem;
+    }
+    .stepLine {
+        margin: 0 2px;
+    }
+    .stepName {
+        font-size: 0.72rem;
+        padding: 4px 0 10px;
+    }
+    .content {
+        padding: 0 12px 90px;
     }
 }
 
