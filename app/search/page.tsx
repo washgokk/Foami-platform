@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -425,6 +425,69 @@ export default function MarketplaceSearchPage() {
   // Selected Shop Drawer & Report Modal
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null)
   const [reportModalOpen, setReportModalOpen] = useState(false)
+
+  // Swipe / Drag Down to Dismiss Drawer
+  const [drawerTranslateY, setDrawerTranslateY] = useState(0)
+  const [isDraggingDrawer, setIsDraggingDrawer] = useState(false)
+  const dragStartYRef = useRef(0)
+
+  const handleHandleTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    dragStartYRef.current = clientY
+    setIsDraggingDrawer(true)
+  }
+
+  const handleHandleTouchMove = (e: React.TouchEvent) => {
+    if (!isDraggingDrawer) return
+    const clientY = e.touches[0].clientY
+    const deltaY = clientY - dragStartYRef.current
+    if (deltaY > 0) {
+      setDrawerTranslateY(deltaY)
+    }
+  }
+
+  const handleHandleTouchEnd = () => {
+    if (!isDraggingDrawer) return
+    setIsDraggingDrawer(false)
+    if (drawerTranslateY > 70) {
+      setSelectedShop(null)
+    }
+    setDrawerTranslateY(0)
+  }
+
+  useEffect(() => {
+    if (!isDraggingDrawer) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaY = e.clientY - dragStartYRef.current
+      if (deltaY > 0) {
+        setDrawerTranslateY(deltaY)
+      }
+    }
+
+    const handleMouseUp = (e: MouseEvent) => {
+      setIsDraggingDrawer(false)
+      const deltaY = e.clientY - dragStartYRef.current
+      if (deltaY > 70) {
+        setSelectedShop(null)
+      }
+      setDrawerTranslateY(0)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isDraggingDrawer, drawerTranslateY])
+
+  useEffect(() => {
+    if (!selectedShop) {
+      setDrawerTranslateY(0)
+      setIsDraggingDrawer(false)
+    }
+  }, [selectedShop])
 
   // Responsive Screen Detection
   useEffect(() => {
@@ -1069,17 +1132,47 @@ export default function MarketplaceSearchPage() {
               zIndex: 1001,
               background: '#FFFFFF',
               borderRadius: '28px 28px 0 0',
-              padding: '20px 20px 32px',
+              padding: '12px 20px 32px',
               maxHeight: '88vh',
               maxWidth: 640,
               margin: '0 auto',
               overflowY: 'auto',
               boxShadow: '0 -16px 40px rgba(0,0,0,0.25)',
-              boxSizing: 'border-box'
+              boxSizing: 'border-box',
+              transform: `translateY(${drawerTranslateY}px)`,
+              transition: isDraggingDrawer ? 'none' : 'transform 0.25s cubic-bezier(0.32, 0.72, 0, 1)'
             }}
           >
-            {/* Pull Handle bar */}
-            <div style={{ width: 44, height: 5, background: '#CBD5E1', borderRadius: 999, margin: '0 auto 16px' }} />
+            {/* Interactive Pull Handle bar: Drag down or click to dismiss */}
+            <div
+              onClick={() => setSelectedShop(null)}
+              onTouchStart={handleHandleTouchStart}
+              onTouchMove={handleHandleTouchMove}
+              onTouchEnd={handleHandleTouchEnd}
+              onMouseDown={handleHandleTouchStart}
+              style={{
+                width: '100%',
+                padding: '10px 0 16px',
+                margin: '-4px auto 4px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: isDraggingDrawer ? 'grabbing' : 'grab',
+                touchAction: 'none',
+                userSelect: 'none'
+              }}
+              title="เลื่อนลงหรือคลิกเพื่อปิด"
+            >
+              <div style={{
+                width: 44,
+                height: 5,
+                background: isDraggingDrawer ? '#94A3B8' : '#CBD5E1',
+                borderRadius: 999,
+                transition: 'background 0.15s, transform 0.15s',
+                transform: isDraggingDrawer ? 'scale(1.15)' : 'scale(1)'
+              }} />
+            </div>
 
             {/* Shop Header Info */}
             <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', marginBottom: 14 }}>
