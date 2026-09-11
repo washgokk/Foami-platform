@@ -238,123 +238,60 @@ function ShopCard({
         </div>
       </div>
 
-      {/* Earliest Available Service Time Badge based on user location */}
+      {/* Earliest Available Service Time Badge (Minimal Design) */}
       {shop.earliest_slot && (
         shop.earliest_slot.is_out_of_reach ? (
           <div style={{
             background: '#F8FAFC',
             border: '1px solid #E2E8F0',
-            borderRadius: 12,
-            padding: '7px 12px',
+            borderRadius: 10,
+            padding: '6px 10px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            fontSize: 12,
+            fontSize: 11.5,
             color: '#64748B'
           }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, color: '#475569' }}>
-              <AlertTriangle size={13} color="#E11D48" />
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#64748B' }}>
+              <AlertTriangle size={12} color="#94A3B8" />
               อยู่นอกพื้นที่บริการ ({shop.distance_km || 0} กม.)
-            </span>
-            <span style={{ fontSize: 11, color: '#94A3B8' }}>ไม่ครอบคลุม</span>
-          </div>
-        ) : shop.earliest_slot.is_today ? (
-          <div style={{
-            background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
-            border: '1.5px solid #A7F3D0',
-            borderRadius: 12,
-            padding: '8px 12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.1)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 22,
-                height: 22,
-                borderRadius: '50%',
-                background: '#10B981',
-                color: '#FFFFFF',
-                boxShadow: '0 2px 6px rgba(16, 185, 129, 0.35)',
-                flexShrink: 0
-              }}>
-                <Zap size={12} fill="#FFFFFF" />
-              </span>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: 13, color: '#065F46' }}>
-                  พร้อมบริการเร็วสุด: {shop.earliest_slot.display_text}
-                </div>
-                <div style={{ fontSize: 11, color: '#059669', marginTop: 1 }}>
-                  {shop.earliest_slot.is_in_zone
-                    ? `📍 ในพื้นที่บริการ${shop.earliest_slot.zone_name ? ` (${shop.earliest_slot.zone_name})` : ''}`
-                    : `🚗 นอกโซน (เดินทาง ~${shop.earliest_slot.travel_minutes} นาที)`}
-                </div>
-              </div>
-            </div>
-            <span style={{
-              background: '#FFFFFF',
-              color: '#059669',
-              padding: '2px 8px',
-              borderRadius: 8,
-              fontSize: 11,
-              fontWeight: 800,
-              border: '1px solid #A7F3D0',
-              whiteSpace: 'nowrap'
-            }}>
-              วันนี้
             </span>
           </div>
         ) : (
           <div style={{
-            background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
-            border: '1.5px solid #BFDBFE',
-            borderRadius: 12,
-            padding: '8px 12px',
+            background: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+            borderRadius: 10,
+            padding: '7px 11px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            boxShadow: '0 2px 8px rgba(59, 130, 246, 0.1)'
+            fontSize: 12,
+            color: '#334155'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 22,
-                height: 22,
-                borderRadius: '50%',
-                background: '#3B82F6',
-                color: '#FFFFFF',
-                boxShadow: '0 2px 6px rgba(59, 130, 246, 0.35)',
-                flexShrink: 0
-              }}>
-                <Clock size={12} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Clock size={13} color="#64748B" style={{ flexShrink: 0 }} />
+              <span style={{ color: '#475569' }}>
+                พร้อมบริการเร็วสุด: <span style={{ fontWeight: 700, color: '#0F172A' }}>{shop.earliest_slot.display_text}</span>
               </span>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: 13, color: '#1E3A8A' }}>
-                  คิวเร็วสุด: {shop.earliest_slot.display_text}
-                </div>
-                <div style={{ fontSize: 11, color: '#2563EB', marginTop: 1 }}>
-                  {shop.earliest_slot.status_message || 'เปิดรับจองล่วงหน้า'}
-                </div>
-              </div>
             </div>
-            <span style={{
-              background: '#FFFFFF',
-              color: '#1D4ED8',
-              padding: '2px 8px',
-              borderRadius: 8,
-              fontSize: 11,
-              fontWeight: 800,
-              border: '1px solid #BFDBFE',
-              whiteSpace: 'nowrap'
-            }}>
-              {shop.earliest_slot.is_tomorrow ? 'พรุ่งนี้' : 'จองล่วงหน้า'}
-            </span>
+            {shop.earliest_slot.is_in_zone && (
+              <span style={{
+                fontSize: 10.5,
+                color: '#64748B',
+                background: '#F1F5F9',
+                border: '1px solid #E2E8F0',
+                padding: '2px 6px',
+                borderRadius: 4,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 3,
+                whiteSpace: 'nowrap'
+              }}>
+                <MapPin size={10} color="#94A3B8" />
+                {shop.earliest_slot.zone_name ? `โซน${shop.earliest_slot.zone_name}` : 'ในพื้นที่'}
+              </span>
+            )}
           </div>
         )
       )}
@@ -806,21 +743,21 @@ export default function MarketplaceSearchPage() {
           </button>
         </div>
 
-        {/* GPS location accuracy feedback indicator */}
+        {/* GPS location feedback indicator (Minimal) */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: 6,
           padding: '4px 10px',
-          background: userLoc ? '#F0FDF4' : '#F8FAFC',
-          border: `1px solid ${userLoc ? '#BBF7D0' : '#E2E8F0'}`,
+          background: '#F8FAFC',
+          border: '1px solid #E2E8F0',
           borderRadius: 8,
           fontSize: 11.5,
-          color: userLoc ? '#15803D' : '#64748B',
-          fontWeight: 600
+          color: userLoc ? '#334155' : '#64748B',
+          fontWeight: 500
         }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: userLoc ? '#22C55E' : '#94A3B8', display: 'inline-block' }} />
-          <span>{userLoc ? 'อิงตำแหน่ง GPS ของคุณ: คำนวณเวลาเดินทางและคิวที่พร้อมบริการเร็วสุดแล้ว' : 'กดปุ่ม GPS เพื่อคำนวณเวลาที่พร้อมบริการเร็วสุดตามพิกัดจริง'}</span>
+          <Navigation2 size={11} color={userLoc ? '#315EC3' : '#94A3B8'} />
+          <span>{userLoc ? 'อิงตำแหน่ง GPS ของคุณ: คำนวณคิวที่พร้อมบริการเร็วสุดแล้ว' : 'กดปุ่ม GPS เพื่อคำนวณคิวพร้อมบริการตามตำแหน่งจริง'}</span>
         </div>
 
         {/* Category Chips Bar & Sort */}
@@ -898,10 +835,10 @@ export default function MarketplaceSearchPage() {
                 outline: 'none', fontFamily: 'inherit', cursor: 'pointer'
               }}
             >
-              <option value="earliest">⚡ คิวที่ว่างเร็วที่สุด</option>
-              <option value="distance">📍 ใกล้ที่สุด</option>
-              <option value="rating">⭐ คะแนนรีวิว</option>
-              <option value="price">🏷️ ราคาเริ่มต้น</option>
+              <option value="earliest">คิวที่ว่างเร็วที่สุด</option>
+              <option value="distance">ใกล้ที่สุด</option>
+              <option value="rating">คะแนนรีวิว</option>
+              <option value="price">ราคาเริ่มต้น</option>
             </select>
           </div>
         </div>
@@ -1031,14 +968,18 @@ export default function MarketplaceSearchPage() {
                     {selectedShop.earliest_slot && !selectedShop.earliest_slot.is_out_of_reach && (
                       <span style={{
                         fontSize: 10.5,
-                        fontWeight: 800,
-                        color: selectedShop.earliest_slot.is_today ? '#047857' : '#1D4ED8',
-                        background: selectedShop.earliest_slot.is_today ? '#ECFDF5' : '#EFF6FF',
-                        border: `1px solid ${selectedShop.earliest_slot.is_today ? '#A7F3D0' : '#BFDBFE'}`,
+                        fontWeight: 600,
+                        color: '#475569',
+                        background: '#F1F5F9',
+                        border: '1px solid #E2E8F0',
                         padding: '1px 6px',
-                        borderRadius: 6
+                        borderRadius: 4,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 3
                       }}>
-                        ⚡ ว่างเร็วสุด: {selectedShop.earliest_slot.short_text}
+                        <Clock size={10} color="#64748B" />
+                        เร็วสุด {selectedShop.earliest_slot.short_text}
                       </span>
                     )}
                   </div>
@@ -1232,89 +1173,75 @@ export default function MarketplaceSearchPage() {
               </p>
             )}
 
-            {/* Location-Based Earliest Availability Banner */}
+            {/* Earliest Availability Banner (Minimal & Clean) */}
             {selectedShop.earliest_slot && (
               <div style={{
                 marginBottom: 16,
-                background: selectedShop.earliest_slot.is_out_of_reach
-                  ? '#F8FAFC'
-                  : selectedShop.earliest_slot.is_today
-                    ? 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)'
-                    : 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
-                border: selectedShop.earliest_slot.is_out_of_reach
-                  ? '1.5px solid #CBD5E1'
-                  : selectedShop.earliest_slot.is_today
-                    ? '1.5px solid #6EE7B7'
-                    : '1.5px solid #93C5FD',
-                borderRadius: 18,
-                padding: '14px 16px',
-                boxShadow: selectedShop.earliest_slot.is_out_of_reach
-                  ? 'none'
-                  : '0 4px 14px rgba(16, 185, 129, 0.1)'
+                background: '#F8FAFC',
+                border: '1px solid #E2E8F0',
+                borderRadius: 14,
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12
               }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                    <span style={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: '50%',
-                      background: selectedShop.earliest_slot.is_out_of_reach
-                        ? '#94A3B8'
-                        : selectedShop.earliest_slot.is_today
-                          ? '#10B981'
-                          : '#3B82F6',
-                      color: '#FFFFFF',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      marginTop: 2
-                    }}>
-                      {selectedShop.earliest_slot.is_out_of_reach ? (
-                        <AlertTriangle size={16} />
-                      ) : selectedShop.earliest_slot.is_today ? (
-                        <Zap size={17} fill="#FFFFFF" />
-                      ) : (
-                        <Clock size={16} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    background: '#F1F5F9',
+                    border: '1px solid #E2E8F0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#475569',
+                    flexShrink: 0
+                  }}>
+                    {selectedShop.earliest_slot.is_out_of_reach ? (
+                      <AlertTriangle size={15} color="#64748B" />
+                    ) : (
+                      <Clock size={15} color="#475569" />
+                    )}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#64748B', fontWeight: 500 }}>
+                      เวลาที่พร้อมให้บริการเร็วที่สุด
+                    </div>
+                    <div style={{ fontSize: 14.5, fontWeight: 700, color: '#0F172A', marginTop: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span>{selectedShop.earliest_slot.display_text}</span>
+                      {selectedShop.earliest_slot.is_in_zone && (
+                        <span style={{ fontSize: 11, fontWeight: 500, color: '#64748B', background: '#F1F5F9', border: '1px solid #E2E8F0', padding: '1px 6px', borderRadius: 4, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                          <MapPin size={10} color="#94A3B8" />
+                          {selectedShop.earliest_slot.zone_name ? `โซน${selectedShop.earliest_slot.zone_name}` : 'ในพื้นที่บริการ'}
+                        </span>
                       )}
-                    </span>
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: selectedShop.earliest_slot.is_today ? '#047857' : '#1E3A8A', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        เวลาที่พร้อมให้บริการเร็วที่สุดสำหรับคุณ
-                      </div>
-                      <div style={{ fontSize: 17, fontWeight: 900, color: selectedShop.earliest_slot.is_out_of_reach ? '#475569' : selectedShop.earliest_slot.is_today ? '#065F46' : '#1E40AF', marginTop: 2 }}>
-                        {selectedShop.earliest_slot.display_text}
-                      </div>
-                      <div style={{ fontSize: 12, color: selectedShop.earliest_slot.is_today ? '#059669' : '#2563EB', marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                        <span>📍 {selectedShop.earliest_slot.is_in_zone ? `ในพื้นที่บริการ (${selectedShop.earliest_slot.zone_name || 'โซนหลัก'})` : `ห่างจากร้าน ${selectedShop.distance_km || 0} กม.`}</span>
-                        <span>🚗 ประมาณเวลาเดินทาง: ~{selectedShop.earliest_slot.travel_minutes} นาที</span>
-                      </div>
                     </div>
                   </div>
-
-                  {!selectedShop.earliest_slot.is_out_of_reach && (
-                    <button
-                      onClick={() => router.push(`/${selectedShop.shop_slug}/book?date=${selectedShop.earliest_slot?.date}&slot=${selectedShop.earliest_slot?.time}`)}
-                      style={{
-                        background: selectedShop.earliest_slot.is_today ? '#059669' : '#2563EB',
-                        color: '#FFFFFF',
-                        border: 'none',
-                        borderRadius: 12,
-                        padding: '8px 14px',
-                        fontSize: 12,
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        flexShrink: 0,
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                      }}
-                    >
-                      จองรอบนี้ <ChevronRight size={14} />
-                    </button>
-                  )}
                 </div>
+
+                {!selectedShop.earliest_slot.is_out_of_reach && (
+                  <button
+                    onClick={() => router.push(`/${selectedShop.shop_slug}/book?date=${selectedShop.earliest_slot?.date}&slot=${selectedShop.earliest_slot?.time}`)}
+                    style={{
+                      background: '#0F172A',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: 8,
+                      padding: '7px 12px',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      flexShrink: 0
+                    }}
+                  >
+                    จองรอบนี้ <ChevronRight size={13} />
+                  </button>
+                )}
               </div>
             )}
 

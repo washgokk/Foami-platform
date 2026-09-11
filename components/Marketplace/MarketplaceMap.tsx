@@ -154,11 +154,11 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, user
         ? `<span style="font-size: 10.5px; font-weight: 800; color: ${isSelected ? '#FDE68A' : '#D97706'}; background: ${isSelected ? 'rgba(0,0,0,0.2)' : '#FEF3C7'}; padding: 2px 6px; border-radius: 6px; display: inline-flex; align-items: center; gap: 2px;">★ ${shop.avg_rating.toFixed(1)}</span>`
         : ''
 
-      // Earliest Slot Pill on Map Marker
+      // Earliest Slot Pill on Map Marker (Minimal, No Emoji)
       const slotBadge = shop.earliest_slot && !shop.earliest_slot.is_out_of_reach
-        ? `<span style="font-size: 9.5px; font-weight: 800; color: ${isSelected ? '#A7F3D0' : (shop.earliest_slot.is_today ? '#047857' : '#1D4ED8')}; background: ${isSelected ? 'rgba(0,0,0,0.25)' : (shop.earliest_slot.is_today ? '#ECFDF5' : '#EFF6FF')}; padding: 1px 6px; border-radius: 5px; display: inline-flex; align-items: center; gap: 2px; border: 0.5px solid ${isSelected ? 'rgba(255,255,255,0.3)' : (shop.earliest_slot.is_today ? '#A7F3D0' : '#BFDBFE')};">⚡ ${shop.earliest_slot.short_text}</span>`
+        ? `<span style="font-size: 9.5px; font-weight: 600; color: ${isSelected ? '#FFFFFF' : '#475569'}; background: ${isSelected ? 'rgba(255,255,255,0.2)' : '#F1F5F9'}; padding: 1px 6px; border-radius: 4px; display: inline-flex; align-items: center; border: 0.5px solid ${isSelected ? 'rgba(255,255,255,0.3)' : '#E2E8F0'};">ว่าง ${shop.earliest_slot.short_text}</span>`
         : (shop.earliest_slot?.is_out_of_reach
-          ? `<span style="font-size: 9px; font-weight: 700; color: #94A3B8; background: #F1F5F9; padding: 1px 5px; border-radius: 5px;">นอกโซน</span>`
+          ? `<span style="font-size: 9px; font-weight: 600; color: #94A3B8; background: #F8FAFC; padding: 1px 5px; border-radius: 4px;">นอกโซน</span>`
           : '')
 
       // Marker Pin with Shop Logo, Shop Name, Starting Price, Earliest Slot, and pointer tip
