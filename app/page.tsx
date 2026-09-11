@@ -21,7 +21,10 @@ import {
   LogIn,
   Users,
   Compass,
-  Award
+  Award,
+  GraduationCap,
+  Lightbulb,
+  HeartHandshake
 } from 'lucide-react'
 
 // Foami Brand CI Design Tokens
@@ -181,7 +184,7 @@ export default function LandingPage() {
           <nav style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 28,
+            gap: 24,
           }} className="desktop-nav">
             <a href="#services" style={{ color: C.textSecondary, textDecoration: 'none', fontSize: 14, fontWeight: 500, transition: 'color 0.2s' }}>
               บริการ
@@ -192,8 +195,9 @@ export default function LandingPage() {
             <a href="#standards" style={{ color: C.textSecondary, textDecoration: 'none', fontSize: 14, fontWeight: 500, transition: 'color 0.2s' }}>
               มาตรฐาน Foami
             </a>
-            <a href="#about" style={{ color: C.textSecondary, textDecoration: 'none', fontSize: 14, fontWeight: 500, transition: 'color 0.2s' }}>
-              เกี่ยวกับเรา
+            <a href="#team-project" style={{ color: C.primary, textDecoration: 'none', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <GraduationCap size={16} />
+              <span>โปรเจกต์นักศึกษา KKU</span>
             </a>
           </nav>
 
@@ -272,8 +276,8 @@ export default function LandingPage() {
               fontWeight: 600,
               marginBottom: 20
             }}>
-              <Sparkles size={14} />
-              <span>แพลตฟอร์มค้นหาและจองคิวดูแลยานยนต์</span>
+              <GraduationCap size={15} />
+              <span>KKU Digital Entrepreneurship Project · KKBS</span>
             </div>
 
             <h1 style={{
@@ -407,7 +411,7 @@ export default function LandingPage() {
                     Foami Care & Detailing Service
                   </div>
                   <div style={{ fontSize: 12, color: C.textSecondary }}>
-                    บริการล้างและดูแลรักษาสภาพยานยนต์โดยช่างผู้ชำนาญการ
+                    บริการดูแลรักษาสภาพยานยนต์โดยช่างผู้ชำนาญการ
                   </div>
                 </div>
                 <div style={{
@@ -752,47 +756,144 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── ABOUT FOAMI & REAL TEAM ─── */}
-      <section id="about" style={{ padding: '64px 20px', maxWidth: 1200, margin: '0 auto' }}>
+      {/* ─── ABOUT KKU STUDENT PROJECT & FOUNDER TEAM ─── */}
+      <section id="team-project" style={{ padding: '72px 20px', maxWidth: 1200, margin: '0 auto' }}>
         <div style={{
           background: C.surface,
-          borderRadius: 20,
+          borderRadius: 24,
           border: `1.5px solid ${C.border}`,
-          padding: '40px 32px',
-          boxShadow: '0 8px 24px rgba(49, 94, 195, 0.05)'
+          padding: '44px 36px',
+          boxShadow: '0 12px 32px rgba(49, 94, 195, 0.06)'
         }}>
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-            gap: 36,
+            gap: 40,
             alignItems: 'center'
           }}>
+            {/* Left Column: Inspiring Profile & Student Innovation Story */}
             <div>
               <div style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 6,
-                padding: '4px 12px',
+                gap: 7,
+                padding: '5px 14px',
                 borderRadius: 20,
                 background: C.primaryLight,
                 color: C.primary,
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: 600,
-                marginBottom: 14
+                marginBottom: 16,
+                border: `1px solid ${C.subordinate}`
               }}>
-                เกี่ยวกับทีมงาน Foami
+                <GraduationCap size={16} />
+                <span>นักศึกษาชั้นปีที่ 4 มหาวิทยาลัยขอนแก่น</span>
               </div>
-              <h2 style={{ fontSize: 'clamp(22px, 3vw, 30px)', fontWeight: 700, color: C.textPrimary, margin: '0 0 16px', lineHeight: 1.3 }}>
-                พัฒนาเทคโนโลยี เพื่อยกระดับศูนย์บริการยานยนต์ไทย
+
+              <h2 style={{ fontSize: 'clamp(22px, 3.2vw, 32px)', fontWeight: 700, color: C.textPrimary, margin: '0 0 16px', lineHeight: 1.3 }}>
+                จากโปรเจกต์ผู้ประกอบการดิจิทัล <br />
+                <span style={{ color: C.primary }}>สู่แพลตฟอร์มยกระดับการดูแลยานยนต์จริง</span>
               </h2>
+
               <p style={{ fontSize: 15, color: C.textSecondary, lineHeight: 1.7, margin: '0 0 16px' }}>
-                Foami ก่อตั้งขึ้นด้วยวิสัยทัศน์ที่ต้องการแก้ไขปัญหาความไม่แน่นอนในการรอคิว และยกระดับมาตรฐานการดูแลยานยนต์ในประเทศไทย ด้วยการนำระบบดิจิทัลมาบริหารจัดการการนัดหมายอย่างเป็นระบบ
-              </p>
-              <p style={{ fontSize: 15, color: C.textSecondary, lineHeight: 1.7, margin: '0 0 24px' }}>
-                เราทำงานอย่างใกล้ชิดร่วมกับผู้ประกอบการศูนย์บริการ เพื่อพัฒนาคู่มือมาตรฐานการปฏิบัติงาน (Brand & Operational Guidelines) และนำเสนอประสบการณ์ที่สะดวก มั่นใจ ให้แก่ผู้ใช้บริการทุกคน
+                <strong>Foami</strong> เริ่มต้นขึ้นจากพลังความมุ่งมั่นของ <strong>กลุ่มนักศึกษาชั้นปีที่ 4 สาขาผู้ประกอบการดิจิทัล คณะบริหารธุรกิจและการบัญชี (KKBS) มหาวิทยาลัยขอนแก่น</strong> ที่ตั้งใจนำองค์ความรู้ด้านธุรกิจ การจัดการระบบการเงิน และเทคโนโลยีดิจิทัล มาแก้ไขปัญหาที่เกิดขึ้นจริงในชีวิตประจำวัน
               </p>
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+              {/* 3 Value Pillars of the Project */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14, margin: '20px 0 28px' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 12,
+                  padding: '12px 16px',
+                  borderRadius: 12,
+                  background: C.bg,
+                  border: `1px solid ${C.borderLight}`
+                }}>
+                  <div style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    background: C.primaryLight,
+                    color: C.primary,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <Lightbulb size={17} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.textPrimary }}>การแก้ปัญหาจากชีวิตจริง (Real-world Problem)</div>
+                    <div style={{ fontSize: 13, color: C.textSecondary, marginTop: 2 }}>
+                      สำรวจ Pain Point ของผู้ใช้รถที่เสียเวลารอคิวหน้าร้าน และศูนย์บริการขนาดเล็กที่ขาดระบบจัดการคิวมาตรฐาน
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 12,
+                  padding: '12px 16px',
+                  borderRadius: 12,
+                  background: C.bg,
+                  border: `1px solid ${C.borderLight}`
+                }}>
+                  <div style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    background: C.subordinateLight,
+                    color: C.primary,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <Award size={17} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.textPrimary }}>การสร้าง Brand & Service Guidelines</div>
+                    <div style={{ fontSize: 13, color: C.textSecondary, marginTop: 2 }}>
+                      วางแผนคู่มือมาตรฐานการปฏิบัติงาน Foami ทั้งด้านเอกลักษณ์แบรนด์ ขั้นตอนล้างรถ และการบริการรับ-ส่ง
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 12,
+                  padding: '12px 16px',
+                  borderRadius: 12,
+                  background: C.bg,
+                  border: `1px solid ${C.borderLight}`
+                }}>
+                  <div style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    background: C.primaryLight,
+                    color: C.primary,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <HeartHandshake size={17} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.textPrimary }}>สนับสนุนผู้ประกอบการท้องถิ่น</div>
+                    <div style={{ fontSize: 13, color: C.textSecondary, marginTop: 2 }}>
+                      ช่วยให้ร้านค้ารายย่อยมีเครื่องมือดิจิทัลบริหารคิว เพิ่มความน่าเชื่อถือ และขยายฐานลูกค้าได้อย่างยั่งยืน
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
                 <Link
                   href="/search"
                   style={{
@@ -805,11 +906,12 @@ export default function LandingPage() {
                     color: '#FFFFFF',
                     fontSize: 14,
                     fontWeight: 600,
-                    textDecoration: 'none'
+                    textDecoration: 'none',
+                    boxShadow: '0 2px 10px rgba(49, 94, 195, 0.2)'
                   }}
                 >
                   <MapPin size={16} />
-                  <span>ค้นหาศูนย์บริการใกล้ฉัน</span>
+                  <span>ค้นหาศูนย์บริการ</span>
                 </Link>
                 
                 <Link
@@ -834,16 +936,18 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div style={{ position: 'relative' }}>
+            {/* Right Column: Cropped Team Photo Focused on People & Brand Guidelines */}
+            <div>
               <div style={{
-                borderRadius: 16,
+                borderRadius: 20,
                 overflow: 'hidden',
-                border: `1.5px solid ${C.subordinate}`,
-                boxShadow: '0 8px 24px rgba(49, 94, 195, 0.08)'
+                border: `2px solid ${C.subordinate}`,
+                boxShadow: '0 12px 32px rgba(49, 94, 195, 0.12)',
+                background: C.surface
               }}>
                 <img
-                  src="/landing-team.jpg"
-                  alt="Foami Operational Team"
+                  src="/landing-team-cropped.jpg"
+                  alt="ทีมนักศึกษาผู้พัฒนา Foami สาขาผู้ประกอบการดิจิทัล คณะบริหารธุรกิจและการบัญชี มหาวิทยาลัยขอนแก่น"
                   style={{
                     width: '100%',
                     height: 'auto',
@@ -852,26 +956,38 @@ export default function LandingPage() {
                   }}
                 />
                 <div style={{
-                  padding: '12px 14px',
+                  padding: '16px 18px',
                   background: C.surface,
                   borderTop: `1px solid ${C.border}`,
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'space-between'
+                  justifyContent: 'space-between',
+                  gap: 12
                 }}>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: C.textPrimary }}>Foami Operational & Product Team</div>
-                    <div style={{ fontSize: 11, color: C.textSecondary }}>ทีมงานเบื้องหลังการพัฒนาระบบและคู่มือมาตรฐาน Foami</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.textPrimary }}>
+                      ทีมผู้พัฒนาโครงการ Foami
+                    </div>
+                    <div style={{ fontSize: 12, color: C.textSecondary, marginTop: 2 }}>
+                      สาขาผู้ประกอบการดิจิทัล คณะบริหารธุรกิจและการบัญชี ม.ขอนแก่น
+                    </div>
                   </div>
-                  <span style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: C.primary,
+                  <div style={{
+                    padding: '4px 10px',
+                    borderRadius: 20,
                     background: C.subordinateLight,
                     border: `1px solid ${C.subordinate}`,
-                    padding: '3px 8px',
-                    borderRadius: 12
-                  }}>Official</span>
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: C.primary,
+                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4
+                  }}>
+                    <GraduationCap size={13} />
+                    <span>KKBS KKU</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -964,8 +1080,8 @@ export default function LandingPage() {
         }}>
           <div>
             <Logo variant="landscape" width={120} />
-            <p style={{ fontSize: 13, color: C.textSecondary, margin: '10px 0 0', maxWidth: 360, lineHeight: 1.5 }}>
-              แพลตฟอร์มค้นหาและนัดหมายบริการดูแลยานยนต์ ยกระดับมาตรฐานการบริการด้วยระบบดิจิทัล
+            <p style={{ fontSize: 13, color: C.textSecondary, margin: '10px 0 0', maxWidth: 420, lineHeight: 1.5 }}>
+              แพลตฟอร์มค้นหาและนัดหมายบริการดูแลยานยนต์ · ผลงานพัฒนานวัตกรรมโดยนักศึกษาชั้นปีที่ 4 สาขาผู้ประกอบการดิจิทัล คณะบริหารธุรกิจและการบัญชี มหาวิทยาลัยขอนแก่น
             </p>
           </div>
 
@@ -995,7 +1111,7 @@ export default function LandingPage() {
           color: C.textMuted
         }}>
           <div>
-            © 2026 Foami Wash & Delivery. สงวนลิขสิทธิ์ทุกประการ
+            © 2026 Foami Wash & Delivery · KKBS Khon Kaen University
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10B981' }} />
