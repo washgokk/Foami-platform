@@ -176,7 +176,7 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, user
             transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
           ">
             <div style="
-              background: ${isSelected ? 'linear-gradient(135deg, #1E3A8A, #315EC3)' : '#FFFFFF'};
+              background: ${isSelected ? '#315EC3' : '#FFFFFF'};
               color: ${isSelected ? '#FFFFFF' : '#1A2340'};
               border: 2px solid ${isSelected ? '#214192' : '#315EC3'};
               border-radius: 999px;
