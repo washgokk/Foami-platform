@@ -350,13 +350,7 @@ export default function LandingPage() {
           {/* Right Column: Hero Visual - Foami App Mockup */}
           <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
             <div style={{
-              background: 'linear-gradient(180deg, #FFFFFF 0%, #F0F6FD 100%)',
-              borderRadius: 24,
-              padding: '24px 20px 18px',
-              border: `2px solid ${C.subordinate}`,
-              boxShadow: '0 16px 36px rgba(49, 94, 195, 0.12)',
               position: 'relative',
-              overflow: 'hidden',
               width: '100%',
               maxWidth: 480,
               display: 'flex',
