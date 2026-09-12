@@ -347,31 +347,39 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Right Column: Hero Visual */}
-          <div style={{ position: 'relative' }}>
+          {/* Right Column: Hero Visual - Foami App Mockup */}
+          <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
             <div style={{
-              background: C.surface,
-              borderRadius: 20,
-              padding: 12,
+              background: 'linear-gradient(180deg, #FFFFFF 0%, #F0F6FD 100%)',
+              borderRadius: 24,
+              padding: '24px 20px 18px',
               border: `2px solid ${C.subordinate}`,
-              boxShadow: '0 12px 32px rgba(49, 94, 195, 0.12)',
+              boxShadow: '0 16px 36px rgba(49, 94, 195, 0.12)',
               position: 'relative',
-              overflow: 'hidden'
+              overflow: 'hidden',
+              width: '100%',
+              maxWidth: 480,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center'
             }}>
               <img
-                src="/landing-hero.jpg"
-                alt="บริการดูแลและล้างยานยนต์มาตรฐาน Foami"
+                src="/landing-hero.png"
+                alt="ระบบแอปพลิเคชัน Foami Wash & Delivery บนสมาร์ทโฟน"
                 style={{
                   width: '100%',
+                  maxWidth: 400,
                   height: 'auto',
-                  borderRadius: 14,
                   display: 'block',
-                  objectFit: 'cover',
-                  maxHeight: 380
+                  objectFit: 'contain',
+                  filter: 'drop-shadow(0 14px 28px rgba(49, 94, 195, 0.16))'
                 }}
               />
               <div style={{
-                padding: '14px 12px 6px',
+                width: '100%',
+                paddingTop: 16,
+                borderTop: `1px solid ${C.border}`,
+                marginTop: 14,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -379,14 +387,14 @@ export default function LandingPage() {
               }}>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: C.textPrimary }}>
-                    Foami Care & Detailing Service
+                    Foami Web Application
                   </div>
-                  <div style={{ fontSize: 12, color: C.textSecondary }}>
-                    บริการดูแลรักษาสภาพยานยนต์โดยช่างผู้ชำนาญการ
+                  <div style={{ fontSize: 12, color: C.textSecondary, marginTop: 2 }}>
+                    จองง่ายผ่านสมาร์ทโฟน ไม่ต้องดาวน์โหลดแอปพลิเคชัน
                   </div>
                 </div>
                 <div style={{
-                  padding: '4px 10px',
+                  padding: '4px 12px',
                   borderRadius: 20,
                   background: C.subordinateLight,
                   border: `1px solid ${C.subordinate}`,
@@ -398,8 +406,8 @@ export default function LandingPage() {
                   alignItems: 'center',
                   gap: 4
                 }}>
-                  <Award size={13} />
-                  <span>Verified Standard</span>
+                  <Sparkles size={13} />
+                  <span>Mobile First</span>
                 </div>
               </div>
             </div>
