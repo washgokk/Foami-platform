@@ -975,7 +975,7 @@ export default function LandingPage() {
             <Link href="/partner" style={{ color: C.primary, textDecoration: 'none', fontWeight: 600 }}>
               ติดต่อสนใจเป็น Partner
             </Link>
-            <Link href="/portal" style={{ color: C.textSecondary, textDecoration: 'none' }}>
+            <Link href="/admin/login" style={{ color: C.textSecondary, textDecoration: 'none' }}>
               เข้าสู่ระบบร้านค้า
             </Link>
             <Link href="/login" style={{ color: C.textSecondary, textDecoration: 'none' }}>

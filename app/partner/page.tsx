@@ -219,7 +219,7 @@ LINE: ${formData.line_id}
               ค้นหาร้าน
             </Link>
             <Link
-              href="/portal"
+              href="/admin/login"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -828,7 +828,7 @@ LINE: ${formData.line_id}
             <Link href="/search" style={{ color: C.textSecondary, textDecoration: 'none' }}>
               ค้นหาร้านค้า
             </Link>
-            <Link href="/portal" style={{ color: C.textSecondary, textDecoration: 'none' }}>
+            <Link href="/admin/login" style={{ color: C.textSecondary, textDecoration: 'none' }}>
               เข้าสู่ระบบร้านค้า
             </Link>
             <a href="mailto:washgo.kk@gmail.com" style={{ color: C.primary, textDecoration: 'none', fontWeight: 600 }}>
