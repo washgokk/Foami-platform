@@ -855,47 +855,6 @@ export default function ServicesPage(props: any) {
                                             ))}
                                     </div>
                                     
-                                    <div style={{ marginTop: 24, borderTop: '2px dashed var(--border)', paddingTop: 20 }}>
-                                        <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--brand-dominant)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <Building2 size={18} /> ตั้งค่ารายสาขา (Branch Availability & Pricing)
-                                        </h3>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                            {branches.map(b => {
-                                                const config = svcForm.branch_settings[b.id] || { is_active: true, price_markup: 0 }
-                                                return (
-                                                    <div key={b.id} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px', alignItems: 'center', gap: 12, background: 'var(--surface-2)', padding: '10px 16px', borderRadius: 12 }}>
-                                                        <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{b.name}</div>
-                                                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem' }}>
-                                                            <input 
-                                                                type="checkbox" 
-                                                                checked={config.is_active} 
-                                                                onChange={e => {
-                                                                    const next = { ...svcForm.branch_settings }
-                                                                    next[b.id] = { ...config, is_active: e.target.checked }
-                                                                    setSvcForm(p => ({ ...p, branch_settings: next }))
-                                                                }}
-                                                            />
-                                                            <span style={{ fontWeight: 600 }}>เปิดบริการ</span>
-                                                        </label>
-                                                        <div style={{ position: 'relative' }}>
-                                                            <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.8rem', fontWeight: 800, color: 'var(--brand-dominant)' }}>+฿</span>
-                                                            <input 
-                                                                type="number" 
-                                                                className="form-input" 
-                                                                style={{ paddingLeft: 35, fontSize: '0.85rem', height: 36, borderRadius: 8, fontWeight: 700 }}
-                                                                value={config.price_markup}
-                                                                onChange={e => {
-                                                                    const next = { ...svcForm.branch_settings }
-                                                                    next[b.id] = { ...config, price_markup: Number(e.target.value) }
-                                                                    setSvcForm(p => ({ ...p, branch_settings: next }))
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 24 }}>
@@ -946,7 +905,7 @@ export default function ServicesPage(props: any) {
                                                             }} required />
                                                             <button type="button" className="btn btn-ghost" onClick={() => {
                                                                 setAddonForm(p => ({ ...p, dynamicPrices: p.dynamicPrices.filter((_, idx) => idx !== i) } as any))
-                                                            }}>✕</button>
+                                                            }}><XIcon size={16} /></button>
                                                         </div>
                                                         <ImageUpload
                                                             value={dp.imageUrl}
@@ -969,47 +928,6 @@ export default function ServicesPage(props: any) {
                                         </div>
                                     )}
 
-                                    <div style={{ marginTop: 24, borderTop: '2px dashed var(--border)', paddingTop: 20 }}>
-                                        <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--brand-dominant)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <Building2 size={18} /> ตั้งค่ารายสาขา (Branch Availability & Pricing)
-                                        </h3>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                            {branches.map(b => {
-                                                const config = addonForm.branch_settings[b.id] || { is_active: true, price_markup: 0 }
-                                                return (
-                                                    <div key={b.id} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px', alignItems: 'center', gap: 12, background: 'var(--surface-2)', padding: '10px 16px', borderRadius: 12 }}>
-                                                        <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{b.name}</div>
-                                                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem' }}>
-                                                            <input 
-                                                                type="checkbox" 
-                                                                checked={config.is_active} 
-                                                                onChange={e => {
-                                                                    const next = { ...addonForm.branch_settings }
-                                                                    next[b.id] = { ...config, is_active: e.target.checked }
-                                                                    setAddonForm(p => ({ ...p, branch_settings: next }))
-                                                                }}
-                                                            />
-                                                            <span style={{ fontWeight: 600 }}>เปิดบริการ</span>
-                                                        </label>
-                                                        <div style={{ position: 'relative' }}>
-                                                            <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: '0.8rem', fontWeight: 800, color: 'var(--brand-dominant)' }}>+฿</span>
-                                                            <input 
-                                                                type="number" 
-                                                                className="form-input" 
-                                                                style={{ paddingLeft: 35, fontSize: '0.85rem', height: 36, borderRadius: 8, fontWeight: 700 }}
-                                                                value={config.price_markup}
-                                                                onChange={e => {
-                                                                    const next = { ...addonForm.branch_settings }
-                                                                    next[b.id] = { ...config, price_markup: Number(e.target.value) }
-                                                                    setAddonForm(p => ({ ...p, branch_settings: next }))
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 24 }}>
                                     <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>ยกเลิก</button>

@@ -14,6 +14,7 @@ import { format, addDays } from 'date-fns'
 import { th } from 'date-fns/locale'
 import { haversine, isPointInPolygon, minDistanceToPolygon, roadDistanceKm } from '@/lib/geo-utils'
 import { findMatchingStaffForJob } from '@/lib/staff-matching'
+import { trackBookingStep, trackButtonClick } from '@/lib/analytics'
 import {
     ChevronLeft,
     ChevronRight,
@@ -155,6 +156,15 @@ export default function BookPage() {
         const found = zones.find(z => z.is_active && z.polygon_coords?.length >= 3 && isPointInPolygon(deliveryLat, deliveryLng, z.polygon_coords))
         setDeliveryMatched(found || null)
     }, [showDelivery, zones, deliveryLat, deliveryLng])
+
+        // ─── Analytics & User Listening (Clarity Step Tracking) ─────
+    useEffect(() => {
+        const stepName = STEPS[step]?.name || `step_${step}`
+        trackBookingStep(step, stepName, {
+            branchSlug,
+            packageName: selectedPkg?.name
+        })
+    }, [step, branchSlug, selectedPkg?.name])
 
     // ─── Init ───────────────────────────────────────────────────
     useEffect(() => {

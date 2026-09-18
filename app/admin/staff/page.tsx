@@ -372,6 +372,12 @@ export default function StaffPage(props: any) {
                     description: `แก้ไขข้อมูลพนักงาน: ${editing.full_name}`
                 })
             } else {
+                const targetBranch = branches.find(b => b.id === form.branch_id)
+                const planTier = (targetBranch?.features as any)?.plan_tier || 'starter'
+                const currentCount = staff.filter(s => s.branch_id === form.branch_id && s.is_active).length
+                if (planTier === 'starter' && currentCount >= 3) {
+                    throw new Error('แพ็กเกจ Starter จำกัดจำนวนช่างสูงสุด 3 คน กรุณาอัปเกรดเป็นแพ็กเกจ Pro เพื่อเพิ่มทีมงานได้ไม่จำกัด')
+                }
                 let newStaffId = ''
                 if (localStorage.getItem('foami_mock_db_enabled') === 'true') {
                     const res = await supabase.from('staff').insert({

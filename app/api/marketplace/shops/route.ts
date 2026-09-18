@@ -108,6 +108,10 @@ export async function GET(req: NextRequest) {
       }
 
       // Shop description prioritized from shop settings edited by branch admin
+            const feat = (b.features && typeof b.features === 'object') ? b.features : {}
+      const hasInsurance = Boolean(feat.insurance_renewal ?? feat.has_insurance ?? b.has_insurance)
+      const isVerified = Boolean(feat.is_verified ?? b.is_verified)
+
       const shopDescription = shopSetting.shop_description ||
         listing?.description ||
         b.browser_title ||
@@ -145,7 +149,10 @@ export async function GET(req: NextRequest) {
         price_from: branchLowestPrice || listing?.price_from || 120,
         distance_km: earliestSlot.distance_km,
         services: branchServices,
-        earliest_slot: earliestSlot
+        earliest_slot: earliestSlot,
+        is_verified: isVerified,
+        has_insurance: hasInsurance,
+        plan_tier: feat.plan_tier || 'starter'
       }
     })
 

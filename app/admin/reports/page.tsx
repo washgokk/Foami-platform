@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { th } from 'date-fns/locale'
-import { IncidentReport } from '@/app/admin/platform/reports/page'
+import { IncidentReport } from '@/app/platform/admin/reports/page'
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
   pending: { label: 'รอดำเนินการ', bg: '#FEF3C7', text: '#B45309', border: '#FCD34D' },
@@ -278,7 +278,7 @@ export default function ShopReportsPage() {
                       </td>
                       <td style={{ padding: '14px 18px' }}>
                         <div style={{ fontWeight: 700, color: '#1E293B' }}>{r.customer_name}</div>
-                        <div style={{ fontSize: 11.5, color: '#64748B' }}>📞 {r.customer_phone}</div>
+                        <div style={{ fontSize: 11.5, color: '#64748B' }}>{r.customer_phone}</div>
                       </td>
                       <td style={{ padding: '14px 18px' }}>
                         <span style={{
@@ -341,9 +341,9 @@ export default function ShopReportsPage() {
                 style={{ width: '100%', padding: '10px', borderRadius: 10, border: '1.5px solid #CBD5E1', fontSize: 13 }}
               >
                 <option value="pending">⏳ รอดำเนินการ</option>
-                <option value="investigating">🔍 กำลังตรวจสอบ</option>
-                <option value="resolved">✅ แก้ไขเรียบร้อยแล้ว</option>
-                <option value="refunded">💰 ดำเนินการคืนเงินแล้ว</option>
+                <option value="investigating">กำลังตรวจสอบ</option>
+                <option value="resolved">แก้ไขเรียบร้อยแล้ว</option>
+                <option value="refunded">ดำเนินการคืนเงินแล้ว</option>
               </select>
             </div>
 

@@ -108,3 +108,68 @@ export async function PATCH(req: NextRequest) {
 
   return NextResponse.json({ success: true, status: newStatus })
 }
+
+
+const MIN_WITHDRAWAL_THB = 2500
+
+// POST /api/platform/withdrawals — create withdrawal request (minimum 2,500 THB net)
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const { shop_id, amount_thb, bank_name, account_number, account_name, payout_method } = body
+
+    if (!shop_id || !amount_thb || !bank_name || !account_number || !account_name) {
+      return NextResponse.json({ error: 'กรุณากรอกข้อมูลการถอนเงินให้ครบถ้วน' }, { status: 400 })
+    }
+
+    const amount = Number(amount_thb)
+    if (isNaN(amount) || amount < MIN_WITHDRAWAL_THB) {
+      return NextResponse.json({
+        error: `ยอดถอนขั้นต่ำคือ ฿${MIN_WITHDRAWAL_THB.toLocaleString('th-TH')} บาท (หลังหักค่าธรรมเนียมเข้าแพลตฟอร์มแล้ว)`
+      }, { status: 400 })
+    }
+
+    // Check shop wallet balance
+    const { data: wallet, error: wErr } = await supabaseAdmin
+      .from('shop_wallets')
+      .select('balance_thb')
+      .eq('shop_id', shop_id)
+      .maybeSingle()
+
+    if (wErr || !wallet) {
+      return NextResponse.json({ error: 'ไม่พบข้อมูลกระเป๋าเงินของสาขา' }, { status: 404 })
+    }
+
+    if (amount > (wallet.balance_thb || 0)) {
+      return NextResponse.json({
+        error: `ยอดเงินในกระเป๋าไม่เพียงพอ (มี ฿${(wallet.balance_thb || 0).toLocaleString('th-TH')} บาท)`
+      }, { status: 400 })
+    }
+
+    // Insert withdrawal request
+    const { data: wr, error: insertErr } = await supabaseAdmin
+      .from('withdrawal_requests')
+      .insert({
+        shop_id,
+        amount_thb: amount,
+        bank_name: `${bank_name} (${payout_method || 'Stripe Payout'})`,
+        account_number,
+        account_name,
+        status: 'pending'
+      })
+      .select()
+      .single()
+
+    if (insertErr) {
+      return NextResponse.json({ error: insertErr.message }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `ส่งคำขอถอนเงิน ฿${amount.toLocaleString('th-TH')} บาท เรียบร้อยแล้ว (รอดำเนินการโอนเงินผ่านระบบ Stripe Payouts)`,
+      withdrawal: wr
+    })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'เกิดข้อผิดพลาดในการส่งคำขอถอนเงิน' }, { status: 500 })
+  }
+}

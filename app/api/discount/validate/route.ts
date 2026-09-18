@@ -99,15 +99,17 @@ export async function POST(req: NextRequest) {
                         : 9999
                 }
 
-                // Evaluate Rule
-                let isMatch = false;
-                const metricVal = stats[segmentRule.metric as keyof typeof stats];
-                if (segmentRule.operator === '>=') isMatch = metricVal >= segmentRule.value;
-                if (segmentRule.operator === '<=') isMatch = metricVal <= segmentRule.value;
-                if (segmentRule.operator === '===') isMatch = metricVal === segmentRule.value;
+                // Only evaluate if this is an actual RFM segment rule (has metric and operator)
+                if (segmentRule && segmentRule.metric && segmentRule.operator) {
+                    let isMatch = false;
+                    const metricVal = stats[segmentRule.metric as keyof typeof stats];
+                    if (segmentRule.operator === '>=') isMatch = metricVal >= segmentRule.value;
+                    if (segmentRule.operator === '<=') isMatch = metricVal <= segmentRule.value;
+                    if (segmentRule.operator === '===') isMatch = metricVal === segmentRule.value;
 
-                if (!isMatch) {
-                    return NextResponse.json({ error: `โค้ดนี้สงวนสิทธิ์เฉพาะลูกค้าในกลุ่ม "${segmentRule.name}" เท่านั้น` }, { status: 400 })
+                    if (!isMatch) {
+                        return NextResponse.json({ error: `โค้ดนี้สงวนสิทธิ์เฉพาะลูกค้าในกลุ่ม "${segmentRule.name || 'เป้าหมาย'}" เท่านั้น` }, { status: 400 })
+                    }
                 }
             } catch (e) {
                 // Ignore parsing errors, assume valid or log it

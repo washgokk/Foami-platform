@@ -131,6 +131,9 @@ export interface Branch {
     lat: number
     lng: number
     is_active: boolean
+    has_insurance?: boolean
+    is_verified?: boolean
+    features?: Record<string, any>
     created_at: string
     out_of_zone_type?: 'per_km' | 'flat_rate'
     out_of_zone_fee?: number
@@ -150,6 +153,7 @@ export interface Zone {
     extra_fee: number
     polygon_coords: [number, number][]
     is_active: boolean
+    has_insurance?: boolean
     color?: string
 }
 
@@ -161,6 +165,9 @@ export interface Staff {
     line_user_id?: string
     role: 'admin' | 'staff'
     is_active: boolean
+    has_insurance?: boolean
+    is_verified?: boolean
+    features?: Record<string, any>
     created_at: string
     branches?: Branch
     bank_account_number?: string
@@ -179,9 +186,11 @@ export interface Service {
     price_m: number
     price_l: number
     is_active: boolean
+    has_insurance?: boolean
     is_addon_required: boolean
     image_url?: string
-    branch_settings?: Record<string, { is_active: boolean; price_markup: number }>
+    branch_settings?: Record<string, { is_active: boolean
+    has_insurance?: boolean; price_markup: number }>
 }
 
 export interface ServiceAddon {
@@ -190,6 +199,7 @@ export interface ServiceAddon {
     description: string
     price: number
     is_active: boolean
+    has_insurance?: boolean
     image_url?: string
     pricing_type?: 'free' | 'fixed' | 'notify_later'
     sub_options?: Array<{
@@ -197,7 +207,8 @@ export interface ServiceAddon {
         price: number
         image_url?: string
     }>
-    branch_settings?: Record<string, { is_active: boolean; price_markup: number }>
+    branch_settings?: Record<string, { is_active: boolean
+    has_insurance?: boolean; price_markup: number }>
 }
 
 export interface ServiceSizeAdjustment {
@@ -268,6 +279,7 @@ export interface CCPriceGroup {
     service_ids: string[]
     prices: Record<string, number> // e.g. { S: 100, M: 130, ... }
     is_active: boolean
+    has_insurance?: boolean
     created_at?: string
 }
 
@@ -340,6 +352,7 @@ export interface DiscountCode {
     used_count: number
     expires_at: string
     is_active: boolean
+    has_insurance?: boolean
 }
 
 // ─── Payout Types ────────────────────────────────────────────

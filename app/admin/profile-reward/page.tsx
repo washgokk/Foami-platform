@@ -90,7 +90,7 @@ export default function ProfileRewardPage() {
                             className="form-input" 
                             value={config.title} 
                             onChange={e => setConfig({ ...config, title: e.target.value })} 
-                            placeholder="เช่น 🎁 ของขวัญพิเศษสำหรับคุณ!"
+                            placeholder="เช่น ของขวัญพิเศษสำหรับคุณ!"
                         />
                     </div>
                     <div className="form-group">

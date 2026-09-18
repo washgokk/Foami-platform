@@ -99,3 +99,84 @@ export async function roadDistanceKm(
     const km = haversine(lat1, lng1, lat2, lng2) * 1.35
     return { distance_km: km, duration_min: (km / 30) * 60, source: 'haversine' }
 }
+
+/**
+ * Find closest point on polygon boundary to a given point
+ */
+export function closestPointOnPolygon(lat: number, lng: number, polygon: [number, number][]): { point: [number, number]; distance_km: number } {
+    if (!polygon || polygon.length === 0) return { point: [lat, lng], distance_km: Infinity }
+    let minD = Infinity
+    let closestPoint: [number, number] = [lat, lng]
+    for (let i = 0; i < polygon.length; i++) {
+        const p1 = polygon[i]
+        const p2 = polygon[(i + 1) % polygon.length]
+        
+        const x = lat, y = lng
+        const x1 = p1[0], y1 = p1[1]
+        const x2 = p2[0], y2 = p2[1]
+        
+        const A = x - x1
+        const B = y - y1
+        const C = x2 - x1
+        const D = y2 - y1
+
+        const dot = A * C + B * D
+        const lenSq = C * C + D * D
+        let param = -1
+        if (lenSq !== 0) param = dot / lenSq
+
+        let xx: number, yy: number
+        if (param < 0) {
+            xx = x1; yy = y1
+        } else if (param > 1) {
+            xx = x2; yy = y2
+        } else {
+            xx = x1 + param * C
+            yy = y1 + param * D
+        }
+
+        const d = haversine(lat, lng, xx, yy)
+        if (d < minD) {
+            minD = d
+            closestPoint = [xx, yy]
+        }
+    }
+    return { point: closestPoint, distance_km: minD }
+}
+
+/**
+ * Road distance from polygon boundary to an external point
+ * Uses OSRM if available, falls back to haversine * 1.35
+ */
+export async function roadDistanceToPolygonKm(
+    lat: number, lng: number,
+    polygon: [number, number][],
+    appUrl?: string
+): Promise<{ distance_km: number; duration_min: number; source: 'osrm' | 'haversine' }> {
+    const { point, distance_km } = closestPointOnPolygon(lat, lng, polygon)
+    if (distance_km === 0 || distance_km === Infinity) {
+        return { distance_km: 0, duration_min: 0, source: 'haversine' }
+    }
+    return await roadDistanceKm(point[0], point[1], lat, lng, appUrl)
+}
+
+/**
+ * Calculates geodesic area of a polygon in square kilometers (km²)
+ */
+export function calculatePolygonAreaKm2(coords: [number, number][]): number {
+    if (!coords || coords.length < 3) return 0
+    const R = 6371 // Earth radius in km
+    let total = 0
+    const len = coords.length
+    for (let i = 0; i < len; i++) {
+        const p1 = coords[i]
+        const p2 = coords[(i + 1) % len]
+        const lat1 = (p1[0] * Math.PI) / 180
+        const lat2 = (p2[0] * Math.PI) / 180
+        const lng1 = (p1[1] * Math.PI) / 180
+        const lng2 = (p2[1] * Math.PI) / 180
+        total += (lng2 - lng1) * (2 + Math.sin(lat1) + Math.sin(lat2))
+    }
+    const area = (Math.abs(total) * R * R) / 2
+    return Number(area.toFixed(2))
+}

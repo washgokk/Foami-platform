@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
                                     type: 'box', layout: 'vertical',
                                     backgroundColor: '#1A2340', paddingAll: '20px',
                                     contents: [
-                                        { type: 'text', text: '🫧', size: 'xxl', align: 'center' },
+                                        { type: 'text', text: '', size: 'xxl', align: 'center' },
                                         { type: 'text', text: 'FOAMI', size: 'xs', weight: 'bold', color: '#A0D9F6', align: 'center', letterSpacing: '6px', margin: 'xs' },
                                         { type: 'separator', margin: 'md', color: 'rgba(160,217,246,0.3)' },
                                         { type: 'text', text: n.pushTitle, color: '#FFFFFF', weight: 'bold', size: 'lg', margin: 'md', align: 'center', wrap: true },
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
                                         {
                                             type: 'button', style: 'primary', color: '#315EC3', margin: 'lg',
                                             cornerRadius: '16px',
-                                            action: { type: 'uri', label: '📋 ดูรายละเอียด', uri: `${appUrl}${pushPayload.url}` }
+                                            action: { type: 'uri', label: 'ดูรายละเอียด', uri: `${appUrl}${pushPayload.url}` }
                                         }
                                     ],
                                 },
@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
             }
             const notif_type = notifTypeMap[caseId] ?? 'generic'
 
-            // ✅ เรียก LINE API โดยตรงด้วย token จาก env (ไม่ผ่าน HTTP fetch ไปหา appUrl)
+            // เรียก LINE API โดยตรงด้วย token จาก env (ไม่ผ่าน HTTP fetch ไปหา appUrl)
             if (enableLine && lineUserId && token) {
                 const res = await fetch(`${internalUrl}/api/line/notify-customer`, {
                     method: 'POST',

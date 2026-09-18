@@ -61,6 +61,65 @@ export async function POST(req: NextRequest) {
             const { data: zoneForBranch } = await supabase.from('zones').select('branch_id').eq('id', zone_id).single()
             resolved_branch_id = zoneForBranch?.branch_id || null
         }
+
+        // Tri-party revenue split: Staff gets 60% of out-of-zone surcharge as extra payout
+        const outOfZoneSurcharge = Number(travel_surcharge) || 0
+        const staffOutOfZoneIncentive = Math.round(outOfZoneSurcharge * 0.60)
+        const finalStaffExtraPayout = (Number(staff_extra_payout) || 0) + staffOutOfZoneIncentive
+
+        // Compensation model check & Platform fee rate check
+        let resolvedLaborCost = Number(labor_cost) || 0
+        let branchPlatformFeePct = 0.15 // default 15% commission
+        if (resolved_branch_id) {
+            const { data: bData } = await supabase.from('branches').select('settings, labor_cost_per_job, platform_fee_pct').eq('id', resolved_branch_id).maybeSingle()
+            const compModel = bData?.settings?.compensation_model || 'per_job'
+            if (compModel === 'disabled' || compModel === 'daily' || compModel === 'monthly') {
+                resolvedLaborCost = 0
+            } else if (compModel === 'per_job' && bData?.labor_cost_per_job !== undefined) {
+                resolvedLaborCost = Number(bData.labor_cost_per_job) || 0
+            }
+            if (bData?.platform_fee_pct !== undefined && bData.platform_fee_pct !== null) {
+                branchPlatformFeePct = Number(bData.platform_fee_pct)
+            }
+        }
+
+        // Check discount funding model (platform 100%, shared 50/50, or shop 100%)
+        let discountFundingType = 'shop'
+        if (discount_code) {
+            const { data: discCode } = await supabase.from('discount_codes').select('target_segment').eq('code', discount_code.toUpperCase()).maybeSingle()
+            if (discCode?.target_segment) {
+                try {
+                    const seg = JSON.parse(discCode.target_segment)
+                    if (seg.funding_type) discountFundingType = seg.funding_type
+                } catch (e) {}
+            }
+        }
+
+        const grossVal = Number(gross_total) || 0
+        const discVal = Number(discount_amount) || 0
+
+        // Financial snapshot calculation based on funding model:
+        let shopDiscountDeduction = 0
+        let platformDiscountSubsidy = 0
+
+        if (discountFundingType === 'platform') {
+            // Platform funds 100%: Shop absorbs 0%, Platform absorbs all
+            shopDiscountDeduction = 0
+            platformDiscountSubsidy = discVal
+        } else if (discountFundingType === 'shared_50_50') {
+            // 50/50 shared: Shop absorbs 50%, Platform subsidizes 50%
+            shopDiscountDeduction = Math.round(discVal * 0.5)
+            platformDiscountSubsidy = discVal - shopDiscountDeduction
+        } else {
+            // Shop funds 100%: Shop absorbs all
+            shopDiscountDeduction = discVal
+            platformDiscountSubsidy = 0
+        }
+
+        const baseShopShare = Math.max(0, grossVal * (1 - branchPlatformFeePct))
+        const finalShopNet = Math.max(0, baseShopShare - shopDiscountDeduction)
+        const finalPlatformFee = Math.max(0, (grossVal * branchPlatformFeePct) - platformDiscountSubsidy)
+
         // Insert using service client → bypasses all RLS policies
         const { data: bookingData, error: insertError } = await supabase
             .from('bookings')
@@ -77,7 +136,7 @@ export async function POST(req: NextRequest) {
                 extra_fee: extra_fee || 0,
                 travel_surcharge: travel_surcharge || 0,
                 different_spot_fee: different_spot_fee || 0,
-                staff_extra_payout: staff_extra_payout || 0,
+                staff_extra_payout: finalStaffExtraPayout,
                 base_price,
                 total_price: Math.max(0, gross_total - (discount_amount || 0)),       // Store NET (after discount) to prevent double deduction in CRM/Staff
                 additional_price: 0,
@@ -93,17 +152,17 @@ export async function POST(req: NextRequest) {
                 auto_assigned: false,
                 package_markup_amount: package_markup_amount || 0,
                 original_base_price: original_base_price || 0,
-                labor_cost: labor_cost || 0,
+                labor_cost: resolvedLaborCost,
                 capital_cost: capital_cost || 0,
                 rental_cost: rental_cost || 0,
                 fuel_cost: fuel_cost || 0,
                 // === Financial Snapshot ณ เวลาจอง ===
-                // บันทึกราคาและ fee ณ เวลาที่จอง เพื่อให้ยอดไม่เปลี่ยนถ้า admin แก้ราคาทีหลัง
+                // บันทึกราคาและ fee ณ เวลาที่จอง พร้อมสัดส่วนเงินทุนส่วนลด (Platform vs Shop)
                 snapshot_base_price: base_price || 0,
                 snapshot_service_price: base_price || 0,
-                snapshot_platform_fee_pct: 0.20,   // TODO: ดึงจาก branch.platform_fee_pct
-                snapshot_platform_fee_thb: Math.max(0, (gross_total || 0) - (discount_amount || 0)) * 0.20,
-                snapshot_net_to_shop_thb: Math.max(0, (gross_total || 0) - (discount_amount || 0)) * 0.80,
+                snapshot_platform_fee_pct: branchPlatformFeePct,
+                snapshot_platform_fee_thb: finalPlatformFee,
+                snapshot_net_to_shop_thb: finalShopNet,
             })
             .select()
             .single()

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import styles from './login.module.css'
 import Logo from '@/components/Branding/Logo'
-import { Crown, ArrowRight } from 'lucide-react'
+// lucide-react not needed
 
 export default function AdminLoginPage() {
     const router = useRouter()
@@ -23,7 +23,7 @@ export default function AdminLoginPage() {
             if (isMockForced) {
                 if (email === 'admin@foami.th' && password === 'admin123') {
                     localStorage.setItem('admin_token', 'mock_admin_token')
-                    router.replace('/admin/dashboard')
+                    router.replace('/kku/admin/dashboard')
                     return
                 } else {
                     throw new Error('อีเมลหรือรหัสผ่านไม่ถูกต้อง (Mock DB: ใช้ admin@foami.th / admin123)')
@@ -38,7 +38,7 @@ export default function AdminLoginPage() {
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || 'Login failed')
             localStorage.setItem('admin_token', data.token || 'admin_token_' + Date.now())
-            router.replace('/admin/dashboard')
+            router.replace('/kku/admin/dashboard')
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด')
         } finally {
@@ -83,23 +83,6 @@ export default function AdminLoginPage() {
                         {loading ? <span className="spinner" /> : 'เข้าสู่ระบบ'}
                     </button>
                 </form>
-
-                <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px solid var(--border)', textAlign: 'center' }}>
-                    <Link 
-                        href="/admin/platform/login" 
-                        style={{ 
-                            display: 'inline-flex', 
-                            alignItems: 'center', 
-                            gap: 6, 
-                            fontSize: 13, 
-                            color: '#D97706', 
-                            fontWeight: 600,
-                            textDecoration: 'none' 
-                        }}
-                    >
-                        <Crown size={15} /> เข้าสู่ระบบ Platform Super Admin <ArrowRight size={13} />
-                    </Link>
-                </div>
             </div>
         </div>
     )

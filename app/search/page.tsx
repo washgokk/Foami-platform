@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   MapPin, AlertTriangle, Search as SearchIcon, Navigation2, Star, Clock,
   ChevronRight, Bike, Droplets, Wrench, Zap, Filter, X, RefreshCw,
-  Map as MapIcon, List as ListIcon, Shield, SlidersHorizontal, ArrowUpDown,
+  Map as MapIcon, List as ListIcon, Shield, ShieldCheck, SlidersHorizontal, ArrowUpDown,
   Award, Columns, Check, Sparkles, CheckCircle2, Package, Tag, Layers
 } from 'lucide-react'
 import Logo from '@/components/Branding/Logo'
@@ -72,6 +72,9 @@ interface Shop {
   review_count: number
   booking_count: number
   is_featured: boolean
+  is_verified?: boolean
+  has_insurance?: boolean
+  plan_tier?: string
   lat: number
   lng: number
   address: string
@@ -174,6 +177,28 @@ function ShopCard({
           }}>
             <Droplets size={36} style={{ marginBottom: 4, opacity: 0.8 }} />
             <span style={{ fontSize: 13, fontWeight: 700, opacity: 0.9 }}>{shop.shop_name}</span>
+          </div>
+        )}
+
+        {/* Verified Partner Badge */}
+        {shop.is_verified && (
+          <div style={{
+            position: 'absolute',
+            top: 10,
+            right: 10,
+            background: '#15803D',
+            color: '#FFFFFF',
+            fontSize: 10.5,
+            fontWeight: 800,
+            padding: '3px 9px',
+            borderRadius: 999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+          }}>
+            <ShieldCheck size={12} />
+            <span>ผ่านการตรวจสอบแล้ว ✓</span>
           </div>
         )}
 
@@ -424,6 +449,7 @@ export default function MarketplaceSearchPage() {
 
   // Selected Shop Drawer & Report Modal
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const [reportModalOpen, setReportModalOpen] = useState(false)
 
   // Swipe / Drag Down to Dismiss Drawer
@@ -450,7 +476,7 @@ export default function MarketplaceSearchPage() {
     if (!isDraggingDrawer) return
     setIsDraggingDrawer(false)
     if (drawerTranslateY > 70) {
-      setSelectedShop(null)
+      setDrawerOpen(false)
     }
     setDrawerTranslateY(0)
   }
@@ -469,7 +495,7 @@ export default function MarketplaceSearchPage() {
       setIsDraggingDrawer(false)
       const deltaY = e.clientY - dragStartYRef.current
       if (deltaY > 70) {
-        setSelectedShop(null)
+        setDrawerOpen(false)
       }
       setDrawerTranslateY(0)
     }
@@ -483,11 +509,11 @@ export default function MarketplaceSearchPage() {
   }, [isDraggingDrawer, drawerTranslateY])
 
   useEffect(() => {
-    if (!selectedShop) {
+    if (!drawerOpen) {
       setDrawerTranslateY(0)
       setIsDraggingDrawer(false)
     }
-  }, [selectedShop])
+  }, [drawerOpen])
 
   // Responsive Screen Detection
   useEffect(() => {
@@ -964,7 +990,10 @@ export default function MarketplaceSearchPage() {
                     key={shop.id}
                     shop={shop}
                     isSelected={selectedShop?.id === shop.id}
-                    onSelect={() => setSelectedShop(shop)}
+                    onSelect={() => {
+                      setSelectedShop(shop)
+                      setDrawerOpen(true)
+                    }}
                   />
                 ))}
               </div>
@@ -986,27 +1015,35 @@ export default function MarketplaceSearchPage() {
             <MarketplaceMap
               shops={filteredShops}
               selectedShop={selectedShop}
-              onSelectShop={setSelectedShop}
+              onSelectShop={(s) => setSelectedShop(s)}
+              onOpenDrawer={(s) => {
+                setSelectedShop(s)
+                setDrawerOpen(true)
+              }}
               userLocation={userLoc}
             />
 
             {/* Mobile floating map card preview when a shop pin is selected */}
-            {isMobile && selectedShop && viewMode === 'map' && (
-              <div style={{
-                position: 'absolute',
-                bottom: 74,
-                left: 14,
-                right: 14,
-                zIndex: 400,
-                background: '#FFFFFF',
-                borderRadius: 18,
-                padding: '12px 14px',
-                boxShadow: '0 12px 32px rgba(0,0,0,0.22)',
-                border: '1.5px solid #315EC3',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12
-              }}>
+            {isMobile && selectedShop && viewMode === 'map' && !drawerOpen && (
+              <div
+                onClick={() => setDrawerOpen(true)}
+                style={{
+                  position: 'absolute',
+                  bottom: 74,
+                  left: 14,
+                  right: 14,
+                  zIndex: 400,
+                  background: '#FFFFFF',
+                  borderRadius: 18,
+                  padding: '12px 14px',
+                  boxShadow: '0 12px 32px rgba(0,0,0,0.22)',
+                  border: '1.5px solid #315EC3',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  cursor: 'pointer'
+                }}
+              >
                 {selectedShop.logo_url ? (
                   <img
                     src={selectedShop.logo_url}
@@ -1049,9 +1086,12 @@ export default function MarketplaceSearchPage() {
                   </div>
                 </div>
                 <button
-                  onClick={() => setSelectedShop(selectedShop)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    router.push(`/${selectedShop.shop_slug}/book`)
+                  }}
                   style={{
-                    padding: '8px 12px',
+                    padding: '8px 14px',
                     borderRadius: 10,
                     background: '#2563EB',
                     color: '#FFF',
@@ -1109,10 +1149,10 @@ export default function MarketplaceSearchPage() {
       </div>
 
       {/* ── Responsive Slide-Up Drawer / Bottom Sheet for Selected Shop ── */}
-      {selectedShop && (
+      {selectedShop && drawerOpen && (
         <>
           <div
-            onClick={() => setSelectedShop(null)}
+            onClick={() => setDrawerOpen(false)}
             style={{
               position: 'fixed',
               inset: 0,
@@ -1145,7 +1185,7 @@ export default function MarketplaceSearchPage() {
           >
             {/* Interactive Pull Handle bar: Drag down or click to dismiss */}
             <div
-              onClick={() => setSelectedShop(null)}
+              onClick={() => setDrawerOpen(false)}
               onTouchStart={handleHandleTouchStart}
               onTouchMove={handleHandleTouchMove}
               onTouchEnd={handleHandleTouchEnd}
@@ -1218,7 +1258,7 @@ export default function MarketplaceSearchPage() {
                       <Shield size={11} /> รายงานร้าน
                     </button>
                     <button
-                      onClick={() => setSelectedShop(null)}
+                      onClick={() => setDrawerOpen(false)}
                       style={{ background: '#F0F3FC', border: 'none', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#5A6589' }}
                     >
                       <X size={16} />

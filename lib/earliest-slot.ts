@@ -167,13 +167,13 @@ export function calculateEarliestSlot({
         // Check if staff can serve this user
         if (isInZone && matchedZone) {
           // If in zone: in_zone matching zone, or cross_zone / out_of_zone
-          if (s.zone_id === matchedZone.id || s.work_type === 'cross_zone' || s.work_type === 'out_of_zone') {
+          if (s.zone_id === matchedZone.id || s.work_type === 'cross_zone' ) {
             if (!slotMap.has(timeNorm)) slotMap.set(timeNorm, [])
             slotMap.get(timeNorm)!.push(s)
           }
         } else {
           // Out of zone: requires out_of_zone permission or fallback to any unbooked
-          if (s.work_type === 'out_of_zone' || !s.work_type) {
+          if (s.work_type === 'cross_zone' || !s.work_type) {
             if (!slotMap.has(timeNorm)) slotMap.set(timeNorm, [])
             slotMap.get(timeNorm)!.push(s)
           }

@@ -1,5 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import { MousePointer2, RotateCcw, Trash2, Save, AlertTriangle } from 'lucide-react'
+import { calculatePolygonAreaKm2 } from '@/lib/geo-utils'
 
 interface Props {
     zones: any[]
@@ -20,12 +22,13 @@ export default function ZoneMapEditor({ zones, mode, editingZone, center, onSave
     )
     const polylineRef = useRef<any>(null)
     const markersRef = useRef<any[]>([])
+    const areaKm2 = calculatePolygonAreaKm2(points)
+    const isAreaOverLimit = areaKm2 > 100
 
     useEffect(() => {
         if (mapInstanceRef.current || !mapRef.current) return
 
         import('leaflet').then(L => {
-            // Import Leaflet CSS (required for tiles, icons, controls)
             if (!document.querySelector('link[href*="leaflet.css"]')) {
                 const link = document.createElement('link')
                 link.rel = 'stylesheet'
@@ -60,7 +63,7 @@ export default function ZoneMapEditor({ zones, mode, editingZone, center, onSave
                     fillOpacity: 0.12,
                     weight: 2,
                 }).addTo(map)
-                poly.bindTooltip(`📍 ${z.name}`, { permanent: true, direction: 'center', className: 'zone-tooltip' })
+                poly.bindTooltip(z.name, { permanent: true, direction: 'center', className: 'zone-tooltip' })
             })
 
             // In draw mode: show existing points and allow adding new
@@ -83,7 +86,6 @@ export default function ZoneMapEditor({ zones, mode, editingZone, center, onSave
                     const coord: [number, number] = [e.latlng.lat, e.latlng.lng]
                     setPoints(prev => {
                         const next = [...prev, coord]
-                        // Remove old polyline and add new
                         polylineRef.current?.remove()
                         if (next.length > 1) {
                             polylineRef.current = L.polygon(next, {
@@ -93,7 +95,6 @@ export default function ZoneMapEditor({ zones, mode, editingZone, center, onSave
                                 weight: 2.5,
                             }).addTo(map)
                         }
-                        // Add dot marker
                         const marker = L.circleMarker(coord, {
                             radius: 6, fillColor: '#3B5FCC', color: '#fff', weight: 2, fillOpacity: 1,
                         }).addTo(map)
@@ -104,7 +105,6 @@ export default function ZoneMapEditor({ zones, mode, editingZone, center, onSave
 
                 map.on('contextmenu', (e: any) => {
                     e.originalEvent.preventDefault()
-                    // Right-click: undo last point
                     setPoints(prev => {
                         const next = prev.slice(0, -1)
                         markersRef.current.pop()?.remove()
@@ -144,7 +144,7 @@ export default function ZoneMapEditor({ zones, mode, editingZone, center, onSave
         )
     }
 
-    // Draw mode controls
+    // Draw mode controls (NO EMOJIS, clean Lucide icons)
     return (
         <div>
             <div style={{
@@ -154,9 +154,15 @@ export default function ZoneMapEditor({ zones, mode, editingZone, center, onSave
                 display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--space-3)',
                 fontSize: '0.82rem', color: 'var(--text-secondary)',
             }}>
-                <span>📌 <strong>Click left</strong> = เพิ่มจุด</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    <MousePointer2 size={14} color="#3B5FCC" />
+                    <strong>คลิกซ้าย</strong> = เพิ่มจุดขอบเขต
+                </span>
                 <span>·</span>
-                <span>🖱️ <strong>Click right</strong> = ลบจุดล่าสุด</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    <RotateCcw size={14} color="#D97706" />
+                    <strong>คลิกขวา</strong> = ยกเลิกจุดล่าสุด
+                </span>
                 <span style={{ marginLeft: 'auto', fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-ghost)', padding: '2px 12px', borderRadius: 'var(--radius-full)' }}>
                     {points.length} จุด
                 </span>
@@ -165,14 +171,25 @@ export default function ZoneMapEditor({ zones, mode, editingZone, center, onSave
                 <div ref={mapRef} style={{ width: '100%', height: 420, cursor: 'crosshair' }} />
             </div>
             <div style={{ padding: 'var(--space-4)', display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', background: 'var(--surface-2)' }}>
-                <button className="btn btn-ghost btn-sm" onClick={clearAll}>🗑️ ล้างทั้งหมด</button>
-                <button className="btn btn-ghost btn-sm" onClick={onCancel}>ยกเลิก</button>
                 <button
-                    className="btn btn-primary btn-sm"
-                    disabled={points.length < 3}
-                    onClick={() => onSave(points)}
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={clearAll}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}
                 >
-                    💾 บันทึกกรอบ ({points.length} จุด)
+                    <Trash2 size={14} /> ล้างทั้งหมด
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>
+                    ยกเลิก
+                </button>
+                <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    disabled={points.length < 3 || isAreaOverLimit}
+                    onClick={() => onSave(points)}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                >
+                    <Save size={14} /> บันทึกกรอบ ({points.length} จุด)
                 </button>
             </div>
         </div>

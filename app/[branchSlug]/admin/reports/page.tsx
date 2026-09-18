@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { th } from 'date-fns/locale'
-import { IncidentReport } from '@/app/admin/platform/reports/page'
+import { IncidentReport } from '@/app/platform/admin/reports/page'
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
   pending: { label: 'รอดำเนินการ', bg: '#FEF3C7', text: '#B45309', border: '#FCD34D' },

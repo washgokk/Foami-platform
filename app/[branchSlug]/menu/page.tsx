@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Bath, ClipboardList, Settings, Bike, ChevronRight, Search, User } from 'lucide-react'
+import { Bath, ClipboardList, Settings, Bike, ChevronRight, Search, User, Star, ShieldCheck, Ticket, Copy, Check } from 'lucide-react'
 import Logo from '@/components/Branding/Logo'
 import styles from './menu.module.css'
 
@@ -18,6 +18,8 @@ export default function MenuPage() {
     const [unratedCount, setUnratedCount] = useState(0)
     const [zones, setZones] = useState<any[]>([])
     const [branchName, setBranchName] = useState('')
+    const [rewardCoupon, setRewardCoupon] = useState<any>(null)
+    const [copied, setCopied] = useState(false)
 
     useEffect(() => {
         const data = localStorage.getItem('liff_customer')
@@ -37,25 +39,21 @@ export default function MenuPage() {
             })
 
         // Initial data setup
-
-        // 🚀 Check for unrated completed bookings
         supabase.from('bookings')
-            .select('id, scheduled_date, branch_id, services(name), zones(name), staff(full_name)')
+            .select('id, scheduled_date, scheduled_time, rating, review_comment, branch_id, services(name)')
             .eq('customer_id', parsed.id)
             .eq('status', 'completed')
             .is('rating', null)
-            .order('created_at', { ascending: false })
+            .order('scheduled_date', { ascending: false })
             .then(({ data: bData }) => {
                 if (bData && bData.length > 0) {
                     setUnratedCount(bData.length)
                     
-                    // Check if this specific booking was recently dismissed in this session
                     const dismissed = sessionStorage.getItem('dismissed_review_' + bData[0].id)
                     if (!dismissed) {
                         setUnratedBooking(bData[0])
                     }
 
-                    // Fetch zones of the branch resolved from Slug OR the most recent booking
                     const currentBranchId = customer?.branch_id || bData[0].branch_id
                     if (currentBranchId) {
                         supabase.from('zones').select('name').eq('branch_id', currentBranchId).eq('is_active', true)
@@ -64,7 +62,6 @@ export default function MenuPage() {
                             })
                     }
                 } else {
-                    // Fallback: fetch zones of the branch resolved from Slug
                     supabase.from('branches').select('id').eq('slug', branchSlug).maybeSingle()
                         .then(({ data: brData }) => {
                             if (brData) {
@@ -83,6 +80,7 @@ export default function MenuPage() {
             sessionStorage.setItem('dismissed_review_' + unratedBooking.id, 'true')
         }
         setUnratedBooking(null)
+        setRewardCoupon(null)
     }
 
     const handleReview = async () => {
@@ -95,8 +93,31 @@ export default function MenuPage() {
             
             if (error) throw error
             
-            alert('ขอบคุณสำหรับรีวิวของคุณครับ!')
-            setUnratedBooking(null)
+            // Request review reward coupon (100% Platform Funded)
+            try {
+                const resReward = await fetch('/api/reviews/reward', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        customer_phone: customer.phone,
+                        booking_id: unratedBooking.id,
+                        branch_slug: branchSlug,
+                        branch_id: unratedBooking.branch_id || customer.branch_id,
+                        rating: rating
+                    })
+                })
+                const rData = await resReward.json()
+                if (rData.coupon) {
+                    setRewardCoupon(rData.coupon)
+                } else {
+                    alert('ขอบคุณสำหรับรีวิวของคุณครับ!')
+                    setUnratedBooking(null)
+                }
+            } catch (err) {
+                alert('ขอบคุณสำหรับรีวิวของคุณครับ!')
+                setUnratedBooking(null)
+            }
+
             setRating(0)
             setComment('')
         } catch (e: any) {
@@ -104,6 +125,12 @@ export default function MenuPage() {
         } finally {
             setSubmitting(false)
         }
+    }
+
+    const handleCopyCoupon = (code: string) => {
+        navigator.clipboard.writeText(code)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
     }
 
     if (!customer) return (
@@ -172,7 +199,7 @@ export default function MenuPage() {
             {/* Review Popup Modal */}
             {unratedBooking && (
                 <div className={styles.overlay} onClick={dismissReview}>
-                    <div className={styles.modal} onClick={e => e.stopPropagation()}>
+                    <div className={styles.modal} onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
                         <div className={styles.modalHeader}>
                             <div>
                                 <h2 style={{ fontSize: '1.2rem', fontWeight: 800 }}>รีวิวบริการล่าสุด</h2>
@@ -180,48 +207,116 @@ export default function MenuPage() {
                             </div>
                             <button className={styles.closeBtn} onClick={dismissReview}>×</button>
                         </div>
-                        
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                            <div style={{ textAlign: 'center', background: 'var(--surface-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-lg)' }}>
-                                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>งานเมื่อวันที่ {unratedBooking.scheduled_date}</div>
-                                <div style={{ fontWeight: 700, color: 'var(--primary)', marginTop: 4 }}>{unratedBooking.services?.name}</div>
-                            </div>
 
-                            <div style={{ padding: 'var(--space-4)', background: 'var(--surface-2)', borderRadius: 'var(--radius-xl)' }}>
-                                <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 'var(--space-2)', textAlign: 'center' }}>คุณพอใจกับบริการครั้งนี้แค่ไหน?</div>
-                                
-                                <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-                                    {[1, 2, 3, 4, 5].map(s => (
-                                        <button 
-                                            key={s} 
-                                            onClick={() => setRating(s)}
-                                            style={{ background: 'none', border: 'none', fontSize: '2rem', cursor: 'pointer', color: s <= rating ? '#fbbf24' : '#d1d5db', transition: 'transform 0.1s' }}
-                                            onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.9)')}
-                                            onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-                                        >
-                                            ★
-                                        </button>
-                                    ))}
+                        {rewardCoupon ? (
+                            /* Reward voucher reveal */
+                            <div style={{ padding: 20, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
+                                    <ShieldCheck size={32} />
+                                </div>
+                                <div>
+                                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                                        ขอบคุณสำหรับรีวิวของคุณ!
+                                    </h3>
+                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+                                        คุณได้รับคูปองส่วนลดสำหรับการจองครั้งถัดไป
+                                    </p>
                                 </div>
 
-                                <textarea 
-                                    className="form-input" 
-                                    placeholder="เขียนคอมเม้นเพิ่มเติมที่นี่ (ไม่บังคับ)..." 
-                                    style={{ width: '100%', borderRadius: 12, marginBottom: 'var(--space-3)', fontSize: '0.85rem', padding: 12, minHeight: 80 }}
-                                    value={comment}
-                                    onChange={e => setComment(e.target.value)}
-                                />
-                                
-                                <button 
-                                    className="btn btn-primary" 
-                                    style={{ width: '100%', borderRadius: 'var(--radius-full)' }} 
-                                    disabled={rating === 0 || submitting}
-                                    onClick={handleReview}
+                                <div style={{ background: '#f8fafc', border: '2px dashed var(--brand-dominant)', borderRadius: 14, padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'left' }}>รหัสส่วนลดของคุณ</div>
+                                        <div style={{ fontSize: '1.4rem', fontWeight: 900, letterSpacing: 2, color: 'var(--brand-dominant)', textAlign: 'left' }}>
+                                            {rewardCoupon.code}
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 700, textAlign: 'left', marginTop: 2 }}>
+                                            ลด ฿{rewardCoupon.discount_value} · สนับสนุนโดย Foami 100%
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCopyCoupon(rewardCoupon.code)}
+                                        style={{
+                                            padding: '8px 14px',
+                                            borderRadius: 8,
+                                            border: 'none',
+                                            background: copied ? '#059669' : 'var(--brand-dominant)',
+                                            color: 'white',
+                                            fontWeight: 700,
+                                            fontSize: '0.8rem',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 4
+                                        }}
+                                    >
+                                        {copied ? <><Check size={14} /> คัดลอกแล้ว</> : <><Copy size={14} /> คัดลอก</>}
+                                    </button>
+                                </div>
+
+                                <button
+                                    className="btn btn-primary"
+                                    style={{ width: '100%', borderRadius: 'var(--radius-full)', fontWeight: 800 }}
+                                    onClick={dismissReview}
                                 >
-                                    {submitting ? <div className="spinner" style={{ width: 20, height: 20, borderTopColor: '#fff' }} /> : 'ส่งรีวิว'}
+                                    รับสิทธิ์และปิดหน้านี้
                                 </button>
                             </div>
-                        </div>
+                        ) : (
+                            /* Review form with promo banner */
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                                {/* Promo Incentive Banner (Always visible) */}
+                                <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <Ticket size={20} color="#059669" style={{ flexShrink: 0 }} />
+                                    <div style={{ fontSize: '0.8rem', color: '#065f46', lineHeight: 1.4, textAlign: 'left' }}>
+                                        <strong>รับคูปองส่วนลด ฿50 ทันที!</strong> เพียงส่งรีวิวบริการนี้ (Foami สนับสนุน 100% ไม่หักเงินร้านค้า)
+                                    </div>
+                                </div>
+
+                                <div style={{ textAlign: 'center', background: 'var(--surface-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-lg)' }}>
+                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>งานเมื่อวันที่ {unratedBooking.scheduled_date}</div>
+                                    <div style={{ fontWeight: 700, color: 'var(--primary)', marginTop: 4 }}>{unratedBooking.services?.name}</div>
+                                </div>
+
+                                <div style={{ padding: 'var(--space-4)', background: 'var(--surface-2)', borderRadius: 'var(--radius-xl)' }}>
+                                    <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: 'var(--space-2)', textAlign: 'center' }}>คุณพอใจกับบริการครั้งนี้แค่ไหน?</div>
+                                    
+                                    <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 'var(--space-3)' }}>
+                                        {[1, 2, 3, 4, 5].map(s => (
+                                            <button 
+                                                key={s} 
+                                                type="button"
+                                                onClick={() => setRating(s)}
+                                                style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                            >
+                                                <Star 
+                                                    size={32} 
+                                                    fill={s <= rating ? '#f59e0b' : 'none'} 
+                                                    color={s <= rating ? '#f59e0b' : '#cbd5e1'} 
+                                                />
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <textarea 
+                                        className="form-input" 
+                                        placeholder="เขียนคอมเม้นเพิ่มเติมที่นี่ (ไม่บังคับ)..." 
+                                        style={{ width: '100%', borderRadius: 12, marginBottom: 'var(--space-3)', fontSize: '0.85rem', padding: 12, minHeight: 80, border: '1px solid var(--border)' }}
+                                        value={comment}
+                                        onChange={e => setComment(e.target.value)}
+                                    />
+                                    
+                                    <button 
+                                        className="btn btn-primary" 
+                                        style={{ width: '100%', borderRadius: 'var(--radius-full)', fontWeight: 800 }} 
+                                        disabled={rating === 0 || submitting}
+                                        onClick={handleReview}
+                                    >
+                                        {submitting ? <div className="spinner" style={{ width: 20, height: 20, borderTopColor: '#fff' }} /> : 'ส่งรีวิวและรับคูปอง'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

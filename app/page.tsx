@@ -369,41 +369,7 @@ export default function LandingPage() {
                   filter: 'drop-shadow(0 14px 28px rgba(49, 94, 195, 0.16))'
                 }}
               />
-              <div style={{
-                width: '100%',
-                paddingTop: 16,
-                borderTop: `1px solid ${C.border}`,
-                marginTop: 14,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 12
-              }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: C.textPrimary }}>
-                    Foami Web Application
-                  </div>
-                  <div style={{ fontSize: 12, color: C.textSecondary, marginTop: 2 }}>
-                    จองง่ายผ่านสมาร์ทโฟน ไม่ต้องดาวน์โหลดแอปพลิเคชัน
-                  </div>
-                </div>
-                <div style={{
-                  padding: '4px 12px',
-                  borderRadius: 20,
-                  background: C.subordinateLight,
-                  border: `1px solid ${C.subordinate}`,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: C.primary,
-                  whiteSpace: 'nowrap',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4
-                }}>
-                  <Sparkles size={13} />
-                  <span>Mobile First</span>
-                </div>
-              </div>
+
             </div>
           </div>
         </div>

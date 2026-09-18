@@ -383,11 +383,11 @@ export default function PromotionsPage() {
                             {(() => {
                                 const p = promo as any
                                 const badges = []
-                                if (p.usage_type === 'recurring') badges.push({ label: '🔄 ประจำ', color: '#7C3AED' })
-                                else badges.push({ label: '🎯 ครั้งเดียว', color: '#059669' })
-                                if (p.valid_from || p.valid_until) badges.push({ label: `📅 ${p.valid_from || '?'} → ${p.valid_until || '?'}`, color: '#0369a1' })
-                                if (p.allowed_branch_ids?.length) badges.push({ label: `🏪 ${p.allowed_branch_ids.length} สาขา`, color: '#B45309' })
-                                if (p.allowed_zone_ids?.length) badges.push({ label: `📍 ${p.allowed_zone_ids.length} โซน`, color: '#B45309' })
+                                if (p.usage_type === 'recurring') badges.push({ label: 'ประจำ', color: '#7C3AED' })
+                                else badges.push({ label: ' ครั้งเดียว', color: '#059669' })
+                                if (p.valid_from || p.valid_until) badges.push({ label: `${p.valid_from || '?'} → ${p.valid_until || '?'}`, color: '#0369a1' })
+                                if (p.allowed_branch_ids?.length) badges.push({ label: `${p.allowed_branch_ids.length} สาขา`, color: '#B45309' })
+                                if (p.allowed_zone_ids?.length) badges.push({ label: `${p.allowed_zone_ids.length} โซน`, color: '#B45309' })
                                 return badges.length > 0 ? (
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
                                         {badges.map((b, i) => (

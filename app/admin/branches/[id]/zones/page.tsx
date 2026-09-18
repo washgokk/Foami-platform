@@ -32,6 +32,15 @@ export default function ZonesPage() {
         message: string;
     }>({ isOpen: false, id: '', title: '', message: '' })
 
+        const handleStartCreateZone = () => {
+        const planTier = (branch?.features as any)?.plan_tier || 'starter'
+        if (planTier === 'starter' && zones.length >= 2) {
+            alert('แพ็กเกจ Starter รองรับพื้นที่บริการสูงสุด 2 โซน (ปัจจุบันมี 2 โซนแล้ว)\nกรุณาติดต่อ Platform Super Admin เพื่ออัปเกรดเป็นแพ็กเกจ Pro เพื่อเพิ่มโซนบริการไม่จำกัด')
+            return
+        }
+        setCreateMode('naming')
+    }
+
     const load = useCallback(async () => {
         const [{ data: br }, { data: zns }] = await Promise.all([
             supabase.from('branches').select('*').eq('id', id).single(),
@@ -185,10 +194,10 @@ export default function ZonesPage() {
                     <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <Map size={28} color="var(--brand-dominant)" /> โซนบริการ — {branch?.name}
                     </h1>
-                    <p className="page-subtitle">แต่ละโซนแสดงเป็นสีต่างกันบนแผนที่ · นอกโซน = {branch?.out_of_zone_fee || 0} บาท/กม. · รัศมีสูงสุด {branch?.max_out_of_zone_km || 2} กม.</p>
+                    <p className="page-subtitle">แต่ละโซนแสดงเป็นสีต่างกันบนแผนที่ · พนักงานจะให้บริการเฉพาะในโซนที่กำหนดและรับงานข้ามโซน</p>
                 </div>
                 {createMode === 'idle' && !redrawZone && (
-                    <button className="btn btn-primary" style={{ borderRadius: 12, gap: 8 }} onClick={() => setCreateMode('naming')}>
+                    <button className="btn btn-primary" style={{ borderRadius: 12, gap: 8 }} onClick={handleStartCreateZone}>
                         <Plus size={18} /> เพิ่มโซน
                     </button>
                 )}
@@ -561,16 +570,7 @@ function ZoneDrawMap({ center, zones, editingZoneId, title, accentColor, existin
                 L.polygon(z.polygon_coords, { color, fillColor: color, fillOpacity: 0.1, weight: 1.5, dashArray: '6,4' })
                     .addTo(map).bindTooltip(z.name, { direction: 'center' })
 
-                // Buffer for other zones
-                if (maxKm && maxKm > 0 && z.polygon_coords.length >= 3) {
-                    try {
-                        const turf = require('@turf/turf')
-                        const coords = z.polygon_coords.map(c => [c[1], c[0]])
-                        coords.push([coords[0][0], coords[0][1]])
-                        const buff = turf.buffer(turf.polygon([coords]), maxKm, { units: 'kilometers' })
-                        L.geoJSON(buff, { style: { color, fillOpacity: 0, weight: 1, dashArray: '4,6', opacity: 0.5 } }).addTo(map)
-                    } catch(e) {}
-                }
+// Buffer dashed line removed as requested
             })
 
             // Draw existing points if re-drawing
@@ -581,16 +581,7 @@ function ZoneDrawMap({ center, zones, editingZoneId, title, accentColor, existin
                 })
                 polyRef.current = L.polygon(existingCoords, { color: accentColor, fillColor: accentColor, fillOpacity: 0.2, weight: 2.5 }).addTo(map)
 
-                // Buffer for being edited zone
-                if (maxKm && maxKm > 0) {
-                    try {
-                        const turf = require('@turf/turf')
-                        const coords = existingCoords.map(c => [c[1], c[0]])
-                        coords.push([coords[0][0], coords[0][1]])
-                        const buff = turf.buffer(turf.polygon([coords]), maxKm, { units: 'kilometers' })
-                        L.geoJSON(buff, { style: { color: accentColor, fillOpacity: 0, weight: 2, dashArray: '5,10' } }).addTo(map)
-                    } catch(e) {}
-                }
+// Buffer dashed line removed as requested
             }
 
             map.on('click', (e: any) => {

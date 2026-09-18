@@ -13,6 +13,12 @@ export interface MatchingStaffResult {
 /**
  * Core Logic Shared between Booking Page and Cron Jobs.
  * Finds all staff members who can perform a specific job at a specific time.
+ * 
+ * NEW FAIR-SERVICE MODEL:
+ * 1. In-Zone (Free Delivery): If customer pickup & delivery are inside ANY active zone of the branch,
+ *    fee is ALWAYS 0 (รับ-ส่งฟรี). Any available staff in the branch can take the job.
+ * 2. Out-of-Zone: If outside active zones but within max_out_of_zone_km, calculate out-of-zone fee
+ *    based on distance from nearest polygon boundary. Available staff can take the job with out-of-zone surcharge.
  */
 export function findMatchingStaffForJob({
     pickupLat,
@@ -37,104 +43,70 @@ export function findMatchingStaffForJob({
     dayBookings: any[];
     timeSlot: string;
 }) {
-    // 1. Determine if the job itself is local to any zone
-    const localPickupMatched = zones.find(z => z.is_active && isPointInPolygon(pickupLat, pickupLng, z.polygon_coords))
-    const localDeliveryMatched = showDelivery ? zones.find(z => z.is_active && isPointInPolygon(deliveryLat || 0, deliveryLng || 0, z.polygon_coords)) : null
+    const activeZones = (zones || []).filter(z => z.is_active && z.polygon_coords?.length >= 3)
+    if (activeZones.length === 0) return []
 
-    // 2. Identify staff who are ALREADY BOOKED for this slot (any zone)
-    const slotSchedules = daySchedules.filter(s => (s.time_slot === timeSlot || s.time_slot?.startsWith(timeSlot)))
-    const bookedStaffIdsForSlot = slotSchedules.filter(s => s.is_booked).map(s => s.staff_id)
-    
-    // 3. Filter for available schedules (not booked, and staff not already busy)
-    const availableSchedules = slotSchedules.filter(s => !s.is_booked && !bookedStaffIdsForSlot.includes(s.staff_id))
+    // 1. Check if pickup & delivery are inside active service zones
+    const isPickupInZone = activeZones.some(z => isPointInPolygon(pickupLat, pickupLng, z.polygon_coords))
+    const isDeliveryInZone = !showDelivery || activeZones.some(z => isPointInPolygon(deliveryLat || 0, deliveryLng || 0, z.polygon_coords))
 
-    const staffAssignments: Record<string, any[]> = {}
-    availableSchedules.forEach(s => {
-        if (!staffAssignments[s.staff_id]) staffAssignments[s.staff_id] = []
-        staffAssignments[s.staff_id].push(s)
-    })
+    let isOutOfZone = false
+    let calculatedFee = 0
 
-    const matchingStaff: MatchingStaffResult[] = []
-
-    Object.entries(staffAssignments).forEach(([sId, assignments]) => {
-        // Find the ANCHOR assignment (in_zone) to act as the base for distances
-        const anchor = assignments.find(a => !a.work_type || a.work_type === 'in_zone') || assignments[0]
-        const baseZone = zones.find(zn => zn.id === anchor.zone_id)
-        if (!baseZone) return
-
-        // BUG-Z1 FIX: isO = pickup is outside ALL zones (delivery alone doesn't make isO)
-        // isC = pickup or delivery is inside a DIFFERENT zone than staff base zone
-        const isPickupOutOfAllZones = !localPickupMatched
-        const isDeliveryOutOfAllZones = showDelivery && !!deliveryLat && !localDeliveryMatched
-
-        const isO = isPickupOutOfAllZones  // Only pickup-out-of-zone triggers "out_of_zone" staff requirement
-        const isC = !isO && (
-            // pickup is in a different zone than staff base
-            (localPickupMatched && localPickupMatched.id !== baseZone.id) ||
-            // delivery is in a different zone than staff base
-            (showDelivery && localDeliveryMatched && localDeliveryMatched.id !== baseZone.id) ||
-            // delivery is outside all zones but pickup is inside (cross_zone staff can handle)
-            isDeliveryOutOfAllZones
-        )
-
-        // Check compatibility based on work_type
-        let canServe = false
-        if (isO) canServe = assignments.some(a => a.work_type === 'out_of_zone')
-        else if (isC) canServe = assignments.some(a => a.work_type === 'cross_zone' || a.work_type === 'out_of_zone')
-        else canServe = true // Local to their base zone
-        
-        if (canServe) {
-            // Calculate actual distances from baseZone polygon to pickup/delivery (used for fee)
-            const isPickupInBase = isPointInPolygon(pickupLat, pickupLng, baseZone.polygon_coords)
-            const dPickup = isPickupInBase ? 0 : minDistanceToPolygon(pickupLat, pickupLng, baseZone.polygon_coords)
-
-            const isDeliveryInBase = showDelivery ? isPointInPolygon(deliveryLat || 0, deliveryLng || 0, baseZone.polygon_coords) : true
-            const dDelivery = (showDelivery && !isDeliveryInBase) ? minDistanceToPolygon(deliveryLat || 0, deliveryLng || 0, baseZone.polygon_coords) : 0
-
-            // For limit check: cross_zone staff explicitly opted into that zone, so bypass
-            // the base-zone distance cap — but still use actual distance for fee calculation.
-            let dPickupForLimit = dPickup
-            let dDeliveryForLimit = dDelivery
-
-            if (isC && localPickupMatched) {
-                const hasCrossForPickupZone = assignments.some(a =>
-                    a.zone_id === localPickupMatched.id &&
-                    (a.work_type === 'cross_zone' || a.work_type === 'out_of_zone')
-                )
-                if (hasCrossForPickupZone) dPickupForLimit = 0
-            }
-
-            if (isC && showDelivery && localDeliveryMatched) {
-                const hasCrossForDeliveryZone = assignments.some(a =>
-                    a.zone_id === localDeliveryMatched.id &&
-                    (a.work_type === 'cross_zone' || a.work_type === 'out_of_zone')
-                )
-                if (hasCrossForDeliveryZone) dDeliveryForLimit = 0
-            }
-
-            const maxDist = Math.max(dPickupForLimit, dDeliveryForLimit)
-
-            // Limit check: only filters true out-of-zone (customer outside all polygons)
-            if (maxDist > (branch.max_out_of_zone_km || 2)) return
-
-            // Fee: always based on actual distance from base zone (cross_zone still earns travel surcharge)
-            // BUG-Z2 FIX: road distance = haversine * 1.35 (road factor), x2 for round trip (staff goes out and returns)
-            // Uses out_of_zone_fee as per-km rate for staff travel surcharge
-            const dPickupRoad = dPickup * 1.35  // straight-line -> road distance estimate
-            let fee = Math.ceil(dPickupRoad * 2 * (branch.out_of_zone_fee || 10))
-            
-            matchingStaff.push({
-                staff_id: sId,
-                base_zone_id: baseZone.id,
-                fee: fee,
-                type: (isO || isC) ? 'overflow' : 'local'
-            })
+    if (isPickupInZone && isDeliveryInZone) {
+        // In-zone: FREE delivery! 0 fee
+        calculatedFee = 0
+        isOutOfZone = false
+    } else {
+        // Out-of-zone check: Does branch accept out-of-zone?
+        const maxKm = Number(branch?.max_out_of_zone_km) || 0
+        if (maxKm <= 0) {
+            // Branch does not accept out-of-zone bookings
+            return []
         }
-    })
 
-    // 4. Handle Capacity (Pending unassigned bookings)
-    // IMPORTANT: This subtraction should be handled by the caller if they want "Availability" 
-    // vs "Matching Staff". Cron Jobs usually want "All Matching Staff".
-    
+        // Distance from nearest polygon edge
+        let minPickupD = Infinity
+        let minDeliveryD = Infinity
+
+        activeZones.forEach(z => {
+            const dP = minDistanceToPolygon(pickupLat, pickupLng, z.polygon_coords)
+            if (dP < minPickupD) minPickupD = dP
+            if (showDelivery) {
+                const dD = minDistanceToPolygon(deliveryLat || 0, deliveryLng || 0, z.polygon_coords)
+                if (dD < minDeliveryD) minDeliveryD = dD
+            }
+        })
+
+        const maxD = showDelivery ? Math.max(minPickupD, minDeliveryD) : minPickupD
+        if (maxD > maxKm) {
+            // Exceeds max out-of-zone radius
+            return []
+        }
+
+        isOutOfZone = true
+        const ratePerKm = Number(branch?.delivery_rate_per_km || branch?.out_of_zone_fee) || 10
+        // Standard road distance = straight line * 1.35
+        const roadDistance = maxD * 1.35
+        calculatedFee = Math.ceil(roadDistance * ratePerKm)
+    }
+
+    // 2. Filter schedules for this time slot
+    const slotSchedules = daySchedules.filter(s => (s.time_slot === timeSlot || s.time_slot?.startsWith(timeSlot)))
+    const bookedStaffIds = slotSchedules.filter(s => s.is_booked).map(s => s.staff_id)
+
+    // Available staff on duty in this branch
+    const availableSchedules = slotSchedules.filter(s => !s.is_booked && !bookedStaffIds.includes(s.staff_id))
+    const uniqueStaffIds = Array.from(new Set(availableSchedules.map(s => s.staff_id)))
+
+    const primaryZoneId = activeZones[0]?.id || ''
+
+    const matchingStaff: MatchingStaffResult[] = uniqueStaffIds.map(sId => ({
+        staff_id: sId,
+        base_zone_id: primaryZoneId,
+        fee: calculatedFee,
+        type: isOutOfZone ? 'overflow' : 'local'
+    }))
+
     return matchingStaff.sort((a, b) => a.fee - b.fee)
 }

@@ -125,13 +125,21 @@ export default function ShopSchedulePage() {
                 <div style={{ flex: 1 }} />
 
                 <div className={styles.weekControl}>
-                    <button className="btn btn-ghost btn-sm" style={{ borderRadius: 8 }} onClick={() => setWeekStart(d => addDays(d, -7))}>
+                    <button className="btn btn-ghost btn-sm" style={{ borderRadius: 8 }} onClick={() => setWeekStart(d => addDays(d, -7))} title="สัปดาห์ก่อนหน้า">
                         <ChevronLeft size={18} />
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        style={{ borderRadius: 8, fontSize: '0.78rem', fontWeight: 700, padding: '4px 10px', background: 'var(--surface-2)' }}
+                        onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
+                    >
+                        สัปดาห์นี้
                     </button>
                     <div className={styles.weekLabel}>
                         {format(weekStart, 'd MMM', { locale: th })} – {format(addDays(weekStart, 6), 'd MMM yy', { locale: th })}
                     </div>
-                    <button className="btn btn-ghost btn-sm" style={{ borderRadius: 8 }} onClick={() => setWeekStart(d => addDays(d, 7))}>
+                    <button className="btn btn-ghost btn-sm" style={{ borderRadius: 8 }} onClick={() => setWeekStart(d => addDays(d, 7))} title="สัปดาห์ถัดไป">
                         <ChevronRight size={18} />
                     </button>
                 </div>

@@ -5,6 +5,10 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { BOOKING_STATUS_LABEL, BOOKING_STATUS_CSS, BookingStatus, VEHICLE_SIZE_LABEL } from '@/lib/types'
 import { 
+    Ticket,
+    ShieldCheck,
+    Copy,
+    Check,
     ChevronLeft, 
     Clock, 
     CheckCircle, 
@@ -72,6 +76,8 @@ export default function MyBookingsPage() {
     const [rating, setRating] = useState(0)
     const [comment, setComment] = useState('')
     const [reviewPhotos, setReviewPhotos] = useState<string[]>([])
+    const [rewardCoupon, setRewardCoupon] = useState<any>(null)
+    const [copiedCoupon, setCopiedCoupon] = useState(false)
     const [rewardCode, setRewardCode] = useState<string | null>(null)
     const [uploadingReviewPhotos, setUploadingReviewPhotos] = useState(false)
     const [customer, setCustomer] = useState<any>(null)
@@ -178,8 +184,33 @@ export default function MyBookingsPage() {
             
             // Update local state
             setBookings(prev => prev.map(b => b.id === selectedBooking.id ? { ...b, rating, review_comment: comment } : b))
-            alert('ขอบคุณสำหรับรีวิวของคุณครับ!')
-            setSelectedBooking(null)
+            
+            // Request review reward coupon (100% Platform Funded)
+            try {
+                const cust = JSON.parse(localStorage.getItem('liff_customer') || '{}')
+                const resReward = await fetch('/api/reviews/reward', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        customer_phone: cust.phone,
+                        booking_id: selectedBooking.id,
+                        branch_slug: branchSlug,
+                        branch_id: selectedBooking.branch_id,
+                        rating: rating
+                    })
+                })
+                const rData = await resReward.json()
+                if (rData.coupon) {
+                    setRewardCoupon(rData.coupon)
+                } else {
+                    alert('ขอบคุณสำหรับรีวิวของคุณครับ!')
+                    setSelectedBooking(null)
+                }
+            } catch (err) {
+                alert('ขอบคุณสำหรับรีวิวของคุณครับ!')
+                setSelectedBooking(null)
+            }
+
             setRating(0)
             setComment('')
         } catch (e: any) {
@@ -240,7 +271,7 @@ export default function MyBookingsPage() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         staff_id: selectedBooking.staff_id,
-                        title: 'ลูกค้าชำระเงินแล้ว! ✨',
+                        title: 'ลูกค้าชำระเงินแล้ว!',
                         body: `ยอดเพิ่มเติม ฿${selectedBooking.additional_price.toLocaleString()} ชำระเรียบร้อยแล้ว ดำเนินการต่อได้เลย`,
                         url: `/staff/jobs/${selectedBooking.id}`
                     })
@@ -248,7 +279,7 @@ export default function MyBookingsPage() {
 
                 // If job is already in delivering status, notify customer that it's now actually delivering
                 if (selectedBooking.status === 'delivering') {
-                    const message = '🚗 ล้างเสร็จแล้ว! พนักงานกำลังนำรถกลับ\nเตรียมรอรับรถสุดเงาได้เลยครับ'
+                    const message = 'ล้างเสร็จแล้ว! พนักงานกำลังนำรถกลับ\nเตรียมรอรับรถได้เลยครับ'
                     fetch('/api/line/notify-customer', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1093,45 +1124,112 @@ export default function MyBookingsPage() {
 
                             {selectedBooking.status === 'completed' && (
                                 <div style={{ background: 'var(--surface-2)', borderRadius: '24px', padding: 'var(--space-5)', textAlign: 'center' }}>
-                                    <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)', marginBottom: 'var(--space-3)' }}>
-                                        {selectedBooking.rating ? 'ขอบคุณสำหรับรีวิวของคุณครับ!' : 'รีวิวบริการนี้'}
-                                    </div>
-                                    
-                                    <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 'var(--space-4)' }}>
-                                        {[1, 2, 3, 4, 5].map(s => (
-                                            <button 
-                                                key={s} 
-                                                disabled={!!selectedBooking.rating}
-                                                onClick={() => setRating(s)}
-                                                style={{ background: 'none', border: 'none', fontSize: '2rem', cursor: selectedBooking.rating ? 'default' : 'pointer', color: s <= rating ? 'var(--brand-accent)' : 'var(--surface-2)' }}
+                                    {rewardCoupon ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 10 }}>
+                                            <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
+                                                <ShieldCheck size={28} />
+                                            </div>
+                                            <div>
+                                                <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-primary)' }}>ขอบคุณสำหรับรีวิวของคุณ!</div>
+                                                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 2 }}>คุณได้รับคูปองส่วนลดพิเศษสำหรับการจองครั้งถัดไป</div>
+                                            </div>
+                                            <div style={{ background: 'white', border: '2px dashed var(--brand-dominant)', borderRadius: 14, padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <div>
+                                                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'left' }}>รหัสส่วนลดของคุณ</div>
+                                                    <div style={{ fontSize: '1.3rem', fontWeight: 900, letterSpacing: 2, color: 'var(--brand-dominant)', textAlign: 'left' }}>
+                                                        {rewardCoupon.code}
+                                                    </div>
+                                                    <div style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 700, textAlign: 'left', marginTop: 2 }}>
+                                                        ลด ฿{rewardCoupon.discount_value} · สนับสนุนโดย Foami 100%
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(rewardCoupon.code)
+                                                        setCopiedCoupon(true)
+                                                        setTimeout(() => setCopiedCoupon(false), 2000)
+                                                    }}
+                                                    style={{
+                                                        padding: '6px 12px',
+                                                        borderRadius: 8,
+                                                        border: 'none',
+                                                        background: copiedCoupon ? '#059669' : 'var(--brand-dominant)',
+                                                        color: 'white',
+                                                        fontWeight: 700,
+                                                        fontSize: '0.8rem',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 4
+                                                    }}
+                                                >
+                                                    {copiedCoupon ? <><Check size={14} /> คัดลอกแล้ว</> : <><Copy size={14} /> คัดลอก</>}
+                                                </button>
+                                            </div>
+                                            <button
+                                                className="btn btn-primary"
+                                                style={{ width: '100%', borderRadius: 'var(--radius-full)', fontWeight: 800 }}
+                                                onClick={() => {
+                                                    setRewardCoupon(null)
+                                                    setSelectedBooking(null)
+                                                }}
                                             >
-                                                <Star size={32} fill={s <= rating ? 'var(--brand-accent)' : 'none'} color={s <= rating ? 'var(--brand-accent)' : 'var(--border)'} />
-                                            </button>
-                                        ))}
-                                    </div>
-
-                                    {!selectedBooking.rating ? (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                            <textarea 
-                                                className="form-input" 
-                                                placeholder="เขียนคอมเม้นเพิ่มเติมที่นี่..." 
-                                                style={{ width: '100%', borderRadius: '16px', fontSize: '0.85rem', padding: 14, minHeight: 90, border: 'none', background: 'white' }}
-                                                value={comment}
-                                                onChange={e => setComment(e.target.value)}
-                                            />
-                                            <button 
-                                                className="btn btn-primary btn-lg" 
-                                                style={{ width: '100%', borderRadius: 'var(--radius-full)', fontWeight: 800 }} 
-                                                disabled={rating === 0 || submitting}
-                                                onClick={handleReview}
-                                            >
-                                                {submitting ? <div className="spinner spinner-white" /> : 'ส่งรีวิว'}
+                                                ตกลง
                                             </button>
                                         </div>
                                     ) : (
-                                        <div style={{ background: 'white', padding: 16, borderRadius: '16px', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5, textAlign: 'left' }}>
-                                            {selectedBooking.review_comment || '(ไม่มีคอมเม้น)'}
-                                        </div>
+                                        <>
+                                            {!selectedBooking.rating && (
+                                                <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 12, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                    <Ticket size={20} color="#059669" style={{ flexShrink: 0 }} />
+                                                    <div style={{ fontSize: '0.8rem', color: '#065f46', lineHeight: 1.4, textAlign: 'left' }}>
+                                                        <strong>รับคูปองส่วนลด ฿50 ทันที!</strong> เพียงส่งรีวิวบริการนี้ (Foami สนับสนุน 100% ไม่หักเงินร้านค้า)
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)', marginBottom: 'var(--space-3)' }}>
+                                                {selectedBooking.rating ? 'ขอบคุณสำหรับรีวิวของคุณครับ!' : 'รีวิวบริการนี้'}
+                                            </div>
+                                            
+                                            <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 'var(--space-4)' }}>
+                                                {[1, 2, 3, 4, 5].map(s => (
+                                                    <button 
+                                                        key={s} 
+                                                        disabled={!!selectedBooking.rating}
+                                                        onClick={() => setRating(s)}
+                                                        style={{ background: 'none', border: 'none', fontSize: '2rem', cursor: selectedBooking.rating ? 'default' : 'pointer', color: s <= rating ? 'var(--brand-accent)' : 'var(--surface-2)' }}
+                                                    >
+                                                        <Star size={32} fill={s <= rating ? 'var(--brand-accent)' : 'none'} color={s <= rating ? 'var(--brand-accent)' : 'var(--border)'} />
+                                                    </button>
+                                                ))}
+                                            </div>
+
+                                            {!selectedBooking.rating ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                                    <textarea 
+                                                        className="form-input" 
+                                                        placeholder="เขียนคอมเม้นเพิ่มเติมที่นี่..." 
+                                                        style={{ width: '100%', borderRadius: '16px', fontSize: '0.85rem', padding: 14, minHeight: 90, border: 'none', background: 'white' }}
+                                                        value={comment}
+                                                        onChange={e => setComment(e.target.value)}
+                                                    />
+                                                    <button 
+                                                        className="btn btn-primary btn-lg" 
+                                                        style={{ width: '100%', borderRadius: 'var(--radius-full)', fontWeight: 800 }} 
+                                                        disabled={rating === 0 || submitting}
+                                                        onClick={handleReview}
+                                                    >
+                                                        {submitting ? <div className="spinner spinner-white" /> : 'ส่งรีวิวและรับคูปอง'}
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div style={{ background: 'white', padding: 16, borderRadius: '16px', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5, textAlign: 'left' }}>
+                                                    {selectedBooking.review_comment || '(ไม่มีคอมเม้น)'}
+                                                </div>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             )}

@@ -239,9 +239,9 @@ export default function BranchesPage() {
             <div className="page-header animate-fade">
                 <div>
                     <h2 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <Store size={28} style={{ color: 'var(--brand-dominant)' }} /> จัดการสาขา
+                        <Store size={28} style={{ color: 'var(--brand-dominant)' }} /> ที่ตั้งร้านค้า & โซนพื้นที่ให้บริการ
                     </h2>
-                    <p className="page-subtitle">จัดการตำแหน่งและพื้นที่ให้บริการทั้งหมด {branches.length} แห่ง</p>
+                    <p className="page-subtitle">จัดการพิกัดที่ตั้งร้านและกำหนดขอบเขตพื้นที่ให้บริการ / รัศมีส่งรถ</p>
                 </div>
                 <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
                     <div className="btn-group" style={{ background: 'var(--surface-2)', padding: 4, borderRadius: '12px', display: 'flex' }}>
@@ -260,8 +260,8 @@ export default function BranchesPage() {
                             <MapIcon size={16} /> แผนที่โซน
                         </button>
                     </div>
-                    <Link href="/kku/admin/zones" className="btn btn-primary" style={{ borderRadius: '12px', gap: 8, textDecoration: 'none' }}>
-                        <MapPin size={18} /> ???????????????
+                    <Link href={branches[0] ? `/admin/branches/${branches[0].id}/zones` : '#'} className="btn btn-primary" style={{ borderRadius: '12px', gap: 8, textDecoration: 'none' }}>
+                        <MapPin size={18} /> จัดการโซนพื้นที่ให้บริการ
                     </Link>
                 </div>
             </div>
@@ -280,7 +280,7 @@ export default function BranchesPage() {
                         <Store size={40} />
                     </div>
                     <p className="empty-state-title" style={{ fontWeight: 800 }}>ยังไม่มีสาขาที่เปิดให้บริการ</p>
-                    <button className="btn btn-primary" style={{ marginTop: 12, borderRadius: 12 }} onClick={openAdd}>เพิ่มสาขาแรก</button>
+                    <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: 8 }}>กรุณาติดต่อ Platform Super Admin เพื่อลงทะเบียนร้านค้า</p>
                 </div>
             ) : (
                 <div className={`${styles.grid} animate-fade`}>
@@ -313,20 +313,19 @@ export default function BranchesPage() {
                                 </span>
                             </div>
                             <div className={styles.cardActions} style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ display: 'flex', gap: 8 }}>
-                                    <Link href={`/admin/branches/${b.id}/zones`} className="btn btn-ghost btn-sm" style={{ borderRadius: 8, gap: 6 }}>
-                                        <MapIcon size={14} /> โซน
+                                <div style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+                                    <Link href={`/admin/branches/${b.id}/zones`} className="btn btn-primary btn-sm" style={{ borderRadius: 8, gap: 6, textDecoration: 'none' }}>
+                                        <MapIcon size={14} /> จัดการโซนพื้นที่ให้บริการ
                                     </Link>
-                                    <button className="btn btn-outline btn-sm" style={{ borderRadius: 8, gap: 6 }} onClick={() => openEdit(b)}>
-                                        <Edit3 size={14} /> แก้ไข
-                                    </button>
-                                    <button className="btn btn-ghost btn-sm" style={{ borderRadius: 8, gap: 6 }} onClick={() => toggleActive(b)}>
-                                        {b.is_active ? <><Pause size={14} /> ปิด</> : <><Play size={14} /> เปิด</>}
-                                    </button>
+                                    <div style={{ display: 'flex', gap: 8 }}>
+                                        <button className="btn btn-outline btn-sm" style={{ borderRadius: 8, gap: 6 }} onClick={() => openEdit(b)}>
+                                            <Edit3 size={14} /> แก้ไขที่ตั้ง
+                                        </button>
+                                        <button className="btn btn-ghost btn-sm" style={{ borderRadius: 8, gap: 6 }} onClick={() => toggleActive(b)}>
+                                            {b.is_active ? <><Pause size={14} /> ปิดชั่วคราว</> : <><Play size={14} /> เปิดบริการ</>}
+                                        </button>
+                                    </div>
                                 </div>
-                                <button className="btn-delete-premium" onClick={() => deleteBranch(b.id)} title="ลบสาขา">
-                                    <Trash2 size={16} />
-                                </button>
                             </div>
                         </div>
                     ))}
@@ -338,7 +337,7 @@ export default function BranchesPage() {
                 <div className="overlay" onClick={() => setShowModal(false)}>
                     <div className="modal" style={{ maxWidth: 600, width: '95vw' }} onClick={e => e.stopPropagation()}>
                         <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: 12, color: 'var(--brand-dominant)' }}>
-                            {editing ? <><Edit3 size={24} /> แก้ไขสาขา</> : <><Plus size={24} /> เพิ่มสาขาใหม่</>}
+                            <><Edit3 size={24} /> แก้ไขข้อมูลที่ตั้งร้านค้า & ค่าจัดส่ง</>
                         </h2>
                         <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                             <div className="form-group">
@@ -411,57 +410,7 @@ export default function BranchesPage() {
                                 <textarea className="form-input" rows={2} placeholder="ที่อยู่แบบยาว" value={form.rawAddress} onChange={e => setForm(p => ({ ...p, rawAddress: e.target.value }))} />
                             </div>
 
-                            {/* Out of Zone Settings */}
-                            <div style={{ background: 'var(--surface-2)', padding: 'var(--space-5)', borderRadius: '16px', border: '1px solid var(--border)', marginTop: 'var(--space-2)' }}>
-                                <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 10, color: 'var(--brand-dominant)' }}>
-                                    <GasStation size={20} /> การคิดค่าบริการนอกโซน
-                                </h3>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 'var(--space-3)' }}>
-                                    <div className="form-group">
-                                        <label className="form-label">รูปแบบการคิดเงิน</label>
-                                        <select className="form-input form-select" value={form.out_of_zone_type} onChange={e => setForm(p => ({ ...p, out_of_zone_type: e.target.value as any }))}>
-                                            <option value="per_km">คิดตามระยะทาง (บาท/กม.)</option>
-                                            <option value="flat_rate">เหมาจ่าย (บาท)</option>
-                                        </select>
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label">{form.out_of_zone_type === 'flat_rate' ? 'จำนวนเงินที่บวกเพิ่ม' : 'เรทราคา (บาท/กม.)'}</label>
-                                        <input type="number" className="form-input" placeholder="เช่น 10" value={form.out_of_zone_fee} onChange={e => setForm(p => ({ ...p, out_of_zone_fee: Number(e.target.value) }))} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label">ระยะให้บริการสูงสุดนอกโซน (กม.)</label>
-                                        <input type="number" min={2} className="form-input" placeholder="เช่น 5" value={form.max_out_of_zone_km} onChange={e => setForm(p => ({ ...p, max_out_of_zone_km: Number(e.target.value) }))} />
-                                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 4 }}>กำหนดระยะทางสูงสุดที่อนุญาตให้ลูกค้าจองได้ (ขั้นต่ำ 2 กม.)</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div style={{ background: 'var(--brand-dominant-ghost)', padding: 'var(--space-5)', borderRadius: '16px', border: '1px solid var(--brand-dominant-light)', marginTop: 'var(--space-2)' }}>
-                                <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 10, color: 'var(--brand-dominant)' }}>
-                                    <Coins size={20} /> ข้อมูลการเงินรายทริป
-                                </h3>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-4)' }}>
-                                    <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 700 }}>ค่าแรงพนักงาน (บาท)</label>
-                                        <input type="number" className="form-input" style={{ background: 'white' }} value={form.labor_cost_per_job} onChange={e => setForm(p => ({ ...p, labor_cost_per_job: Number(e.target.value) }))} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 700 }}>ค่าน้ำมัน (บาท)</label>
-                                        <input type="number" className="form-input" style={{ background: 'white' }} value={form.fuel_cost_per_job} onChange={e => setForm(p => ({ ...p, fuel_cost_per_job: Number(e.target.value) }))} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 700 }}>ค่าเช่ารถ (บาท)</label>
-                                        <input type="number" className="form-input" style={{ background: 'white' }} value={form.vehicle_rental_per_job} onChange={e => setForm(p => ({ ...p, vehicle_rental_per_job: Number(e.target.value) }))} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 700 }}>ต้นทุนสูงสุด (บาท)</label>
-                                        <input type="number" className="form-input" style={{ background: 'white' }} value={form.max_capital_per_job} onChange={e => setForm(p => ({ ...p, max_capital_per_job: Number(e.target.value) }))} />
-                                    </div>
-                                </div>
-                                <p style={{ fontSize: '0.75rem', color: 'var(--brand-dominant)', marginTop: 12, opacity: 0.8, fontWeight: 500 }}>
-                                    * ข้อมูลนี้ใช้สำหรับคำนวณกำไรและค่าตอบแทนพนักงานต่อ 1 รายการงาน
-                                </p>
-                            </div>
+{/* Legacy out_of_zone & per-trip costs removed as requested */}
 
                             {error && <div className="alert alert-error">{error}</div>}
                             <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>

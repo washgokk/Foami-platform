@@ -48,9 +48,10 @@ export default function ShopAdminLayoutClient({ children }: { children: React.Re
 
     useEffect(() => {
         if (!branchSlug) return
-        supabase.from('branches').select('id').eq('slug', branchSlug).maybeSingle().then(res => {
+        supabase.from('branches').select('id, features').eq('slug', branchSlug).maybeSingle().then(res => {
             if (res.data?.id) {
                 setBranchId(res.data.id)
+                if (res.data.features) setBranchFeatures(res.data.features)
                 fetch(`/api/platform/chat?type=shop_unread&branchId=${res.data.id}`)
                     .then(r => r.json())
                     .then(d => {
@@ -67,14 +68,13 @@ export default function ShopAdminLayoutClient({ children }: { children: React.Re
         { href: `/${branchSlug}/admin/schedule`, icon: Calendar, label: 'ตารางงาน' },
         { href: `/${branchSlug}/admin/crm`, icon: Users, label: 'CRM & ลูกค้า' },
         { href: `/${branchSlug}/admin/reports`, icon: ShieldAlert, label: 'รายงาน & ข้อร้องเรียน' },
-        { href: `/${branchSlug}/admin/zones`, icon: MapPin, label: 'โซนบริการ' },
         { href: `/${branchSlug}/admin/staff`, icon: UserCircle2, label: 'พนักงาน' },
         { href: `/${branchSlug}/admin/services`, icon: Wrench, label: 'บริการ & ราคา' },
         { href: `/${branchSlug}/admin/bookings`, icon: ClipboardList, label: 'การจอง' },
         { href: `/${branchSlug}/admin/reviews`, icon: Star, label: 'รีวิวลูกค้า' },
         { href: `/${branchSlug}/admin/discounts`, icon: Ticket, label: 'โค้ดส่วนลด' },
         { href: `/${branchSlug}/admin/finance`, icon: Wallet, label: 'กระเป๋าเงิน' },
-        { href: `/${branchSlug}/admin/settings`, icon: Settings, label: 'ตั้งค่าร้าน' },
+        { href: `/${branchSlug}/admin/settings`, icon: Settings, label: 'ตั้งค่าร้าน & โซน' },
         { href: `/${branchSlug}/admin/chat?tab=hq`, icon: MessageCircle, label: 'แชทกับ Platform HQ', badge: hqUnreadCount },
         ...(branchFeatures?.insurance_renewal ? [{ href: `/${branchSlug}/admin/insurance`, icon: Shield, label: 'ต่อพรบ/ประกัน' }] : []),
     ]
@@ -141,7 +141,7 @@ export default function ShopAdminLayoutClient({ children }: { children: React.Re
         const bookingChannel = supabase
             .channel(`shop_bookings_${branchSlug}`)
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings' }, () => {
-                addToast({ type: 'booking', message: '📋 มีการจองใหม่เข้ามา' })
+                addToast({ type: 'booking', message: 'มีการจองใหม่เข้ามา' })
             })
             .subscribe()
 
@@ -224,7 +224,7 @@ export default function ShopAdminLayoutClient({ children }: { children: React.Re
                         <Menu size={24} />
                     </button>
                     <span className={styles.topbarTitle}>
-                        {NAV_ITEMS.find(i => pathname.startsWith(i.href))?.label || 'Shop Admin'}
+                        {NAV_ITEMS.find(i => pathname.startsWith(i.href))?.label || (pathname.includes('/zones') ? 'ตั้งค่าร้าน & โซน' : 'Shop Admin')}
                     </span>
                     <div className={styles.topbarRight}>
                         <div className={styles.adminBadge}>Shop Admin</div>

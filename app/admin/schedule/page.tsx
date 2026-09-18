@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { TIME_SLOTS } from '@/lib/types'
 import { addDays, format, startOfWeek } from 'date-fns'
 import { th } from 'date-fns/locale'
-import { Calendar, ChevronLeft, ChevronRight, MapPin, Layers, Home, Globe, Rocket } from 'lucide-react'
+import { Calendar, ChevronLeft, ChevronRight, MapPin, Layers, Home, Globe } from 'lucide-react'
 import styles from './schedule.module.css'
 
 export default function AdminSchedulePage() {
@@ -100,41 +100,97 @@ export default function AdminSchedulePage() {
             </div>
 
             <div className={styles.filters}>
-                <div className={styles.filterGroup}>
-                    <span className={styles.filterLabel} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <MapPin size={14} /> สาขา:
-                    </span>
-                    <select className="form-input" style={{ width: 160, padding: '6px 12px', borderRadius: '10px' }} value={selectedBranchId} onChange={e => setSelectedBranchId(e.target.value)}>
-                        {branches.map(b => (
-                            <option key={b.id} value={b.id}>{b.name}</option>
-                        ))}
-                    </select>
-                </div>
-
-                <div className={styles.filterGroup}>
-                    <span className={styles.filterLabel} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <Layers size={14} /> โซน:
-                    </span>
-                    <select className="form-input" style={{ width: 160, padding: '6px 12px', borderRadius: '10px' }} value={selectedZoneId} onChange={e => setSelectedZoneId(e.target.value)}>
-                        <option value="">ทุกโซนในสาขา</option>
-                        {zones.filter(z => z.branch_id === selectedBranchId).map(z => (
-                            <option key={z.id} value={z.id}>{z.name}</option>
-                        ))}
-                    </select>
-                </div>
-
-                <div style={{ flex: 1 }} />
-
-                <div className={styles.weekControl}>
-                    <button className="btn btn-ghost btn-sm" style={{ borderRadius: 8 }} onClick={() => setWeekStart(d => addDays(d, -7))}>
-                        <ChevronLeft size={18} />
-                    </button>
-                    <div className={styles.weekLabel}>
-                        {format(weekStart, 'd MMM', { locale: th })} – {format(addDays(weekStart, 6), 'd MMM yy', { locale: th })}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
+                    {/* Row 1: Branches horizontal tabs/pills */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <span className={styles.filterLabel} style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 60 }}>
+                            <MapPin size={16} /> สาขา:
+                        </span>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                            {branches.map(b => {
+                                const isSelected = b.id === selectedBranchId
+                                return (
+                                    <button
+                                        key={b.id}
+                                        type="button"
+                                        onClick={() => setSelectedBranchId(b.id)}
+                                        style={{
+                                            padding: '7px 16px',
+                                            borderRadius: 20,
+                                            fontSize: '0.85rem',
+                                            fontWeight: isSelected ? 700 : 500,
+                                            border: isSelected ? '1.5px solid var(--brand-dominant)' : '1px solid var(--border)',
+                                            background: isSelected ? 'var(--brand-dominant)' : 'var(--surface-2)',
+                                            color: isSelected ? '#ffffff' : 'var(--text-primary)',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.15s ease',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: 6,
+                                            boxShadow: isSelected ? '0 2px 8px rgba(49, 94, 195, 0.25)' : 'none'
+                                        }}
+                                    >
+                                        <MapPin size={13} />
+                                        {b.name}
+                                    </button>
+                                )
+                            })}
+                        </div>
                     </div>
-                    <button className="btn btn-ghost btn-sm" style={{ borderRadius: 8 }} onClick={() => setWeekStart(d => addDays(d, 7))}>
-                        <ChevronRight size={18} />
-                    </button>
+
+                    {/* Row 2: Zone filter & Week navigation */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, paddingTop: 6, borderTop: '1px solid var(--border-light, rgba(0,0,0,0.06))' }}>
+                        <div className={styles.filterGroup}>
+                            <span className={styles.filterLabel} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <Layers size={14} /> โซน:
+                            </span>
+                            <select className="form-input" style={{ width: 170, padding: '6px 12px', borderRadius: '10px', fontSize: '0.85rem' }} value={selectedZoneId} onChange={e => setSelectedZoneId(e.target.value)}>
+                                <option value="">ทุกโซนในสาขา</option>
+                                {zones.filter(z => z.branch_id === selectedBranchId).map(z => (
+                                    <option key={z.id} value={z.id}>{z.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className={styles.weekControl}>
+                            <button 
+                                type="button"
+                                className="btn btn-ghost btn-sm" 
+                                style={{ borderRadius: 8, padding: '4px 8px' }} 
+                                onClick={() => setWeekStart(d => addDays(d, -7))}
+                                title="สัปดาห์ก่อนหน้า"
+                            >
+                                <ChevronLeft size={18} />
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                style={{ 
+                                    borderRadius: 8, 
+                                    fontSize: '0.8rem', 
+                                    fontWeight: 600, 
+                                    padding: '4px 10px',
+                                    background: 'var(--surface-2)',
+                                    border: '1px solid var(--border)'
+                                }}
+                                onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
+                            >
+                                สัปดาห์นี้
+                            </button>
+                            <div className={styles.weekLabel}>
+                                {format(weekStart, 'd MMM', { locale: th })} – {format(addDays(weekStart, 6), 'd MMM yy', { locale: th })}
+                            </div>
+                            <button 
+                                type="button"
+                                className="btn btn-ghost btn-sm" 
+                                style={{ borderRadius: 8, padding: '4px 8px' }} 
+                                onClick={() => setWeekStart(d => addDays(d, 7))}
+                                title="สัปดาห์ถัดไป"
+                            >
+                                <ChevronRight size={18} />
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -145,9 +201,7 @@ export default function AdminSchedulePage() {
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
                     <Globe size={14} color="var(--brand-subordinate)" /> ข้ามโซน
                 </span>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Rocket size={14} color="var(--brand-accent)" /> นอกโซน
-                </span>
+                
                 <div style={{ flex: 1 }} />
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#10b981' }} /> มีงาน (สีเขียว)
@@ -218,9 +272,6 @@ export default function AdminSchedulePage() {
                                                                 if (!zObj) return null
                                                                 const displayName = zObj.name
                                                                 
-                                                                const hasInZone = cs.zones.some((z: any) => z.work_type === 'in_zone')
-                                                                const isPrimary = zInfo.work_type === 'in_zone' || (zInfo.work_type === 'out_of_zone' && !hasInZone && idx === 0)
-                                                                
                                                                 const Icons = []
                                                                 let color = 'var(--brand-dominant)'
                                                                 let bg = 'var(--brand-dominant-ghost)'
@@ -229,20 +280,10 @@ export default function AdminSchedulePage() {
 
                                                                 if (wType === 'in_zone') {
                                                                     Icons.push(Home)
-                                                                } else if (wType === 'cross_zone') {
+                                                                } else {
                                                                     Icons.push(Globe)
                                                                     color = 'var(--brand-subordinate)'
                                                                     bg = 'var(--brand-subordinate-ghost)'
-                                                                } else if (wType === 'out_of_zone') {
-                                                                    if (isPrimary) {
-                                                                        Icons.push(Home, Rocket)
-                                                                    } else {
-                                                                        Icons.push(Globe, Rocket)
-                                                                        color = 'var(--brand-subordinate)'
-                                                                        bg = 'var(--brand-subordinate-ghost)'
-                                                                    }
-                                                                    color = 'var(--brand-accent)'
-                                                                    bg = 'var(--brand-accent-ghost)'
                                                                 }
 
                                                                 let tagBg = bg

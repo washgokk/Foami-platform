@@ -40,7 +40,8 @@ import {
     Bike,
     FileCheck,
     Phone,
-    AlertCircle
+    AlertCircle,
+    Lock
 } from 'lucide-react'
 import { trackAuditLog } from '@/lib/audit'
 import { evaluateSegmentMatch } from '@/lib/segment-engine'
@@ -328,16 +329,17 @@ export default function CRMPage(props: any) {
     // [Rules Engine] Calculate how many users fit the segment builder condition
     const matchedUsersCount = customerStats.filter(c => evaluateSegmentMatch(c, conditions)).length
 
-    // ─── CSV Export Logic ───────────────────────────────────────
+    // ─── CSV Export Logic (Modern 4-Pillar Financial Ledger) ────
     const exportToCSV = () => {
         if (!filteredTransactions.length) return alert('ไม่มีข้อมูลที่กรองได้เพื่อ Export')
 
         const headers = [
             'Timestamp', 'Booking ID', 'Customer Name', 'Phone', 'Brand', 'Model', 'Plate', 'Color',
-            'Scheduled Date', 'Scheduled Time', 'Branch', 'Zone', 'Service', 'Addons',
-            'Original Base Price', 'Branch Markup', 'CC Adjustment', 'Addon Price',
-            'Travel Surcharge', 'Different Spot Fee', 'Additional Price', 'Discount', 'Total Bill',
-            'Labor Cost', 'Rental Cost', 'Fuel Cost', 'Capital Cost', 'Bonus Payout', 'Extra Staff Payment', 'Stripe Fee 1st (1.76%)', 'Stripe Fee 2nd (1.76%)', 'Net Profit to Branch',
+            'Scheduled Date', 'Scheduled Time', 'Branch', 'Service', 'Addons',
+            'Customer Paid (THB)', 'Discount (THB)', 'Discount Code', 'Additional Price (THB)',
+            'Platform Fee (THB)', 'Platform Fee % (Locked)',
+            'Staff Labor (THB)', 'Staff Name',
+            'Branch Net Profit (THB)',
             'Payment Status', 'Job Status', 'Rating', 'Pickup Address', 'Delivery Address'
         ]
 
@@ -347,14 +349,6 @@ export default function CRMPage(props: any) {
             const vData = b.vehicle_data || b.customers || {}
             const zonesData = b.zones as any
             const branchName = zonesData?.branches?.name || branches.find((br: any) => br.id === b.branch_id)?.name || 'ไม่ระบุ'
-            const zoneName = b.extra_fee > 0 ? 'นอกโซน' : (zonesData?.name || '-')
-
-            // Re-calculate derived values
-            const pkgMarkup = b.package_markup_amount || 0
-            const originalBase = b.original_base_price || b.services?.price_s || 0
-            const ccAdj = b.original_base_price !== undefined
-                ? Math.max(0, (b.base_price || 0) - originalBase - pkgMarkup)
-                : Math.max(0, (b.base_price || 0) - (b.services?.price_s || 0))
 
             let rowAddonTotal = 0
             let addonNames = 'ไม่มี'
@@ -366,71 +360,51 @@ export default function CRMPage(props: any) {
                 }).join('; ')
             }
 
-            const isRebookingCode = b.discount_code && /rebook|refund/i.test(b.discount_code)
-            const theoreticalGross = (b.base_price || 0) + rowAddonTotal + (b.travel_surcharge || 0) + (b.different_spot_fee || 0)
             const discountVal = b.discount_amount || 0
-            
-            let baseNet = 0
-            if (b.total_price != null && b.total_price > 0) {
-                if (discountVal > 0 && Math.abs(b.total_price - theoreticalGross) <= 1) {
-                    baseNet = Math.max(0, b.total_price - discountVal)
-                } else {
-                    baseNet = b.total_price
-                }
-            } else {
-                baseNet = Math.max(0, theoreticalGross - discountVal)
-            }
+            const computedTotal = (b.total_price != null && b.total_price > 0)
+                ? b.total_price
+                : Math.max(0, (b.base_price || 0) + rowAddonTotal - discountVal + (b.additional_price || 0))
 
-            const computedTotal = isRebookingCode
-                ? (theoreticalGross + (b.additional_price || 0))   // Rebooking: gross counts as revenue
-                : (baseNet + (b.additional_price || 0)) // Normal discount: net
-            const labor = b.labor_cost || 0;
-            const rental = b.rental_cost || 0;
-            const fuel = b.fuel_cost || 0;
-            const capital = b.capital_cost || 0;
-            const bonus = b.staff_extra_payout || 0;
-            const extraStaff = b.additional_price || 0;
-            const firstTransfer = computedTotal - extraStaff;
-            const stripeFee1 = firstTransfer * 0.0176;
-            const stripeFee2 = extraStaff * 0.0176;
-            const staffTotal = labor + rental + fuel + capital + bonus + extraStaff;
-            const branchProfit = computedTotal - staffTotal - stripeFee1 - stripeFee2;
+            const lockedFeePct = b.snapshot_platform_fee_pct !== undefined && b.snapshot_platform_fee_pct !== null
+                ? Number(b.snapshot_platform_fee_pct)
+                : (b.platform_fee_pct !== undefined && b.platform_fee_pct !== null ? Number(b.platform_fee_pct) : 0.15)
+            const feePctNorm = lockedFeePct > 1 ? lockedFeePct / 100 : lockedFeePct
+            const platformFeeThb = (b.snapshot_platform_fee_thb !== undefined && Number(b.snapshot_platform_fee_thb) > 0)
+                ? Number(b.snapshot_platform_fee_thb)
+                : Math.round(computedTotal * feePctNorm * 100) / 100
+
+            const staffLabor = b.labor_cost || 0
+            const staffBonus = b.staff_extra_payout || 0
+            const staffTotal = staffLabor + staffBonus
+            const staffName = b.staff?.full_name || (b.staff_id ? 'ช่างประจำสาขา' : 'ยังไม่ระบุ')
+
+            const branchNet = Math.max(0, Math.round((computedTotal - platformFeeThb - staffTotal) * 100) / 100)
 
             const row = [
-                new Date(b.created_at).toLocaleString('th-TH'),
-                b.id,
+                `"${new Date(b.created_at).toLocaleString('th-TH')}"`,
+                `"${b.id}"`,
                 `"${(b.customers?.full_name || '').replace(/"/g, '""')}"`,
-                b.customers?.phone || '',
+                `"${b.customers?.phone || ''}"`,
                 `"${(vData.vehicle_brand || '').replace(/"/g, '""')}"`,
                 `"${(vData.vehicle_model || '').replace(/"/g, '""')}"`,
                 `"${(vData.license_plate || '').replace(/"/g, '""')}"`,
                 `"${(vData.vehicle_color || '').replace(/"/g, '""')}"`,
-                b.scheduled_date || '',
-                b.scheduled_time || '',
+                `"${b.scheduled_date || ''}"`,
+                `"${b.scheduled_time || ''}"`,
                 `"${branchName.replace(/"/g, '""')}"`,
-                `"${zoneName.replace(/"/g, '""')}"`,
                 `"${(b.services?.name || '').replace(/"/g, '""')}"`,
                 `"${addonNames.replace(/"/g, '""')}"`,
-                originalBase,
-                pkgMarkup,
-                ccAdj,
-                rowAddonTotal,
-                b.travel_surcharge || 0,
-                b.different_spot_fee || 0,
-                b.additional_price || 0,
-                b.discount_amount || 0,
                 computedTotal,
-                labor,
-                rental,
-                fuel,
-                capital,
-                bonus,
-                extraStaff,
-                stripeFee1.toFixed(2),
-                stripeFee2.toFixed(2),
-                branchProfit.toFixed(2),
-                b.payment_status || '',
-                b.status || '',
+                discountVal,
+                `"${b.discount_code || ''}"`,
+                b.additional_price || 0,
+                platformFeeThb,
+                `"${(feePctNorm * 100).toFixed(0)}%"`,
+                staffTotal,
+                `"${staffName}"`,
+                branchNet,
+                `"${b.payment_status || ''}"`,
+                `"${b.status || ''}"`,
                 b.rating || '',
                 `"${(b.pickup_address || '').replace(/"/g, '""')}"`,
                 `"${(b.delivery_address || '').replace(/"/g, '""')}"`
@@ -769,9 +743,8 @@ export default function CRMPage(props: any) {
                                     <tr>
                                         <th colSpan={3} className={styles.bgGroupCustomer} style={{ textAlign: 'center', borderBottom: 'none' }}>ข้อมูลลูกค้า</th>
                                         <th colSpan={3} className={styles.bgGroupVehicle} style={{ textAlign: 'center', borderBottom: 'none' }}>ข้อมูลรถ</th>
-                                        <th colSpan={4} className={styles.bgGroupDetail} style={{ textAlign: 'center', borderBottom: 'none' }}>รายละเอียดงาน</th>
-                                        <th colSpan={10} className={styles.bgGroupPricing} style={{ textAlign: 'center', borderBottom: 'none' }}>การเงิน & ส่วนลด</th>
-                                        <th colSpan={9} className={styles.bgGroupCosts} style={{ textAlign: 'center', borderBottom: 'none' }}>คำนวนต้นทุนจ่ายพนักงาน</th>
+                                        <th colSpan={3} className={styles.bgGroupDetail} style={{ textAlign: 'center', borderBottom: 'none' }}>รายละเอียดงาน</th>
+                                        <th colSpan={4} className={styles.bgGroupPricing} style={{ textAlign: 'center', borderBottom: 'none', background: '#EFF6FF', color: '#1D4ED8' }}>การเงิน & การแบ่งรายได้ (ล็อกเรทตามสัญญา)</th>
                                         <th colSpan={3} className={styles.bgGroupStatus} style={{ textAlign: 'center', borderBottom: 'none' }}>สถานะ & รีวิว</th>
                                         <th colSpan={2} style={{ textAlign: 'center', borderBottom: 'none' }}>รับ/ส่ง</th>
                                     </tr>
@@ -787,33 +760,15 @@ export default function CRMPage(props: any) {
                                         <th className={styles.bgGroupVehicle}>สีรถ</th>
 
                                         {/* Details */}
-                                        <th className={styles.bgGroupDetail}>วันที่นัด</th>
-                                        <th className={styles.bgGroupDetail}>เวลา</th>
-                                        <th className={styles.bgGroupDetail}>สาขา / โซน</th>
-                                        <th className={styles.bgGroupDetail}>แพ็กเกจ / เสริม</th>
+                                        <th className={styles.bgGroupDetail}>วันที่นัด & เวลา</th>
+                                        <th className={styles.bgGroupDetail}>สาขา</th>
+                                        <th className={styles.bgGroupDetail}>บริการ & Addon</th>
 
-                                        {/* Pricing */}
-                                        <th className={styles.bgGroupPricing}>แพ็กเกจ (เดิม)</th>
-                                        <th className={styles.bgGroupPricing}>ส่วนต่างสาขา</th>
-                                        <th className={styles.bgGroupPricing}>ส่วนต่าง CC</th>
-                                        <th className={styles.bgGroupPricing}>เสริม</th>
-                                        <th className={styles.bgGroupPricing}>ค่านอกโซน</th>
-                                        <th className={styles.bgGroupPricing}>ต่างจุด</th>
-                                        <th className={styles.bgGroupPricing}>เพิ่มเติม</th>
-                                        <th className={styles.bgGroupPricing}>ส่วนลด</th>
-                                        <th className={styles.bgGroupPricing}>โค้ด</th>
-                                        <th className={styles.bgGroupPricing}>ยอดรวม</th>
-
-                                        {/* Staff Costs */}
-                                        <th className={styles.bgGroupCosts}>ค่าแรง</th>
-                                        <th className={styles.bgGroupCosts}>ค่ารถ</th>
-                                        <th className={styles.bgGroupCosts}>น้ำมัน</th>
-                                        <th className={styles.bgGroupCosts}>ต้นทุน</th>
-                                        <th className={styles.bgGroupCosts}>โบนัส</th>
-                                        <th className={styles.bgGroupCosts}>เพิ่มเติม(สตาฟ)</th>
-                                        <th className={styles.bgGroupCosts}>หัก Stripe แรก (1.76%)</th>
-                                        <th className={styles.bgGroupCosts}>หัก Stripe เพิ่ม (1.76%)</th>
-                                        <th className={styles.bgGroupCosts}>เข้าสาขา</th>
+                                        {/* Pricing & Split */}
+                                        <th className={styles.bgGroupPricing} style={{ textAlign: 'right' }}>ยอดชำระลูกค้า</th>
+                                        <th className={styles.bgGroupPricing} style={{ textAlign: 'right', background: '#EFF6FF', color: '#1D4ED8' }}>จ่ายแพลตฟอร์ม</th>
+                                        <th className={styles.bgGroupCosts} style={{ textAlign: 'right' }}>จ่ายพนักงาน</th>
+                                        <th className={styles.bgGroupCosts} style={{ textAlign: 'right', background: '#ECFDF5', color: '#065F46' }}>รายได้สุทธิสาขา</th>
 
                                         {/* Status */}
                                         <th className={styles.bgGroupStatus}>ชำระเงิน</th>
@@ -874,104 +829,95 @@ export default function CRMPage(props: any) {
                                                 <td style={{ fontWeight: 600 }}>{vData.vehicle_brand || '-'} {vData.vehicle_model || ''}</td>
                                                 <td style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{vData.license_plate || '-'}</td>
                                                 <td style={{ fontSize: '0.85rem' }}>{vData.vehicle_color || '-'}</td>
-                                                {/* Details */}
-                                                <td>{b.scheduled_date ? new Date(b.scheduled_date).toLocaleDateString('th-TH') : '-'}</td>
-                                                <td>{b.scheduled_time?.substring(0, 5) || '-'}</td>
+                                                {/* Details (Clean - No Zone Fragmentation) */}
                                                 <td>
-                                                    <div style={{ fontWeight: 600, color: 'var(--primary)' }}>{branchName}</div>
-                                                    <div style={{ fontSize: '0.75rem', color: b.extra_fee > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>{zoneName}</div>
+                                                    <div style={{ fontWeight: 600 }}>{b.scheduled_date ? new Date(b.scheduled_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) : '-'}</div>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{b.scheduled_time?.substring(0, 5) || '-'} น.</div>
+                                                </td>
+                                                <td>
+                                                    <div style={{ fontWeight: 700, color: 'var(--primary)' }}>{branchName}</div>
                                                 </td>
                                                 <td>
                                                     <div style={{ color: 'var(--primary)', fontWeight: 600 }}>{b.services?.name || '-'}</div>
-                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={addonListStr}>
-                                                        + {addonListStr}
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={addonListStr}>
+                                                        {addonListStr !== 'ไม่มี' ? `+ ${addonListStr}` : 'ไม่มีเสริม'}
                                                     </div>
-                                                </td>
-                                                {/* Pricing */}
-                                                <td className={styles.bgGroupPricing}>฿{originalBase.toLocaleString()}</td>
-                                                <td className={styles.bgGroupPricing} style={{ color: pkgMarkup > 0 ? 'var(--brand-dominant)' : 'inherit', fontWeight: pkgMarkup > 0 ? 700 : 400 }}>฿{pkgMarkup.toLocaleString()}</td>
-                                                <td className={styles.bgGroupPricing} style={{ color: ccAdj > 0 ? 'var(--danger)' : 'inherit' }}>฿{ccAdj.toLocaleString()}</td>
-                                                <td className={styles.bgGroupPricing} style={{ color: rowAddonTotal > 0 ? 'var(--brand-secondary)' : 'inherit' }}>฿{rowAddonTotal.toLocaleString()}</td>
-                                                <td className={styles.bgGroupPricing} style={{ color: (b.travel_surcharge || 0) > 0 ? 'var(--primary)' : 'inherit' }}>฿{(b.travel_surcharge || 0).toLocaleString()}</td>
-                                                <td className={styles.bgGroupPricing} style={{ color: (b.different_spot_fee || 0) > 0 ? 'var(--primary)' : 'inherit' }}>฿{(b.different_spot_fee || 0).toLocaleString()}</td>
-                                                <td className={styles.bgGroupPricing} style={{ color: 'var(--warning)' }}>
-                                                    <div>
-                                                        {b.slip_url ? (
-                                                            <a href={b.slip_url} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline', color: 'var(--warning)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }} title="กดเพื่อดูสลิป">
-                                                                ฿{b.additional_price?.toLocaleString() || 0} <FileText size={12} />
-                                                            </a>
-                                                        ) : (
-                                                            <span style={{ fontWeight: 700 }}>฿{b.additional_price?.toLocaleString() || 0}</span>
-                                                        )}
-                                                    </div>
-                                                    {b.additional_price_note && (
-                                                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2, fontStyle: 'italic', maxWidth: 80 }}>
-                                                            {b.additional_price_note}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className={styles.bgGroupPricing} style={{ color: 'var(--danger)' }}>
-                                                    {b.discount_amount ? `-฿${b.discount_amount.toLocaleString()}` : '฿0'}
-                                                </td>
-                                                <td className={styles.bgGroupPricing} style={{ fontSize: '0.75rem' }}>
-                                                    {b.discount_code ? (
-                                                        <span style={{ fontFamily: 'monospace', fontWeight: 700, background: 'rgba(124,58,237,0.1)', color: '#7C3AED', padding: '2px 6px', borderRadius: 4 }}>
-                                                            {b.discount_code}
-                                                        </span>
-                                                    ) : '-'}
                                                 </td>
 
+                                                {/* Pricing & Revenue Share (4 Essential Pillars) */}
                                                 {(() => {
-                                                    // Determine Net Total robustly (handle if total_price in DB is Gross or Net)
-                                                    const isRebookingTx = b.discount_code && /rebook|refund/i.test(b.discount_code)
-                                                    const theoreticalGross = (b.base_price || 0) + rowAddonTotal + (b.travel_surcharge || 0) + (b.different_spot_fee || 0)
                                                     const discountTx = b.discount_amount || 0
+                                                    const addPrice = b.additional_price || 0
+                                                    const computedTotal = (b.total_price != null && b.total_price > 0)
+                                                        ? b.total_price
+                                                        : Math.max(0, (b.base_price || 0) + rowAddonTotal - discountTx + addPrice)
 
-                                                    let baseNet = 0
-                                                    if (b.total_price != null && b.total_price > 0) {
-                                                        if (discountTx > 0 && Math.abs(b.total_price - theoreticalGross) <= 1) {
-                                                            baseNet = Math.max(0, b.total_price - discountTx)
-                                                        } else {
-                                                            baseNet = b.total_price
-                                                        }
-                                                    } else {
-                                                        baseNet = Math.max(0, theoreticalGross - discountTx)
-                                                    }
+                                                    // Platform Fee: Locked snapshot rate from booking
+                                                    const lockedFeePct = b.snapshot_platform_fee_pct !== undefined && b.snapshot_platform_fee_pct !== null
+                                                        ? Number(b.snapshot_platform_fee_pct)
+                                                        : (b.platform_fee_pct !== undefined && b.platform_fee_pct !== null ? Number(b.platform_fee_pct) : 0.15)
+                                                    const feePctNorm = lockedFeePct > 1 ? lockedFeePct / 100 : lockedFeePct
 
-                                                    const computedTotal = isRebookingTx
-                                                        ? (theoreticalGross + (b.additional_price || 0))
-                                                        : (baseNet + (b.additional_price || 0))
+                                                    const platformFeeThb = (b.snapshot_platform_fee_thb !== undefined && Number(b.snapshot_platform_fee_thb) > 0)
+                                                        ? Number(b.snapshot_platform_fee_thb)
+                                                        : Math.round(computedTotal * feePctNorm * 100) / 100
 
-                                                    // Costs (using snapshots or 0)
-                                                    const labor = b.labor_cost || 0;
-                                                    const rental = b.rental_cost || 0;
-                                                    const fuel = b.fuel_cost || 0;
-                                                    const capital = b.capital_cost || 0;
-                                                    const bonus = b.staff_extra_payout || 0;
-                                                    const extraStaff = b.additional_price || 0;
-                                                    const firstTransfer = computedTotal - extraStaff;
-                                                    const stripeFee1 = firstTransfer * 0.0176;
-                                                    const stripeFee2 = extraStaff * 0.0176;
-                                                    const staffTotal = labor + rental + fuel + capital + bonus + extraStaff;
-                                                    const branchProfit = computedTotal - staffTotal - stripeFee1 - stripeFee2;
+                                                    // Staff Payout: labor_cost snapshot + bonus
+                                                    const staffLabor = b.labor_cost !== undefined && b.labor_cost !== null ? Number(b.labor_cost) : 0
+                                                    const staffBonus = b.staff_extra_payout !== undefined && b.staff_extra_payout !== null ? Number(b.staff_extra_payout) : 0
+                                                    const staffTotal = staffLabor + staffBonus
+                                                    const staffName = b.staff?.full_name || (b.staff_id ? 'ช่างประจำสาขา' : 'ยังไม่ระบุ')
+
+                                                    // Branch Net Profit: What the shop actually earns
+                                                    const branchNet = Math.max(0, Math.round((computedTotal - platformFeeThb - staffTotal) * 100) / 100)
 
                                                     return (
                                                         <>
-                                                            <td className={styles.bgGroupPricing} style={{ fontWeight: 800, color: 'var(--primary)', borderLeft: '2px solid var(--border)' }}>
-                                                                ฿{computedTotal.toLocaleString()}
+                                                            {/* 1. ยอดชำระลูกค้า */}
+                                                            <td className={styles.bgGroupPricing} style={{ textAlign: 'right', fontWeight: 800, color: 'var(--text-primary)' }}>
+                                                                <div>฿{computedTotal.toLocaleString()}</div>
+                                                                {discountTx > 0 && (
+                                                                    <div style={{ fontSize: '0.68rem', color: 'var(--danger)', fontWeight: 600 }}>
+                                                                        ลด ฿{discountTx.toLocaleString()} {b.discount_code ? `(${b.discount_code})` : ''}
+                                                                    </div>
+                                                                )}
+                                                                {addPrice > 0 && (
+                                                                    <div style={{ fontSize: '0.68rem', color: '#D97706', fontWeight: 600 }}>
+                                                                        {b.slip_url ? (
+                                                                            <a href={b.slip_url} target="_blank" rel="noreferrer" style={{ color: '#D97706', textDecoration: 'underline' }}>
+                                                                                + เพิ่ม ฿{addPrice.toLocaleString()}
+                                                                            </a>
+                                                                        ) : (
+                                                                            `+ เพิ่ม ฿${addPrice.toLocaleString()}`
+                                                                        )}
+                                                                    </div>
+                                                                )}
                                                             </td>
 
-                                                            {/* Costs Breakdown */}
-                                                            <td className={styles.bgGroupCosts}>฿{labor.toLocaleString()}</td>
-                                                            <td className={styles.bgGroupCosts}>฿{rental.toLocaleString()}</td>
-                                                            <td className={styles.bgGroupCosts}>฿{fuel.toLocaleString()}</td>
-                                                            <td className={styles.bgGroupCosts}>฿{capital.toLocaleString()}</td>
-                                                            <td className={styles.bgGroupCosts} style={{ fontWeight: 600 }}>฿{bonus.toLocaleString()}</td>
-                                                            <td className={styles.bgGroupCosts}>฿{extraStaff.toLocaleString()}</td>
-                                                            <td className={styles.bgGroupCosts} style={{ color: 'var(--danger)' }}>-฿{stripeFee1.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                            <td className={styles.bgGroupCosts} style={{ color: 'var(--danger)' }}>-฿{stripeFee2.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                                                            <td className={styles.bgGroupCosts} style={{ fontWeight: 800, color: branchProfit >= 0 ? 'var(--success)' : 'var(--danger)', borderLeft: '2px solid var(--border)' }}>
-                                                                ฿{branchProfit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                                            {/* 2. จ่ายให้แพลตฟอร์ม (ล็อกเรทตามสัญญา) */}
+                                                            <td className={styles.bgGroupPricing} style={{ textAlign: 'right', background: '#F8FAFC' }}>
+                                                                <div style={{ fontWeight: 700, color: platformFeeThb > 0 ? 'var(--brand-dominant)' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                                                                    ฿{platformFeeThb.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                    <Lock size={11} color="var(--brand-dominant)" />
+                                                                </div>
+                                                                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                                                                    {(feePctNorm * 100).toFixed(0)}% GP (ล็อกเรท)
+                                                                </div>
+                                                            </td>
+
+                                                            {/* 3. จ่ายค่าแรงพนักงาน */}
+                                                            <td className={styles.bgGroupCosts} style={{ textAlign: 'right' }}>
+                                                                <div style={{ fontWeight: 700, color: staffTotal > 0 ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                                                                    ฿{staffTotal.toLocaleString()}
+                                                                </div>
+                                                                <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginLeft: 'auto' }} title={staffName}>
+                                                                    {staffName}
+                                                                </div>
+                                                            </td>
+
+                                                            {/* 4. รายได้สุทธิสาขา */}
+                                                            <td className={styles.bgGroupCosts} style={{ textAlign: 'right', fontWeight: 900, fontSize: '0.95rem', background: '#F0FDF4', color: branchNet >= 0 ? '#059669' : 'var(--danger)' }}>
+                                                                ฿{branchNet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                             </td>
                                                         </>
                                                     )

@@ -343,7 +343,7 @@ export default function StaffPage() {
                         </thead>
                         <tbody>
                             {staff.length === 0 ? (
-                                <tr><td colSpan={7}><div className="empty-state"><span className="empty-state-icon">👤</span><p className="empty-state-title">ยังไม่มีพนักงาน</p></div></td></tr>
+                                <tr><td colSpan={7}><div className="empty-state"><span className="empty-state-icon"></span><p className="empty-state-title">ยังไม่มีพนักงาน</p></div></td></tr>
                             ) : staff.map(s => (
                                 <tr key={s.id} style={{ background: 'var(--surface)', cursor: 'default' }}>
                                     <td style={{ borderRadius: 'var(--radius) 0 0 var(--radius)', border: '2.5px solid var(--border)', borderRight: 'none' }}>
@@ -374,7 +374,7 @@ export default function StaffPage() {
                                             </div>
                                             <div>
                                                 <strong>{s.full_name}</strong>
-                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{(s as any).email || '⚠️ ยังไม่ระบุอีเมล'}</div>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{(s as any).email || 'ยังไม่ระบุอีเมล'}</div>
                                             </div>
                                         </div>
                                     </td>
@@ -404,7 +404,7 @@ export default function StaffPage() {
                                                     </button>
                                                 </>
                                             ) : (
-                                                <span style={{ fontSize: '0.7rem', color: 'var(--danger)', fontWeight: 700 }}>⚠️ ต้องตั้งรหัสใหม่</span>
+                                                <span style={{ fontSize: '0.7rem', color: 'var(--danger)', fontWeight: 700 }}>ต้องตั้งรหัสใหม่</span>
                                             )}
                                         </div>
                                     </td>
@@ -739,7 +739,7 @@ export default function StaffPage() {
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 24 }}>
                             <div>
-                                <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: 16 }}>📦 งานที่รวมในฐานกองนี้ ({historyDetailBookings.length} รายการ)</h3>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: 16 }}>งานที่รวมในฐานกองนี้ ({historyDetailBookings.length} รายการ)</h3>
                                 <div className="table-wrapper" style={{ maxHeight: 400, overflowY: 'auto' }}>
                                     <table style={{ fontSize: '0.85rem' }}>
                                         <thead>
@@ -884,7 +884,7 @@ export default function StaffPage() {
                             <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end', marginTop: 16 }}>
                                 <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>ยกเลิก</button>
                                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                                    {saving ? <span className="spinner" /> : '💾 บันทึกข้อมูล'}
+                                    {saving ? <span className="spinner" /> : 'บันทึกข้อมูล'}
                                 </button>
                             </div>
                         </form>
