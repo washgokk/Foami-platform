@@ -42,7 +42,9 @@ import {
     Tag,
     X,
     Check,
-    FileText
+    FileText,
+    Copy,
+    UploadCloud
 } from 'lucide-react'
 import styles from './book.module.css'
 import { loadStripe } from '@stripe/stripe-js'
@@ -131,8 +133,10 @@ export default function BookPage() {
     const [isRefundCode, setIsRefundCode] = useState(false)
 
     // Step 5 — Payment
-    const [payMethod, setPayMethod] = useState<'transfer' | 'stripe'>('stripe')
+    const [payMethod, setPayMethod] = useState<'transfer' | 'stripe'>('transfer')
     const [slip, setSlip] = useState<File | null>(null)
+    const [slipPreviewUrl, setSlipPreviewUrl] = useState<string | null>(null)
+    const [copiedBank, setCopiedBank] = useState(false)
     const [vehicleFiles, setVehicleFiles] = useState<File[]>([])
     const [ccPriceGroups, setCcPriceGroups] = useState<CCPriceGroup[]>([])
     const [submitting, setSubmitting] = useState(false)
@@ -1003,7 +1007,7 @@ export default function BookPage() {
         !!selectedVehicle && !!pickupAddress && !!pickupAddressDetail.trim() && !isTooFar,
         !!(selectedDate && selectedSlot),
         true,
-        !!payMethod,
+        total <= 0 ? true : (payMethod === 'transfer' ? !!slip : !!payMethod),
     ]
 
     const isDeliveryValid = !showDelivery || (!!deliveryAddress && !!deliveryAddressDetail.trim())
@@ -1870,31 +1874,235 @@ export default function BookPage() {
                                     <Tag size={13} /> โค้ด: {discountCode.toUpperCase()}
                                 </div>
                             </div>
-                        ) : paymentError ? (
-                            <div className="alert alert-danger" style={{ marginBottom: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', textAlign: 'center' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <AlertTriangle size={20} />
-                                    <div style={{ fontWeight: 600 }}>{paymentError}</div>
-                                </div>
-                                <button className="btn btn-primary btn-sm" onClick={() => fetchPaymentIntent()}>
-                                    ลองใหม่
-                                </button>
-                            </div>
-                        ) : !clientSecret ? (
-                            <div style={{ textAlign: 'center', padding: 'var(--space-8)' }}>
-                                <div className="spinner" style={{ margin: '0 auto 12px', border: '3px solid var(--primary-ghost)', borderTop: '3px solid var(--primary)' }} />
-                                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>กำลังเตรียมรายการชำระเงิน...</div>
-                            </div>
                         ) : (
-                            <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-5)', border: '1px solid var(--border)' }}>
-                                <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe' } }}>
-                                    <CheckoutForm
-                                        amount={total}
-                                        customerEmail={customer?.email}
-                                        onSuccess={handleStripeSuccess}
-                                        onCancel={() => setClientSecret('')}
-                                    />
-                                </Elements>
+                            <div>
+                                {/* Payment Method Selector Tabs */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 'var(--space-5)' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPayMethod('transfer')}
+                                        style={{
+                                            padding: '14px 12px',
+                                            borderRadius: 'var(--radius-lg)',
+                                            border: payMethod === 'transfer' ? '2.5px solid var(--primary)' : '1.5px solid var(--border)',
+                                            background: payMethod === 'transfer' ? 'rgba(79, 70, 229, 0.08)' : 'var(--surface)',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            gap: 6,
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                            textAlign: 'center',
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.92rem', color: payMethod === 'transfer' ? 'var(--primary)' : 'var(--text-primary)' }}>
+                                            <Wallet size={18} /> โอนเงิน / พร้อมเพย์
+                                        </div>
+                                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>แนบสลิป ตรวจสอบเร็ว</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => { setPayMethod('stripe'); fetchPaymentIntent() }}
+                                        style={{
+                                            padding: '14px 12px',
+                                            borderRadius: 'var(--radius-lg)',
+                                            border: payMethod === 'stripe' ? '2.5px solid var(--primary)' : '1.5px solid var(--border)',
+                                            background: payMethod === 'stripe' ? 'rgba(79, 70, 229, 0.08)' : 'var(--surface)',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            gap: 6,
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                            textAlign: 'center',
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.92rem', color: payMethod === 'stripe' ? 'var(--primary)' : 'var(--text-primary)' }}>
+                                            <CreditCard size={18} /> บัตรเครดิต / ออนไลน์
+                                        </div>
+                                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Stripe / Omise รองรับ</span>
+                                    </button>
+                                </div>
+
+                                {/* TRANSFER & SLIP UPLOAD VIEW */}
+                                {payMethod === 'transfer' && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                                        {/* Bank Details Card */}
+                                        <div style={{
+                                            background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
+                                            borderRadius: 'var(--radius-xl)',
+                                            padding: 'var(--space-5)',
+                                            color: '#fff',
+                                            boxShadow: '0 10px 25px rgba(15, 23, 42, 0.2)',
+                                            position: 'relative',
+                                            overflow: 'hidden',
+                                        }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                                                <div>
+                                                    <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.7 }}>บัญชีสำหรับโอนชำระ</div>
+                                                    <div style={{ fontSize: '1.1rem', fontWeight: 800, marginTop: 4 }}>ธนาคารกสิกรไทย (KBANK)</div>
+                                                    <div style={{ fontSize: '0.85rem', opacity: 0.85, marginTop: 2 }}>บริษัท โฟมมี่ เดลิเวอรี่ จำกัด</div>
+                                                </div>
+                                                <div style={{
+                                                    background: 'rgba(255, 255, 255, 0.15)',
+                                                    padding: '6px 10px',
+                                                    borderRadius: 8,
+                                                    fontSize: '0.78rem',
+                                                    fontWeight: 700,
+                                                    backdropFilter: 'blur(4px)'
+                                                }}>
+                                                    พร้อมเพย์ / QR
+                                                </div>
+                                            </div>
+
+                                            <div style={{
+                                                background: 'rgba(255, 255, 255, 0.1)',
+                                                borderRadius: 'var(--radius)',
+                                                padding: '12px 16px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                backdropFilter: 'blur(4px)'
+                                            }}>
+                                                <div>
+                                                    <div style={{ fontSize: '0.72rem', opacity: 0.7 }}>เลขที่บัญชี</div>
+                                                    <div style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '1px', fontFamily: 'monospace' }}>
+                                                        123-4-56789-0
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText('1234567890')
+                                                        setCopiedBank(true)
+                                                        setTimeout(() => setCopiedBank(false), 2500)
+                                                    }}
+                                                    style={{
+                                                        background: copiedBank ? 'var(--success)' : '#fff',
+                                                        color: copiedBank ? '#fff' : '#0F172A',
+                                                        border: 'none',
+                                                        padding: '8px 14px',
+                                                        borderRadius: 8,
+                                                        fontSize: '0.82rem',
+                                                        fontWeight: 700,
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 6,
+                                                        transition: 'all 0.2s',
+                                                    }}
+                                                >
+                                                    {copiedBank ? <><Check size={15} /> คัดลอกแล้ว</> : <><Copy size={15} /> คัดลอกเลข</>}
+                                                </button>
+                                            </div>
+
+                                            <div style={{ marginTop: 14, fontSize: '0.78rem', opacity: 0.85, textAlign: 'center', background: 'rgba(255,255,255,0.06)', padding: '8px 12px', borderRadius: 8 }}>
+                                                โอนยอด <strong>฿{total.toLocaleString()}</strong> เข้าบัญชีข้างต้น แล้วแนบสลิปด้านล่าง
+                                            </div>
+                                        </div>
+
+                                        {/* Slip Upload Box */}
+                                        <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-5)', border: '1.5px dashed var(--border)' }}>
+                                            <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <UploadCloud size={18} color="var(--primary)" /> แนบหลักฐานการโอนเงิน (สลิป) <span style={{ color: 'var(--danger)' }}>*</span>
+                                            </div>
+                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 14 }}>
+                                                รองรับไฟล์ภาพสลิป JPG, PNG (ระบบจะส่งให้แอดมินยืนยันยอดทันที)
+                                            </p>
+
+                                            {slipPreviewUrl ? (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 12, background: 'var(--surface-2)', borderRadius: 'var(--radius)' }}>
+                                                    <img
+                                                        src={slipPreviewUrl}
+                                                        alt="Slip preview"
+                                                        style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }}
+                                                    />
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <div style={{ fontSize: '0.88rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                            {slip?.name || 'สลิปโอนเงิน'}
+                                                        </div>
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                                                            <CheckCircle size={14} /> พร้อมแนบกับการจอง
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setSlip(null); setSlipPreviewUrl(null) }}
+                                                        style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: 8 }}
+                                                        title="ลบสลิป"
+                                                    >
+                                                        <X size={18} />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <label style={{
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    padding: '24px 16px',
+                                                    borderRadius: 'var(--radius)',
+                                                    background: 'var(--surface-2)',
+                                                    cursor: 'pointer',
+                                                    border: '1.5px dashed var(--border)',
+                                                    transition: 'all 0.2s',
+                                                }}>
+                                                    <UploadCloud size={32} color="var(--primary)" style={{ marginBottom: 8, opacity: 0.8 }} />
+                                                    <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--primary)' }}>
+                                                        กดเพื่อเลือกรูปสลิป หรือแตะเพื่ออัปโหลด
+                                                    </div>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                                                        ไฟล์รูปภาพขนาดไม่เกิน 10MB
+                                                    </div>
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        style={{ display: 'none' }}
+                                                        onChange={(e) => {
+                                                            const f = e.target.files?.[0]
+                                                            if (f) {
+                                                                setSlip(f)
+                                                                setSlipPreviewUrl(URL.createObjectURL(f))
+                                                            }
+                                                        }}
+                                                    />
+                                                </label>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* STRIPE VIEW */}
+                                {payMethod === 'stripe' && (
+                                    paymentError ? (
+                                        <div className="alert alert-danger" style={{ marginBottom: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', textAlign: 'center' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <AlertTriangle size={20} />
+                                                <div style={{ fontWeight: 600 }}>{paymentError}</div>
+                                            </div>
+                                            <button className="btn btn-primary btn-sm" onClick={() => fetchPaymentIntent()}>
+                                                ลองใหม่
+                                            </button>
+                                        </div>
+                                    ) : !clientSecret ? (
+                                        <div style={{ textAlign: 'center', padding: 'var(--space-8)' }}>
+                                            <div className="spinner" style={{ margin: '0 auto 12px', border: '3px solid var(--primary-ghost)', borderTop: '3px solid var(--primary)' }} />
+                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>กำลังเตรียมรายการชำระเงิน...</div>
+                                        </div>
+                                    ) : (
+                                        <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-xl)', padding: 'var(--space-5)', border: '1px solid var(--border)' }}>
+                                            <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe' } }}>
+                                                <CheckoutForm
+                                                    amount={total}
+                                                    customerEmail={customer?.email}
+                                                    onSuccess={handleStripeSuccess}
+                                                    onCancel={() => setClientSecret('')}
+                                                />
+                                            </Elements>
+                                        </div>
+                                    )
+                                )}
                             </div>
                         )}
                     </div>
@@ -1934,7 +2142,7 @@ export default function BookPage() {
                             </button>
                         ) : (
                             // Hide main footer button when Stripe form is active (CheckoutForm has its own button)
-                            clientSecret && step === 4 ? null : (
+                            (payMethod === 'stripe' && clientSecret && step === 4) ? null : (
                                 <button
                                     className="btn btn-primary"
                                     style={{ flex: 2, gap: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)' }}
@@ -1943,7 +2151,8 @@ export default function BookPage() {
                                 >
                                     {submitting ? <span className="spinner" /> :
                                         payMethod === 'stripe' ? <><CreditCard size={18} /> ชำระเงิน</> :
-                                            <><CheckCircle size={18} /> ยืนยันการจอง</>}
+                                            (step === 4 && payMethod === 'transfer' && !slip) ? 'กรุณาแนบสลิปโอนเงิน' :
+                                                <><CheckCircle size={18} /> แนบสลิปและยืนยันการจอง</>}
                                 </button>
                             )
                         )

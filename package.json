@@ -20,6 +20,7 @@
     "@types/web-push": "^3.6.4",
     "browser-image-compression": "^2.0.2",
     "date-fns": "^4.1.0",
+    "firebase": "^12.19.0",
     "googleapis": "^171.4.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.577.0",

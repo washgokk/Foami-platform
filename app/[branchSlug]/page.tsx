@@ -21,13 +21,13 @@ export default function LiffEntry() {
         if (stored) {
             try {
                 const customer = JSON.parse(stored);
-                if (customer.line_user_id) {
-                    // v39: Real-time Visit Tracking (Persistent Intent)
+                if (customer.id) {
+                    // Real-time Visit Tracking (Persistent Intent)
                     // We update the DB immediately to remember this branch across all devices.
                     supabase
                         .from('customers')
                         .update({ last_branch_slug: branchSlug })
-                        .eq('line_user_id', customer.line_user_id)
+                        .eq('id', customer.id)
                         .then(({ error }) => {
                             if (!error) {
                                 // Sync local memory

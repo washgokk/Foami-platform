@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { trackAuditLog } from '@/lib/audit'
 import { BOOKING_STATUS_LABEL, BOOKING_STATUS_CSS, BookingStatus, TIME_SLOTS, VEHICLE_SIZE_LABEL } from '@/lib/types'
 import { generateScalableId } from '@/lib/id-utils'
-import { Search, ClipboardList, MessageCircle, Star, Image as ImageIcon, User, MapPin, Calendar, Clock, Phone, Briefcase, ChevronRight, X, LayoutGrid, List, Plus, Bike, CreditCard, FileText, Tag, Hash, Edit2 } from 'lucide-react'
+import { Search, ClipboardList, MessageCircle, Star, Image as ImageIcon, User, MapPin, Calendar, Clock, Phone, Briefcase, ChevronRight, X, LayoutGrid, List, Plus, Bike, CreditCard, FileText, Tag, Hash, Edit2, CheckCircle, Paperclip } from 'lucide-react'
 import ImageZoom from '@/components/Global/ImageZoom'
 import BookingChat from '@/components/Chat/BookingChat'
 
@@ -88,6 +88,28 @@ export default function AdminBookingsPage(props: any) {
     const filtered = bookings.filter(b =>
         !search || b.customers?.full_name?.includes(search) || b.customers?.phone?.includes(search) || b.id.includes(search)
     )
+
+    const handleApprovePayment = async (bookingId: string) => {
+        const ok = window.confirm('ยืนยันการรับชำระเงินสำหรับรายการนี้?')
+        if (!ok) return
+        try {
+            const { error } = await supabase.from('bookings').update({
+                payment_status: 'paid',
+                payment_verified_by: 'admin',
+                payment_verified_at: new Date().toISOString()
+            }).eq('id', bookingId)
+            if (error) throw error
+            setSelected((prev: any) => prev ? {
+                ...prev,
+                payment_status: 'paid',
+                payment_verified_by: 'admin',
+                payment_verified_at: new Date().toISOString()
+            } : null)
+            load()
+        } catch (e: any) {
+            alert('เกิดข้อผิดพลาด: ' + (e as any).message)
+        }
+    }
 
     const calcTotal = (b: any) => {
         // Prefer total_price from DB (stored as gross pre-discount by booking flow)
@@ -371,9 +393,16 @@ export default function AdminBookingsPage(props: any) {
                                 <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--brand-dominant)' }}>฿{calcTotal(b).toLocaleString()}</div>
                                 {/* Payment */}
                                 <div>
-                                    <span className={`badge ${b.payment_status === 'paid' ? 'badge-completed' : b.payment_status === 'refunded' ? 'badge-cancelled' : 'badge-pending'}`} style={{ fontSize: '0.72rem' }}>
-                                        {b.payment_status === 'paid' ? 'ชำระแล้ว' : b.payment_status === 'refunded' ? 'คืนเงิน' : 'รอชำระ'}
-                                    </span>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-start' }}>
+                                        <span className={`badge ${b.payment_status === 'paid' ? 'badge-completed' : b.payment_status === 'refunded' ? 'badge-cancelled' : 'badge-pending'}`} style={{ fontSize: '0.72rem' }}>
+                                            {b.payment_status === 'paid' ? 'ชำระแล้ว' : b.payment_status === 'refunded' ? 'คืนเงิน' : 'รอชำระ'}
+                                        </span>
+                                        {b.slip_url && (
+                                            <span style={{ fontSize: '0.68rem', color: b.payment_status === 'paid' ? 'var(--text-muted)' : 'var(--brand-dominant)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                <Paperclip size={11} /> มีสลิปแนบ
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                                 {/* Status */}
                                 <div>
@@ -550,17 +579,56 @@ export default function AdminBookingsPage(props: any) {
                                                 )}
                                             </SectionCard>
 
-                                            {/* Slip */}
-                                            {selected.slip_url && (
+                                            {/* Slip & Payment Approval */}
+                                            {selected.slip_url ? (
                                                 <SectionCard title="สลิปโอนเงิน" icon={<ImageIcon size={15} />}>
                                                     <img
                                                         src={selected.slip_url}
                                                         alt="slip"
-                                                        style={{ width: '100%', maxHeight: 260, objectFit: 'contain', borderRadius: 12, border: '1px solid var(--border)', cursor: 'zoom-in' }}
+                                                        style={{ width: '100%', maxHeight: 260, objectFit: 'contain', borderRadius: 12, border: '1px solid var(--border)', cursor: 'zoom-in', background: '#0F172A' }}
                                                         onClick={() => setZoomConfig({ images: [{ src: selected.slip_url, alt: `สลิป: ${selected.customers?.full_name}` }], initialIndex: 0 })}
                                                     />
+                                                    <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                        {selected.payment_status === 'paid' ? (
+                                                            <div style={{ padding: '8px 12px', background: '#ECFDF5', color: '#065F46', borderRadius: 8, fontSize: '0.82rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                                <CheckCircle size={16} color="#059669" /> ยืนยันยอดเงินแล้ว {selected.payment_verified_at ? `(${new Date(selected.payment_verified_at).toLocaleDateString('th-TH', { hour: '2-digit', minute: '2-digit' })})` : ''}
+                                                            </div>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => handleApprovePayment(selected.id)}
+                                                                style={{
+                                                                    padding: '10px 16px', borderRadius: 10,
+                                                                    background: 'linear-gradient(135deg, #10B981, #059669)',
+                                                                    color: '#fff', border: 'none', fontWeight: 700, fontSize: '0.88rem',
+                                                                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                                                                    boxShadow: '0 4px 12px rgba(16,185,129,0.3)',
+                                                                }}
+                                                            >
+                                                                <CheckCircle size={16} /> ยืนยันยอดเงิน (อนุมัติสลิป)
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </SectionCard>
-                                            )}
+                                            ) : selected.payment_status === 'pending' ? (
+                                                <SectionCard title="สถานะการชำระเงิน" icon={<CreditCard size={15} />}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                                            ยังไม่มีการแนบสลิป หรือเลือกชำระหน้างาน
+                                                        </div>
+                                                        <button
+                                                            onClick={() => handleApprovePayment(selected.id)}
+                                                            style={{
+                                                                padding: '8px 14px', borderRadius: 8,
+                                                                background: 'var(--surface-2)', border: '1px solid var(--border)',
+                                                                color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.82rem',
+                                                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                                                            }}
+                                                        >
+                                                            <CheckCircle size={14} color="var(--success)" /> บันทึกว่าชำระแล้ว (เงินสด/โอนตรง)
+                                                        </button>
+                                                    </div>
+                                                </SectionCard>
+                                            ) : null}
                                         </div>
 
                                         {/* RIGHT: Photos + Review */}
