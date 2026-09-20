@@ -2,14 +2,22 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { sendPhoneOtp, signInWithGoogle, isFirebaseConfigured } from '@/lib/firebase'
+import {
+    sendPhoneOtp,
+    signInWithGoogle,
+    loginWithEmail,
+    registerWithEmail,
+    isFirebaseConfigured
+} from '@/lib/firebase'
 import styles from './login.module.css'
 import Logo from '@/components/Branding/Logo'
-import { Phone, ArrowRight, ShieldCheck, RefreshCw, CheckCircle2 } from 'lucide-react'
+import { Phone, ArrowRight, ShieldCheck, RefreshCw, CheckCircle2, Mail, Lock, User } from 'lucide-react'
 
 const LIFF_ID = process.env.NEXT_PUBLIC_LINE_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID || ''
 
 type Phase = 'idle' | 'syncing' | 'otp_sent' | 'success' | 'error'
+type AuthTab = 'phone' | 'email'
+type EmailMode = 'login' | 'register'
 
 export default function LoginPage() {
     const router = useRouter()
@@ -19,6 +27,9 @@ export default function LoginPage() {
     const [errorMsg, setErrorMsg] = useState('')
     const [infoMsg, setInfoMsg] = useState('')
 
+    // Auth Tab ('phone' | 'email')
+    const [authTab, setAuthTab] = useState<AuthTab>('phone')
+
     // Phone Auth State
     const [phone, setPhone] = useState('')
     const [otpCode, setOtpCode] = useState('')
@@ -26,6 +37,13 @@ export default function LoginPage() {
     const [isSendingOtp, setIsSendingOtp] = useState(false)
     const [isVerifyingOtp, setIsVerifyingOtp] = useState(false)
     const [resendTimer, setResendTimer] = useState(0)
+
+    // Email Auth State
+    const [emailMode, setEmailMode] = useState<EmailMode>('login')
+    const [email, setEmail] = useState('')
+    const [password, setPassword] = useState('')
+    const [fullName, setFullName] = useState('')
+    const [isEmailSubmitting, setIsEmailSubmitting] = useState(false)
 
     // Environment detection
     const [isLineClient, setIsLineClient] = useState(false)
@@ -50,6 +68,7 @@ export default function LoginPage() {
             localStorage.setItem('liff_customer', JSON.stringify(data))
             if (data.line_user_id) localStorage.setItem('liff_line_user_id', data.line_user_id)
             if (data.phone) localStorage.setItem('customer_phone', data.phone)
+            if (data.email) localStorage.setItem('customer_email', data.email)
         }
         const branch = data?.last_branch_slug || localStorage.getItem('last_branch_slug')
         window.location.href = branch ? `/${branch}/menu` : '/search'
@@ -75,38 +94,28 @@ export default function LoginPage() {
         const branch = sp.get('branch')
         if (branch) localStorage.setItem('last_branch_slug', branch)
 
-        // Check if returning from Google OAuth (Supabase)
+        // Check if returning from Google OAuth (Supabase fallback)
         supabase.auth.getSession().then(async ({ data: { session } }) => {
             if (session?.user) {
                 setPhase('syncing')
                 const googleUser = session.user
-                const email = googleUser.email
-                const fullName = googleUser.user_metadata?.full_name || googleUser.user_metadata?.name || 'ลูกค้า Google'
+                const userEmail = googleUser.email
+                const userName = googleUser.user_metadata?.full_name || googleUser.user_metadata?.name || 'ลูกค้า Google'
 
-                // Check customer DB
-                const { data: matchedCust } = await supabase
-                    .from('customers')
-                    .select('*')
-                    .or(`google_id.eq.${googleUser.id},email.eq.${email}`)
-                    .maybeSingle()
-
-                if (matchedCust) {
-                    resolveAndRedirect(matchedCust)
-                } else {
-                    // Create customer linked to Google
-                    const res = await fetch('/api/auth/phone-session', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            phone: googleUser.phone || `G-${googleUser.id.slice(0, 8)}`,
-                            fullName,
-                            googleId: googleUser.id
-                        })
+                // Link or create customer record
+                const res = await fetch('/api/auth/phone-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        phone: googleUser.phone || '',
+                        email: userEmail || '',
+                        fullName: userName,
+                        googleId: googleUser.id
                     })
-                    const resData = await res.json()
-                    if (resData.customer) {
-                        resolveAndRedirect(resData.customer)
-                    }
+                })
+                const resData = await res.json()
+                if (resData.customer) {
+                    resolveAndRedirect(resData.customer)
                 }
             }
         })
@@ -167,7 +176,7 @@ export default function LoginPage() {
         }
     }
 
-    // ─── Phone OTP Authentication ───
+    // ─── 1. Phone OTP Authentication ───
     const handleRequestOtp = async (e: React.FormEvent) => {
         e.preventDefault()
         const clean = phone.replace(/\D/g, '')
@@ -207,7 +216,6 @@ export default function LoginPage() {
         setErrorMsg('')
 
         try {
-            // If live Firebase confirmation result
             if (confirmationResult && typeof confirmationResult.confirm === 'function') {
                 await confirmationResult.confirm(otpCode)
             } else if (confirmationResult?.mock && otpCode !== '123456') {
@@ -216,7 +224,6 @@ export default function LoginPage() {
 
             setPhase('syncing')
 
-            // Call universal account linking API
             const res = await fetch('/api/auth/phone-session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -241,7 +248,70 @@ export default function LoginPage() {
         }
     }
 
-    // ─── Google Sign-In ───
+    // ─── 2. Email & Password Authentication ───
+    const handleEmailSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        const cleanEmail = email.trim().toLowerCase()
+        if (!cleanEmail || !password) {
+            setErrorMsg('กรุณากรอกอีเมลและรหัสผ่านให้ครบถ้วน')
+            return
+        }
+        if (password.length < 6) {
+            setErrorMsg('รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร')
+            return
+        }
+
+        setIsEmailSubmitting(true)
+        setErrorMsg('')
+        setInfoMsg('')
+
+        try {
+            if (emailMode === 'login') {
+                await loginWithEmail(cleanEmail, password)
+            } else {
+                await registerWithEmail(cleanEmail, password)
+            }
+
+            setPhase('syncing')
+
+            const res = await fetch('/api/auth/phone-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: cleanEmail,
+                    fullName: fullName.trim() || undefined
+                })
+            })
+
+            const json = await res.json()
+            if (!res.ok || !json.customer) {
+                throw new Error(json.error || 'ไม่สามารถสร้างเซสชันการใช้งานได้')
+            }
+
+            setPhase('success')
+            setTimeout(() => {
+                resolveAndRedirect(json.customer)
+            }, 600)
+        } catch (err: any) {
+            console.error('[Email Auth] error:', err)
+            let msg = err.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วยอีเมล'
+            if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+                msg = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
+            } else if (err.code === 'auth/email-already-in-use') {
+                msg = 'อีเมลนี้ถูกใช้งานแล้ว กรุณาเลือก "เข้าสู่ระบบ"'
+            } else if (err.code === 'auth/invalid-email') {
+                msg = 'รูปแบบอีเมลไม่ถูกต้อง'
+            } else if (err.code === 'auth/weak-password') {
+                msg = 'รหัสผ่านต้องมีความปลอดภัยมากกว่านี้ (อย่างน้อย 6 ตัวอักษร)'
+            }
+            setErrorMsg(msg)
+            setPhase('idle')
+        } finally {
+            setIsEmailSubmitting(false)
+        }
+    }
+
+    // ─── 3. Google Sign-In ───
     const handleGoogleLogin = async () => {
         setErrorMsg('')
         setPhase('syncing')
@@ -254,19 +324,23 @@ export default function LoginPage() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        phone: googleUser.phoneNumber || `G-${googleUser.uid.slice(0, 8)}`,
+                        phone: googleUser.phoneNumber || '',
+                        email: googleUser.email || '',
                         fullName: googleUser.displayName || 'ลูกค้า Google',
                         googleId: googleUser.uid
                     })
                 })
                 const resData = await res.json()
                 if (resData.customer) {
-                    resolveAndRedirect(resData.customer)
+                    setPhase('success')
+                    setTimeout(() => {
+                        resolveAndRedirect(resData.customer)
+                    }, 600)
                     return
                 }
             }
 
-            // Supabase fallback
+            // Supabase OAuth fallback
             const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
@@ -345,89 +419,201 @@ export default function LoginPage() {
                                 </p>
                             </div>
                         ) : (
-                            /* CASE 2: OUTSIDE LINE (Safari, Chrome, iOS PWA, Android, Web) — ZERO-COST PHONE OTP + GOOGLE */
+                            /* CASE 2: GOOGLE + PHONE OTP + EMAIL/PASSWORD */
                             <div>
-                                {phase !== 'otp_sent' ? (
-                                    <form onSubmit={handleRequestOtp}>
-                                        <label className={styles.inputLabel}>
-                                            <Phone size={16} color="var(--primary)" /> หมายเลขโทรศัพท์
-                                        </label>
-                                        <div className={styles.phoneInputWrapper}>
-                                            <div className={styles.countryCode}>
-                                                <span>🇹🇭</span> +66
+                                {/* Method Tabs */}
+                                <div className={styles.tabGroup}>
+                                    <button
+                                        type="button"
+                                        className={`${styles.tabBtn} ${authTab === 'phone' ? styles.tabBtnActive : ''}`}
+                                        onClick={() => { setAuthTab('phone'); setErrorMsg(''); setInfoMsg(''); }}
+                                    >
+                                        <Phone size={15} /> เบอร์โทร (SMS)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`${styles.tabBtn} ${authTab === 'email' ? styles.tabBtnActive : ''}`}
+                                        onClick={() => { setAuthTab('email'); setErrorMsg(''); setInfoMsg(''); }}
+                                    >
+                                        <Mail size={15} /> อีเมล & รหัสผ่าน
+                                    </button>
+                                </div>
+
+                                {/* TAB 1: PHONE OTP */}
+                                {authTab === 'phone' && (
+                                    phase !== 'otp_sent' ? (
+                                        <form onSubmit={handleRequestOtp}>
+                                            <label className={styles.inputLabel}>
+                                                <Phone size={16} color="var(--primary)" /> หมายเลขโทรศัพท์
+                                            </label>
+                                            <div className={styles.phoneInputWrapper}>
+                                                <div className={styles.countryCode}>
+                                                    <span>🇹🇭</span> +66
+                                                </div>
+                                                <input
+                                                    type="tel"
+                                                    className={styles.phoneInput}
+                                                    placeholder="081-234-5678"
+                                                    value={phone}
+                                                    onChange={e => setPhone(e.target.value)}
+                                                    autoFocus
+                                                    required
+                                                />
                                             </div>
+
+                                            <button
+                                                type="submit"
+                                                className={styles.actionBtn}
+                                                style={{ marginTop: 16 }}
+                                                disabled={isSendingOtp || !phone.trim()}
+                                            >
+                                                {isSendingOtp ? <span className="spinner" /> : (
+                                                    <>ขอรหัส OTP ทาง SMS <ArrowRight size={18} /></>
+                                                )}
+                                            </button>
+                                        </form>
+                                    ) : (
+                                        <form onSubmit={handleVerifyOtp}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                                <label className={styles.inputLabel} style={{ marginBottom: 0 }}>
+                                                    <ShieldCheck size={16} color="var(--primary)" /> รหัสยืนยัน OTP (6 หลัก)
+                                                </label>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setPhase('idle'); setOtpCode('') }}
+                                                    style={{ border: 'none', background: 'transparent', color: 'var(--primary)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}
+                                                >
+                                                    เปลี่ยนเบอร์
+                                                </button>
+                                            </div>
+
                                             <input
-                                                type="tel"
-                                                className={styles.phoneInput}
-                                                placeholder="081-234-5678"
-                                                value={phone}
-                                                onChange={e => setPhone(e.target.value)}
+                                                type="text"
+                                                inputMode="numeric"
+                                                maxLength={6}
+                                                className={styles.otpInput}
+                                                placeholder="------"
+                                                value={otpCode}
+                                                onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))}
                                                 autoFocus
                                                 required
                                             />
+
+                                            <button
+                                                type="submit"
+                                                className={styles.actionBtn}
+                                                style={{ marginTop: 16 }}
+                                                disabled={isVerifyingOtp || otpCode.length !== 6}
+                                            >
+                                                {isVerifyingOtp ? <span className="spinner" /> : 'ยืนยันรหัส OTP'}
+                                            </button>
+
+                                            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 14 }}>
+                                                <button
+                                                    type="button"
+                                                    disabled={resendTimer > 0 || isSendingOtp}
+                                                    onClick={handleRequestOtp}
+                                                    style={{
+                                                        border: 'none', background: 'transparent',
+                                                        color: resendTimer > 0 ? 'var(--text-muted)' : 'var(--text-secondary)',
+                                                        fontSize: '0.8rem', fontWeight: 600, cursor: resendTimer > 0 ? 'not-allowed' : 'pointer',
+                                                        display: 'flex', alignItems: 'center', gap: 6
+                                                    }}
+                                                >
+                                                    <RefreshCw size={13} /> {resendTimer > 0 ? `ขอรหัสใหม่ใน (${resendTimer}s)` : 'ส่งรหัส OTP ใหม่อีกครั้ง'}
+                                                </button>
+                                            </div>
+                                        </form>
+                                    )
+                                )}
+
+                                {/* TAB 2: EMAIL & PASSWORD */}
+                                {authTab === 'email' && (
+                                    <form onSubmit={handleEmailSubmit}>
+                                        {emailMode === 'register' && (
+                                            <div style={{ marginBottom: 12 }}>
+                                                <label className={styles.inputLabel}>
+                                                    <User size={16} color="var(--primary)" /> ชื่อ-นามสกุล
+                                                </label>
+                                                <div className={styles.textInputWrapper}>
+                                                    <input
+                                                        type="text"
+                                                        className={styles.textInput}
+                                                        placeholder="ชื่อผู้ใช้งานของคุณ"
+                                                        value={fullName}
+                                                        onChange={e => setFullName(e.target.value)}
+                                                        required
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div style={{ marginBottom: 12 }}>
+                                            <label className={styles.inputLabel}>
+                                                <Mail size={16} color="var(--primary)" /> อีเมล
+                                            </label>
+                                            <div className={styles.textInputWrapper}>
+                                                <input
+                                                    type="email"
+                                                    className={styles.textInput}
+                                                    placeholder="example@mail.com"
+                                                    value={email}
+                                                    onChange={e => setEmail(e.target.value)}
+                                                    required
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div style={{ marginBottom: 16 }}>
+                                            <label className={styles.inputLabel}>
+                                                <Lock size={16} color="var(--primary)" /> รหัสผ่าน
+                                            </label>
+                                            <div className={styles.textInputWrapper}>
+                                                <input
+                                                    type="password"
+                                                    className={styles.textInput}
+                                                    placeholder="•••••••• (อย่างน้อย 6 ตัวอักษร)"
+                                                    value={password}
+                                                    onChange={e => setPassword(e.target.value)}
+                                                    required
+                                                />
+                                            </div>
                                         </div>
 
                                         <button
                                             type="submit"
                                             className={styles.actionBtn}
-                                            style={{ marginTop: 16 }}
-                                            disabled={isSendingOtp || !phone.trim()}
+                                            disabled={isEmailSubmitting || !email.trim() || !password.trim()}
                                         >
-                                            {isSendingOtp ? <span className="spinner" /> : (
-                                                <>ขอรหัส OTP ทาง SMS <ArrowRight size={18} /></>
+                                            {isEmailSubmitting ? <span className="spinner" /> : (
+                                                emailMode === 'login' ? 'เข้าสู่ระบบด้วยอีเมล' : 'สมัครสมาชิกใหม่'
                                             )}
                                         </button>
-                                    </form>
-                                ) : (
-                                    <form onSubmit={handleVerifyOtp}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                            <label className={styles.inputLabel} style={{ marginBottom: 0 }}>
-                                                <ShieldCheck size={16} color="var(--primary)" /> รหัสยืนยัน OTP (6 หลัก)
-                                            </label>
-                                            <button
-                                                type="button"
-                                                onClick={() => { setPhase('idle'); setOtpCode('') }}
-                                                style={{ border: 'none', background: 'transparent', color: 'var(--primary)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}
-                                            >
-                                                เปลี่ยนเบอร์
-                                            </button>
-                                        </div>
 
-                                        <input
-                                            type="text"
-                                            inputMode="numeric"
-                                            maxLength={6}
-                                            className={styles.otpInput}
-                                            placeholder="------"
-                                            value={otpCode}
-                                            onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                                            autoFocus
-                                            required
-                                        />
-
-                                        <button
-                                            type="submit"
-                                            className={styles.actionBtn}
-                                            style={{ marginTop: 16 }}
-                                            disabled={isVerifyingOtp || otpCode.length !== 6}
-                                        >
-                                            {isVerifyingOtp ? <span className="spinner" /> : 'ยืนยันรหัส OTP'}
-                                        </button>
-
-                                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 14 }}>
-                                            <button
-                                                type="button"
-                                                disabled={resendTimer > 0 || isSendingOtp}
-                                                onClick={handleRequestOtp}
-                                                style={{
-                                                    border: 'none', background: 'transparent',
-                                                    color: resendTimer > 0 ? 'var(--text-muted)' : 'var(--text-secondary)',
-                                                    fontSize: '0.8rem', fontWeight: 600, cursor: resendTimer > 0 ? 'not-allowed' : 'pointer',
-                                                    display: 'flex', alignItems: 'center', gap: 6
-                                                }}
-                                            >
-                                                <RefreshCw size={13} /> {resendTimer > 0 ? `ขอรหัสใหม่ใน (${resendTimer}s)` : 'ส่งรหัส OTP ใหม่อีกครั้ง'}
-                                            </button>
+                                        <div className={styles.toggleSubText}>
+                                            {emailMode === 'login' ? (
+                                                <>
+                                                    ยังไม่มีบัญชีผู้ใช้งาน?
+                                                    <button
+                                                        type="button"
+                                                        className={styles.toggleSubBtn}
+                                                        onClick={() => { setEmailMode('register'); setErrorMsg(''); }}
+                                                    >
+                                                        สมัครสมาชิกที่นี่
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    มีบัญชีอยู่แล้ว?
+                                                    <button
+                                                        type="button"
+                                                        className={styles.toggleSubBtn}
+                                                        onClick={() => { setEmailMode('login'); setErrorMsg(''); }}
+                                                    >
+                                                        เข้าสู่ระบบ
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
                                     </form>
                                 )}

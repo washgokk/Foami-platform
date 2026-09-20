@@ -46,12 +46,12 @@ export default function ShopAdminLoginPage() {
                 <div className={styles.logoWrapper}>
                     <Logo width={160} />
                 </div>
-                <h1 className={styles.title}>Shop Admin Portal</h1>
+                <h1 className={styles.title}>เข้าสู่ระบบร้านค้า</h1>
                 <p className={styles.sub} style={{ marginBottom: 4 }}>สาขา: <strong style={{ color: 'var(--brand-dominant)' }}>{branchSlug.toUpperCase()}</strong></p>
 
                 <form onSubmit={handleLogin} className={styles.form}>
                     <div className="form-group">
-                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>อีเมล</label>
+                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem' }}>อีเมลร้านค้า</label>
                         <input
                             type="email"
                             className="form-input"

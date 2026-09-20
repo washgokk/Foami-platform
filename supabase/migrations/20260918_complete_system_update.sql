@@ -21,15 +21,20 @@ EXCEPTION
     WHEN OTHERS THEN NULL;
 END $$;
 
--- 1.2 เพิ่มคอลัมน์ google_id และ auth_provider
+-- 1.2 เพิ่มคอลัมน์ email, google_id และ auth_provider
 ALTER TABLE public.customers
+    ADD COLUMN IF NOT EXISTS email TEXT,
     ADD COLUMN IF NOT EXISTS google_id TEXT,
     ADD COLUMN IF NOT EXISTS auth_provider TEXT DEFAULT 'phone';
 
--- 1.3 สร้าง Unique Index สำหรับ phone (เฉพาะเบอร์ที่ไม่ว่าง) เพื่อใช้เป็น Universal Key
+-- 1.3 สร้าง Unique Index สำหรับ phone และ index สำหรับ email
 CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_phone_unique 
     ON public.customers(phone) 
     WHERE phone IS NOT NULL AND phone != '';
+
+CREATE INDEX IF NOT EXISTS idx_customers_email 
+    ON public.customers(email) 
+    WHERE email IS NOT NULL AND email != '';
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2. ปรับปรุงตาราง bookings (การจอง)

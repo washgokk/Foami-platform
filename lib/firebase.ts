@@ -1,10 +1,13 @@
-import { initializeApp, getApps, getApp } from 'firebase/app'
+import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app'
 import {
     getAuth,
     RecaptchaVerifier,
     signInWithPhoneNumber,
     GoogleAuthProvider,
     signInWithPopup,
+    signInWithEmailAndPassword,
+    createUserWithEmailAndPassword,
+    type Auth,
     type ConfirmationResult
 } from 'firebase/auth'
 
@@ -21,24 +24,51 @@ export const isFirebaseConfigured = () => {
     return !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY && !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
 }
 
-// Singleton app init
-export const app = getApps().length > 0 ? getApp() : (isFirebaseConfigured() ? initializeApp(firebaseConfig) : null)
-export const auth = app ? getAuth(app) : null
-
-if (auth) {
-    auth.useDeviceLanguage()
+// Safe app getter
+export function getFirebaseApp(): FirebaseApp | null {
+    if (getApps().length > 0) return getApp()
+    if (isFirebaseConfigured()) {
+        try {
+            return initializeApp(firebaseConfig)
+        } catch (e) {
+            console.error('[Firebase] Init error:', e)
+            return null
+        }
+    }
+    return null
 }
+
+// Safe auth getter
+export function getFirebaseAuth(): Auth | null {
+    const appInstance = getFirebaseApp()
+    if (!appInstance) return null
+    try {
+        const authInstance = getAuth(appInstance)
+        authInstance.useDeviceLanguage()
+        return authInstance
+    } catch (e) {
+        console.error('[Firebase Auth] GetAuth error:', e)
+        return null
+    }
+}
+
+// Backward-compatible exports
+export const app = typeof window !== 'undefined' ? getFirebaseApp() : null
+export const auth = typeof window !== 'undefined' ? getFirebaseAuth() : null
 
 /**
  * Setup RecaptchaVerifier for Phone OTP verification
  */
 export function setupRecaptcha(containerId: string = 'recaptcha-container') {
-    if (typeof window === 'undefined' || !auth) return null
+    if (typeof window === 'undefined') return null
+    const authInstance = getFirebaseAuth()
+    if (!authInstance) return null
+
     try {
         if ((window as any).recaptchaVerifier) {
             return (window as any).recaptchaVerifier
         }
-        const verifier = new RecaptchaVerifier(auth, containerId, {
+        const verifier = new RecaptchaVerifier(authInstance, containerId, {
             size: 'invisible',
             callback: () => {
                 // reCAPTCHA solved
@@ -68,8 +98,10 @@ export async function sendPhoneOtp(rawPhone: string, containerId: string = 'reca
         e164 = `+${cleanDigits}`
     }
 
+    const authInstance = getFirebaseAuth()
+
     // Fallback/Mock mode if Firebase env is not configured
-    if (!isFirebaseConfigured() || !auth) {
+    if (!isFirebaseConfigured() || !authInstance) {
         console.warn('[Firebase Auth] Firebase keys not detected. Running in Dev/Mock mode. Use OTP: 123456')
         return { mock: true, phone: e164 }
     }
@@ -79,16 +111,41 @@ export async function sendPhoneOtp(rawPhone: string, containerId: string = 'reca
         throw new Error('ไม่สามารถเตรียมระบบความปลอดภัย reCAPTCHA ได้')
     }
 
-    return await signInWithPhoneNumber(auth, e164, appVerifier)
+    return await signInWithPhoneNumber(authInstance, e164, appVerifier)
 }
 
 /**
  * Sign in with Google (Client SDK)
  */
 export async function signInWithGoogle() {
-    if (!isFirebaseConfigured() || !auth) {
+    const authInstance = getFirebaseAuth()
+    if (!isFirebaseConfigured() || !authInstance) {
         throw new Error('Firebase credentials are not configured in .env.local')
     }
     const provider = new GoogleAuthProvider()
-    return await signInWithPopup(auth, provider)
+    return await signInWithPopup(authInstance, provider)
+}
+
+/**
+ * Sign in with Email & Password
+ */
+export async function loginWithEmail(email: string, pass: string) {
+    const authInstance = getFirebaseAuth()
+    if (!isFirebaseConfigured() || !authInstance) {
+        console.warn('[Firebase Auth] Running in Mock mode for email login')
+        return { user: { email, uid: `mock_email_${Date.now()}` } }
+    }
+    return await signInWithEmailAndPassword(authInstance, email, pass)
+}
+
+/**
+ * Create user with Email & Password
+ */
+export async function registerWithEmail(email: string, pass: string) {
+    const authInstance = getFirebaseAuth()
+    if (!isFirebaseConfigured() || !authInstance) {
+        console.warn('[Firebase Auth] Running in Mock mode for email register')
+        return { user: { email, uid: `mock_email_${Date.now()}` } }
+    }
+    return await createUserWithEmailAndPassword(authInstance, email, pass)
 }

@@ -11,11 +11,12 @@ export async function POST(req: Request) {
     try {
         const body = await req.json()
         const rawPhone = body.phone || ''
+        const email = (body.email || '').trim().toLowerCase()
         const fullName = body.fullName || ''
         const googleId = body.googleId || null
 
-        if (!rawPhone) {
-            return NextResponse.json({ error: 'กรุณาระบุหมายเลขโทรศัพท์' }, { status: 400 })
+        if (!rawPhone && !email) {
+            return NextResponse.json({ error: 'กรุณาระบุหมายเลขโทรศัพท์หรืออีเมล' }, { status: 400 })
         }
 
         // Clean digits
@@ -31,11 +32,20 @@ export async function POST(req: Request) {
             e164Format = `+66${digits.slice(1)}`
         }
 
-        // 1. Check if customer exists with this phone number (Universal Key Matching)
-        const { data: existingCustomers, error: searchError } = await supabaseAdmin
-            .from('customers')
-            .select('*')
-            .or(`phone.eq.${localFormat},phone.eq.${e164Format},phone.eq.${digits}`)
+        // 1. Check if customer exists by google_id, email, or phone (Universal Key Matching)
+        const orConditions: string[] = []
+        if (googleId) orConditions.push(`google_id.eq.${googleId}`)
+        if (email) orConditions.push(`email.eq.${email}`)
+        if (digits) {
+            orConditions.push(`phone.eq.${localFormat}`, `phone.eq.${e164Format}`, `phone.eq.${digits}`)
+        }
+
+        let query = supabaseAdmin.from('customers').select('*')
+        if (orConditions.length > 0) {
+            query = query.or(orConditions.join(','))
+        }
+
+        const { data: existingCustomers, error: searchError } = await query
             .order('created_at', { ascending: false })
             .limit(1)
 
@@ -46,13 +56,17 @@ export async function POST(req: Request) {
         let customer = existingCustomers?.[0]
 
         if (customer) {
-            // Customer exists! Update auth_provider or google_id if newly provided
-            if (googleId && !customer.google_id) {
-                await supabaseAdmin
-                    .from('customers')
-                    .update({ google_id: googleId, auth_provider: 'google' })
-                    .eq('id', customer.id)
-                customer.google_id = googleId
+            // Customer exists! Update missing credentials if newly provided
+            const updates: any = {}
+            if (googleId && !customer.google_id) updates.google_id = googleId
+            if (email && !customer.email) updates.email = email
+            if (localFormat && !customer.phone) updates.phone = localFormat
+            if (fullName && (!customer.full_name || customer.full_name.startsWith('ลูกค้า '))) {
+                updates.full_name = fullName
+            }
+            if (Object.keys(updates).length > 0) {
+                await supabaseAdmin.from('customers').update(updates).eq('id', customer.id)
+                customer = { ...customer, ...updates }
             }
             return NextResponse.json({
                 success: true,
@@ -65,9 +79,10 @@ export async function POST(req: Request) {
         const newCustomerId = generateScalableId('CU')
         const newCustomerData = {
             id: newCustomerId,
-            phone: localFormat,
-            full_name: fullName.trim() || `ลูกค้า ${localFormat.slice(-4)}`,
-            auth_provider: googleId ? 'google' : 'phone',
+            phone: localFormat || null,
+            email: email || null,
+            full_name: fullName.trim() || (email ? email.split('@')[0] : `ลูกค้า ${localFormat.slice(-4)}`),
+            auth_provider: googleId ? 'google' : (email ? 'email' : 'phone'),
             google_id: googleId,
             line_user_id: null,
             saved_vehicles: [],
