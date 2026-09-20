@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase'
 
 const supabaseAdmin = createServiceClient()
 
-export const DEFAULT_PACKAGES = {
+const DEFAULT_PACKAGES = {
   starter: {
     id: 'starter',
     name: 'Starter Plan',
