@@ -286,7 +286,7 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, onOp
       const pricePinIcon = L.divIcon({
         className: 'foami-marker-pin',
         html: `
-          <div class="foami-pin-card-wrapper" style="
+          <div id="pin-shop-${shop.id}" class="foami-pin-card-wrapper" style="
             position: absolute;
             bottom: 0;
             left: 50%;
@@ -311,9 +311,10 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, onOp
               gap: 8px;
               white-space: nowrap;
               user-select: none;
+              cursor: pointer;
             ">
               ${logoHtml}
-              <div style="display: flex; flex-direction: column; text-align: left; line-height: 1.2;">
+              <div style="display: flex; flex-direction: column; text-align: left; line-height: 1.2; pointer-events: none;">
                 <div style="display: flex; align-items: center; gap: 5px;">
                   <span style="font-size: 11.5px; font-weight: 700; color: ${isSelected ? '#FFFFFF' : '#0F172A'}; max-width: 125px; overflow: hidden; text-overflow: ellipsis;">
                     ${shop.shop_name}
@@ -336,6 +337,7 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, onOp
               border-right: 6px solid transparent;
               border-top: 7px solid ${isSelected ? '#1E3A8A' : '#315EC3'};
               margin-top: -1px;
+              pointer-events: none;
             "></div>
           </div>
         `,
@@ -346,9 +348,9 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, onOp
       const marker = L.marker([shop.lat, shop.lng], { icon: pricePinIcon, riseOnHover: true })
         .addTo(markersGroupRef.current)
 
-      // Bind Leaflet Popup with customized styling
+      // Bind Leaflet Popup with customized styling sitting cleanly above the pin
       const popup = L.popup({
-        offset: [0, -32],
+        offset: [0, -48],
         className: 'foami-leaflet-popup',
         closeButton: true,
         autoPan: true,
@@ -373,14 +375,34 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, onOp
         }
       })
 
-      // When marker is clicked: notify parent and open popup!
-      marker.on('click', (e: any) => {
-        if (e && e.originalEvent) {
-          e.originalEvent.stopPropagation()
+      const handleTriggerShop = (e?: any) => {
+        if (e) {
+          if (e.stopPropagation) e.stopPropagation()
+          if (e.originalEvent && e.originalEvent.stopPropagation) {
+            e.originalEvent.stopPropagation()
+          }
         }
         onSelectShopRef.current(shop)
+        if (typeof window !== 'undefined' && window.innerWidth < 1024 && onOpenDrawerRef.current) {
+          onOpenDrawerRef.current(shop)
+        }
         marker.openPopup()
-      })
+      }
+
+      // Marker Leaflet event listener
+      marker.on('click', handleTriggerShop)
+
+      // Direct DOM event listener with disableClickPropagation to prevent map click cancel
+      setTimeout(() => {
+        const pinEl = document.getElementById(`pin-shop-${shop.id}`)
+        if (pinEl) {
+          L.DomEvent.disableClickPropagation(pinEl)
+          L.DomEvent.disableScrollPropagation(pinEl)
+          pinEl.style.cursor = 'pointer'
+          pinEl.onclick = handleTriggerShop
+          pinEl.ontouchend = handleTriggerShop
+        }
+      }, 50)
 
       markersMapRef.current[shop.id] = marker
       bounds.extend([shop.lat, shop.lng])
@@ -405,6 +427,18 @@ export default function MarketplaceMap({ shops, selectedShop, onSelectShop, onOp
           0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
           70% { box-shadow: 0 0 0 14px rgba(34, 197, 94, 0); }
           100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+
+        .foami-marker-pin {
+          overflow: visible !important;
+          pointer-events: auto !important;
+          cursor: pointer !important;
+          background: transparent !important;
+          border: none !important;
+        }
+
+        .foami-marker-pin * {
+          cursor: pointer !important;
         }
 
         /* Marker hover effect on inner card only to protect Leaflet's translate3d coords */
