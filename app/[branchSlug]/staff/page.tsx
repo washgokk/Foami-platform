@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 
-export default function StaffPage({ params }: { params: { branchSlug: string } }) {
-  redirect(`/${params.branchSlug}/staff/dashboard`)
+export default async function StaffPage({ params }: { params: Promise<{ branchSlug: string }> }) {
+  const { branchSlug } = await params
+  redirect(`/${branchSlug}/staff/dashboard`)
 }
